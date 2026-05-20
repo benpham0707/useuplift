@@ -139,6 +139,14 @@ export default defineConfig({
       // (fail-fast vs truncation-tolerant) behave per design. Zero LLM cost.
       // Design: docs/pipeline-evolution/04-pipeline-architecture/L4/COMPOSITE_CALL_DESIGN.md
       'tests/unit/l4-composite.test.ts',
+      // Phase 3 (2026-05-20) — L4 unified-cache (C7 fix) prompt + cache-
+      // structure tests. Validates the shared system prompt is byte-identical
+      // across mode A/B/C invocations (so the Anthropic prefix cache fires
+      // on calls 2+3), each mode's contract is preserved, the shared user-
+      // prompt prefix is stable, and the per-mode tails carry the right
+      // dynamic context with compact JSON. Zero LLM cost.
+      // Design: docs/pipeline-evolution/04-pipeline-architecture/L4/L4_CACHE_UNIFICATION_DESIGN.md
+      'tests/unit/l4-unified-cache.test.ts',
     ],
     // Node environment — these are unit tests of business logic, not
     // browser components.

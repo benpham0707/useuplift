@@ -4,9 +4,9 @@
 >
 > **This is a current-status descendant of [`UNIFIED_PLAN_HOLD_2026_05_10.md`](./UNIFIED_PLAN_HOLD_2026_05_10.md)** — the planning rationale lives there. This doc captures *what's live now* and *what's queued next*.
 
-**Last updated**: 2026-05-19 (Phase 3 composite-call code complete, awaiting verification spend).
+**Last updated**: 2026-05-20 (Phase 3 unified-cache (C7) code complete; composite superseded but dormant).
 **Branch**: `fix/warm-edit-completedalllayers`.
-**HEAD**: post-Phase-0a + L5 ranker + Phase 2 wire + Phase 3 composite (behind flag, not yet verified).
+**HEAD**: post-Phase-0a + L5 ranker + Phase 2 wire + Phase 3 unified-cache (behind flag, awaiting verification).
 
 ---
 
@@ -18,7 +18,7 @@
 | **Cost target (v2, locked D1)** | $0.85 cold-start / ~$1.20 lifecycle (1 cold + 3 focused) |
 | **Annotation density (locked 2026-05-12)** | **20-30 L5Annotation per essay**, with ~250-375 tokens per annotation (depth > breadth). Carry-forward via `priorAnnotations` builder handles iteration N≥2 progression — NOT a per-call density backfill. |
 | **Active execution plan** | 8-phase unified — Phase 0a/0b/1 shipped; Phase 2 next |
-| **Test baseline** | 719 passed / 5 skipped (was 688/5; +31 for L4 composite prompt + parsing) |
+| **Test baseline** | 749 passed / 5 skipped (was 719/5; +30 for L4 unified-cache prompt + structure invariants) |
 | **Workstreams** | 04 active. 01 dissolved-into-04. 02 + 03 superseded by L5 doc-set. |
 
 ## Locked design decisions (binding constraints for all phases)
@@ -56,7 +56,7 @@ Phase 6 verification regen quality checks:
 | **0b** Doc regeneration | This doc rewrite + matrix update + 4 supersession marks + L5 index priorAnnotations row | **in progress (this commit)** |
 | **1** Bridge cost cuts | Cuts A/B/D/E/F/G + render R1-R9 + Phase A1 cost-ledger split. **Cut C and S3 R1 dropped per D2** (reshape L3.75 internals being deleted in Phase 7). Projected $1.69 → $1.42 | not started |
 | **2** Assembler convergence | Wire `presentation/renderAnalysisForStudent.ts` to production render path; spec composition contract for Phase 4 merger. $0 cost. **SHIPPED 2026-05-14** — `tests/dump-full-profile.ts` now invokes the renderer alongside the analytical dump, writes `<essay>-student.json` + `<essay>-student.md` per regen. Composition contract: `04-pipeline-architecture/L3-75/COMPOSITION_CONTRACT.md`. Open call: L5-surface persistence on profile (option 1 recommended). | shipped |
-| **3** L4 collapse | S3 R2 — collapse `crystallizer.ts` 3 sub-calls (NorthStar/ScoreMatrix/L4b) into 1 composite call; resolves C2 cache-defeat. $1.42 → ~$1.20. **CODE COMPLETE 2026-05-19** behind `L4_COMPOSITE_CALL=true` flag; default off. 31 unit tests passing (prompt markers, runtime context render, parse paths). Awaiting Tue approval for single Crochet verification run. Design: `04-pipeline-architecture/L4/COMPOSITE_CALL_DESIGN.md`. | code complete; verification pending |
+| **3** L4 cache unification (C7 fix) | Keep 3 focused calls, unify the system prompt + cache the stable shared user-prompt prefix. Resolves C2 cache-defeat at its root. $1.54 → ~$1.40 (~$0.13-$0.16 save, zero quality risk). **CODE COMPLETE 2026-05-20** behind `L4_UNIFIED_CACHE=true`; default off. 30 unit tests passing (system prompt byte-identical across modes, mode contracts preserved, cache-structure invariants). Composite collapse (the original Phase 3 design) is superseded and dormant behind `L4_COMPOSITE_CALL=true`. Awaiting Tue approval for single Crochet verification run. Design: `04-pipeline-architecture/L4/L4_CACHE_UNIFICATION_DESIGN.md`. | code complete; verification pending |
 | **4** Composition layer + parity gate | Build `compositionLayer.ts` per `L3-75/FIELD_DISPOSITION_TABLE.md` (16 pure functions, calibration block by EssayType); MERGE with `renderAnalysisForStudent.ts`. Snapshot parity gate against persisted Crochet + Three Days dumps. $0 cost. | not started |
 | **5** Lens + residue prompts | L3 lens prompts (Voice/Story/Meaning/Admissions); residue call (4 fields); L3.5 schema additions (contradictionFlags + essayStrengthSignatures); L4b ImprovementManifest extension; F1 fix (`profileRouter.ts:783, 809`). $0 dry-run. **L5 Top-N ranker prerequisite SHIPPED 2026-05-14** — `rankAndSurfaceAnnotations()` at `deepAnnotationService.ts`, surfaces 20-30 from full pool, ≥3 mode diversity floor, per-paragraph ACTION+rewrite floor; design at `04-pipeline-architecture/L5/L5_TOPN_RANKER_DESIGN.md`. | not started (ranker landed early) |
 | **6** Bundled verification regen | ONE Crochet dump regen (~$1.20 estimated). REQUIRES TUE APPROVAL per cost-budget. Quality review checkpoint. | not started |

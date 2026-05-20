@@ -1,4 +1,14 @@
-# L4 Composite Call — Design
+# L4 Composite Call — Design (SUPERSEDED 2026-05-20 by L4_CACHE_UNIFICATION_DESIGN.md)
+
+> ⚠️ **SUPERSEDED 2026-05-20** — the production Phase 3 path is the unified-cache approach (`L4_CACHE_UNIFICATION_DESIGN.md`), not the composite collapse described here. The composite saves more $ (~$0.22 vs ~$0.15) but at non-zero quality risk: mid-call calibration loss, attention dilution, and weakening of the W3.3 anti-clustering protocol's forced-ranking step. Tue's call: quality risk outweighs the extra $0.07.
+>
+> The composite code stays in `crystallizer.ts` behind `L4_COMPOSITE_CALL=true` (default off) as a dormant fallback — useful if Phase 7's parity gate or a later quality bet flushes out a different architecture that wants this primitive.
+>
+> The rest of this document is preserved as the original design + verification plan for the composite. Do not build against it without first re-reading the unified-cache design and confirming with Tue that the quality risk is acceptable.
+
+---
+
+# L4 Composite Call — Design (original)
 
 > **Status**: design under review. NO LLM spend yet. Implementation lands behind a feature flag (`L4_COMPOSITE_CALL=true`) — default off. Verification spend gated on Tue approval per cost-budget memory.
 >
