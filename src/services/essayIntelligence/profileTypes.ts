@@ -4959,8 +4959,6 @@ export interface EditUnderstandingOutput {
   understanding: EditUnderstanding;
   /** Pre-computed staleness effects based on the edit */
   stalenessEffects: StalenessEffect[];
-  /** Whether this edit triggered from focused or comprehensive analysis */
-  analysisMode: 'focused' | 'comprehensive';
 }
 
 // ─── L5 Annotation Types ────────────────────────────────────────────────────

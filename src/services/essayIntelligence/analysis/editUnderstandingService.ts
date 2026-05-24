@@ -902,37 +902,6 @@ function computeStalenessEffects(
 }
 
 // ============================================================================
-// ANALYSIS MODE SELECTION
-// ============================================================================
-
-/**
- * Select analysis mode based on diff characteristics and significance.
- * This is a heuristic — the Sonnet scope recommendation takes precedence for
- * understanding, but mode determines whether re-analysis is comprehensive or focused.
- *
- * TODO(M1): This function's output is placed on EditUnderstandingOutput.analysisMode,
- * but NO downstream consumer reads that field. The reanalysisOrchestrator uses
- * FocusedAnalyzer.selectAnalysisMode() instead (a separate, more sophisticated
- * implementation that also considers the profile state). This function should be
- * wired into the focused analysis mode selection pipeline so the edit understanding
- * service's heuristic is not ignored. Until then, the field is informational only
- * (logged but not acted upon).
- */
-function selectAnalysisMode(
-  diff: EditDiff,
-  significance: EditUnderstanding['significance']
-): 'focused' | 'comprehensive' {
-  // Multiple paragraphs changed → comprehensive
-  if (diff.paragraphChanges.length > 2) return 'comprehensive';
-  // Structural changes (add/remove paragraphs) → comprehensive
-  if (diff.structural.paragraphsAdded.length > 0 || diff.structural.paragraphsRemoved.length > 0) return 'comprehensive';
-  // Transformative → comprehensive
-  if (significance === 'transformative') return 'comprehensive';
-  // Everything else → focused
-  return 'focused';
-}
-
-// ============================================================================
 // SPECIAL CASE HANDLERS
 // ============================================================================
 
@@ -1193,8 +1162,6 @@ export class EditUnderstandingService {
               diff,
               understanding: trivialUnderstanding,
               stalenessEffects: [],
-              // TODO(M1): analysisMode is currently dead — see selectAnalysisMode() TODO
-              analysisMode: 'focused',
             },
             cost: {
               layer: 'edit_understanding',
@@ -1431,14 +1398,11 @@ export class EditUnderstandingService {
       diff
     );
 
-    // Select analysis mode
-    const analysisMode = selectAnalysisMode(diff, finalSignificance);
-
     const totalMs = Date.now() - startTime;
     console.log(
       `[EditUnderstanding] Complete: significance=${finalSignificance}, ` +
       `changeTypes=[${allChangeTypes.join(',')}], ` +
-      `scope=${editUnderstanding.scopeRecommendation.scope}, mode=${analysisMode}`
+      `scope=${editUnderstanding.scopeRecommendation.scope}`
     );
     console.log(`[EditUnderstanding] Total: ${totalMs}ms, $${totalCost.toFixed(5)}, ${stalenessEffects.length} staleness effects`);
 
@@ -1447,8 +1411,6 @@ export class EditUnderstandingService {
         diff,
         understanding: editUnderstanding,
         stalenessEffects,
-        // TODO(M1): analysisMode is currently dead — see selectAnalysisMode() TODO
-        analysisMode,
       },
       cost: {
         layer: 'edit_understanding',
