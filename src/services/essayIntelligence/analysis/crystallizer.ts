@@ -133,14 +133,17 @@ function isL4CompositeEnabled(): boolean {
  * (focused output budgets, mid-call calibration via re-serialization, failure
  * isolation) while killing the C2 cache-defeat at its root.
  *
- * Active when `L4_UNIFIED_CACHE=true`. Default off. Distinct from the
- * composite flag — the composite collapses to 1 call (higher quality risk);
- * the unified-cache path stays at 3 calls.
+ * Active by default (Stage 0.E of the cost+quality plan, 2026-05-24).
+ * Kill switch: set `L4_UNIFIED_CACHE=false` in env to fall back to the
+ * 3-call path WITHOUT the shared user-prompt cache prefix. Distinct from
+ * the composite flag — the composite collapses to 1 call (higher quality
+ * risk); the unified-cache path stays at 3 calls.
  *
  * Design: docs/pipeline-evolution/04-pipeline-architecture/L4/L4_CACHE_UNIFICATION_DESIGN.md
+ * Default flip rationale: docs/pipeline-evolution/00-index/CONSOLIDATED_IMPLEMENTATION_PLAN_2026_05_24.md §2.0.E
  */
 function isL4UnifiedCacheEnabled(): boolean {
-  return process.env.L4_UNIFIED_CACHE === 'true';
+  return process.env.L4_UNIFIED_CACHE !== 'false';
 }
 
 // ============================================================================
