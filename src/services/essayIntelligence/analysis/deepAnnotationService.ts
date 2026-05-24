@@ -69,6 +69,87 @@ import { buildCorpusTelemetryRecord, persistCorpusTelemetry } from './corpusTele
 const SONNET = 'claude-sonnet-4-5-20250929';
 
 /**
+ * Stage 2.F (Model sentences + Cut-list) feature flags. Default off; flip on
+ * for the Phase 6 regen via env. Independent so each can A/B independently.
+ *
+ * - `ENABLE_REWRITE_VARIANTS=true` opts priority 1-2 ACTION annotations into
+ *   emitting `rewriteVariants` (2-3 candidate revisions per high-priority
+ *   annotation). The legacy single `rewriteExample` stays populated either
+ *   way (back-compat).
+ * - `ENABLE_CUT_LIST=true` opts the per-paragraph L5 prompt into emitting
+ *   `cutCandidates[]` (essay-level cut candidates with confidence). Only
+ *   ≥0.9-confidence candidates surface to the student; lower confidence
+ *   stays in the result for ledger/carry-forward.
+ */
+function isRewriteVariantsEnabled(): boolean {
+  return process.env.ENABLE_REWRITE_VARIANTS === 'true';
+}
+function isCutListEnabled(): boolean {
+  return process.env.ENABLE_CUT_LIST === 'true';
+}
+
+/**
+ * Stage 2.F: parse the LLM's `rewriteVariants` raw output into a typed array,
+ * dropping invalid entries and de-duplicating by angle. Returns null when the
+ * annotation is ineligible for variants (non-ACTION mode, priority 3+, flag
+ * off, or LLM emitted nothing). Returning null vs an empty array distinguishes
+ * "no variants this annotation" from "variants attempted but all dropped" —
+ * downstream readers check `=== null` for the legacy single-rewrite path.
+ */
+function parseRewriteVariants(
+  raw: unknown,
+  teachingMode: L5TeachingMode,
+  priority: number,
+): RewriteVariant[] | null {
+  if (!isRewriteVariantsEnabled()) return null;
+  if (teachingMode !== 'action') return null;
+  if (priority > 2) return null;
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+
+  const validAngles = ['tighten', 'specify', 'sharpen_voice', 'restructure'] as const;
+  const byAngle = new Map<RewriteVariant['angle'], RewriteVariant>();
+
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const r = item as Record<string, unknown>;
+
+    const rawAngle = typeof r.angle === 'string' ? r.angle : '';
+    if (!validAngles.includes(rawAngle as RewriteVariant['angle'])) continue;
+    const angle = rawAngle as RewriteVariant['angle'];
+
+    const text = typeof r.text === 'string' ? r.text.trim() : '';
+    if (text.length === 0) continue;
+
+    const rationale = typeof r.rationale === 'string' ? r.rationale.trim() : '';
+    const netWordDelta = typeof r.netWordDelta === 'number' ? Math.round(r.netWordDelta) : 0;
+
+    // First-write-wins on angle deduplication.
+    if (!byAngle.has(angle)) {
+      byAngle.set(angle, { angle, text, rationale, netWordDelta });
+    }
+  }
+
+  if (byAngle.size === 0) return null;
+  return Array.from(byAngle.values());
+}
+
+/**
+ * Stage 2.F: surfacing threshold for the cut-list. Only candidates with
+ * confidence ≥ this value render to the student; lower-confidence entries
+ * stay in the result for iteration-ledger telemetry.
+ */
+const CUT_LIST_SURFACE_THRESHOLD = 0.9;
+
+/**
+ * Stage 2.F: maximum surfaced cut candidates per essay per plan §0.5 D6
+ * decision. When the LLM emits more than this many ≥0.9-confidence cuts,
+ * we truncate to the top-N by confidence and log a warning — that scale of
+ * cutting belongs in a structural-review directive (Executive Brief), not
+ * inline cuts.
+ */
+const CUT_LIST_MAX_SURFACED = 5;
+
+/**
  * Phase-specific annotation GUIDANCE.
  * Soft guidance for the LLM prompt — NOT hard caps.
  * The LLM decides how many annotations each paragraph needs.
@@ -288,6 +369,66 @@ export interface L5Annotation {
    * Design: `docs/pipeline-evolution/04-pipeline-architecture/L5/L5_TOPN_RANKER_DESIGN.md`.
    */
   surfaced: boolean;
+
+  /**
+   * Stage 2.F (Model sentences): 2-3 candidate revisions for priority 1-2
+   * ACTION-mode annotations, each playing a different editorial angle. The
+   * student picks one. `rewriteExample` is kept populated as
+   * `rewriteVariants[0].text` for back-compat.
+   *
+   * Null when:
+   *   - The annotation is not ACTION mode.
+   *   - The annotation's priority is 3-5 (variants reserved for top-priority).
+   *   - The ENABLE_REWRITE_VARIANTS flag is off (variants array is null,
+   *     legacy single-rewrite path holds).
+   *   - The LLM judged a single rewrite was sufficient.
+   */
+  rewriteVariants: RewriteVariant[] | null;
+}
+
+/**
+ * Stage 2.F: a single candidate revision angle for a priority 1-2 ACTION
+ * annotation. Each variant stands alone — the student picks one and ships
+ * it. `angle` discriminates which editorial lever the revision pulled.
+ */
+export interface RewriteVariant {
+  /** Which editorial lever this variant pulled. */
+  angle: 'tighten' | 'specify' | 'sharpen_voice' | 'restructure';
+  /** The candidate revision text. */
+  text: string;
+  /** One-sentence rationale (≤25 words) — why this angle for this sentence. */
+  rationale: string;
+  /** Computed: revised word count − original word count (negative = tightening). */
+  netWordDelta: number;
+}
+
+/**
+ * Stage 2.F (Decisive cut-list): a single essay-level deletion candidate
+ * with confidence and rationale. Aggregated across per-paragraph L5 calls
+ * into `L5AnnotationResult.cutCandidates`. Only entries with confidence ≥
+ * `CUT_LIST_SURFACE_THRESHOLD` (0.9) render to the student; lower-confidence
+ * entries persist in the result for iteration-ledger telemetry.
+ */
+export interface CutCandidate {
+  /** Stable, locally-unique id (UUID). */
+  id: string;
+  /** Exact text to delete — must be verbatim from the essay (validator enforces). */
+  textToDelete: string;
+  /** Location anchor — where in the essay the cut sits. */
+  location: {
+    paragraphIndex: number;
+    sentenceIndex: number;
+    /** Sentence-scope = delete the whole sentence; phrase-scope = sub-sentence span. */
+    scope: 'sentence' | 'phrase';
+  };
+  /** 0-1; only ≥`CUT_LIST_SURFACE_THRESHOLD` surface to the student. */
+  confidence: number;
+  /** Why cut — ≤25 words; what the cut accomplishes. */
+  rationale: string;
+  /** Which Finding justifies this cut; null when not associated with one. */
+  pairedFindingId: string | null;
+  /** Which annotation justifies this cut; null when not associated with one. */
+  pairedAnnotationId: string | null;
 }
 
 /**
@@ -322,6 +463,19 @@ export interface L5AnnotationResult {
   surfacedCount: number;
   /** Density diagnostics per paragraph — signal, not a problem to fix */
   densityDiagnostics: AnnotationDensityDiagnostic[];
+
+  /**
+   * Stage 2.F (Decisive cut-list): aggregated cut candidates across all
+   * per-paragraph L5 calls. Includes both surfaced (≥0.9 confidence) and
+   * sub-threshold entries — the render layer filters by confidence.
+   *
+   * Empty when the `ENABLE_CUT_LIST` flag is off. The aggregator caps
+   * surfaced count to `CUT_LIST_MAX_SURFACED` (5) and logs a warning if
+   * the LLM emitted more — that scale of cutting belongs in a
+   * structural-review directive, not inline cuts.
+   */
+  cutCandidates: CutCandidate[];
+
   cost: number;
   tokenUsage: {
     inputTokens: number;
@@ -364,10 +518,27 @@ interface RawAnnotation {
   confidence?: number;
   crossParagraphRefs?: number[];
   capacityBuildingNote?: string | null;
+  /** Stage 2.F: candidate revisions for priority 1-2 ACTION annotations. */
+  rewriteVariants?: unknown[];
+}
+
+interface RawCutCandidate {
+  textToDelete?: string;
+  location?: {
+    paragraphIndex?: number;
+    sentenceIndex?: number;
+    scope?: string;
+  };
+  confidence?: number;
+  rationale?: string;
+  pairedFindingId?: string | null;
+  pairedAnnotationId?: string | null;
 }
 
 interface RawParagraphAnnotationOutput {
   annotations: RawAnnotation[];
+  /** Stage 2.F: per-paragraph cut-list emissions. Aggregated essay-wide. */
+  cutCandidates?: RawCutCandidate[];
 }
 
 // ============================================================================
@@ -645,6 +816,8 @@ class DeepAnnotationService {
 
     // ── Accumulate results ──
     const paragraphAnnotations: ParagraphAnnotations[] = [];
+    // Stage 2.F: per-paragraph cut-list emissions aggregated essay-wide.
+    const rawCutCandidates: CutCandidate[] = [];
     let totalCost = 0;
     const totalTokenUsage = {
       inputTokens: 0,
@@ -663,6 +836,7 @@ class DeepAnnotationService {
       const result = paragraphResults[i];
       if (result.status === 'fulfilled') {
         paragraphAnnotations.push(result.value.paragraphAnnotations);
+        rawCutCandidates.push(...result.value.cutCandidates);
         totalCost += result.value.cost;
         totalTokenUsage.inputTokens += result.value.tokenUsage.inputTokens;
         totalTokenUsage.outputTokens += result.value.tokenUsage.outputTokens;
@@ -890,6 +1064,32 @@ class DeepAnnotationService {
       void persistCorpusTelemetry(record);
     }
 
+    // ── Stage 2.F: aggregate + truncate cut-list ──
+    // Sort by confidence desc so the top-N-by-confidence truncation surfaces
+    // the highest-confidence cuts. Per plan §0.5 D6: warn + truncate to
+    // CUT_LIST_MAX_SURFACED when the surfaced count would exceed it. Lower-
+    // confidence entries stay in the result for iteration-ledger telemetry.
+    const sortedCuts = [...rawCutCandidates].sort((a, b) => b.confidence - a.confidence);
+    const surfacedCuts = sortedCuts.filter((c) => c.confidence >= CUT_LIST_SURFACE_THRESHOLD);
+    let finalCutCandidates = sortedCuts;
+    if (surfacedCuts.length > CUT_LIST_MAX_SURFACED) {
+      console.warn(
+        `[L5] cut-list emitted ${surfacedCuts.length} ≥${CUT_LIST_SURFACE_THRESHOLD}-confidence candidates ` +
+          `(exceeds CUT_LIST_MAX_SURFACED=${CUT_LIST_MAX_SURFACED}). Truncating to top ${CUT_LIST_MAX_SURFACED} by confidence — ` +
+          `this scale of cutting belongs in a structural-review directive (Executive Brief), not inline cuts.`,
+      );
+      const trimmedSurfaced = surfacedCuts.slice(0, CUT_LIST_MAX_SURFACED);
+      const subThreshold = sortedCuts.filter((c) => c.confidence < CUT_LIST_SURFACE_THRESHOLD);
+      finalCutCandidates = [...trimmedSurfaced, ...subThreshold];
+    }
+    if (isCutListEnabled()) {
+      console.log(
+        `[L5] cutCandidates: total=${finalCutCandidates.length} ` +
+          `surfaced=${Math.min(surfacedCuts.length, CUT_LIST_MAX_SURFACED)} ` +
+          `sub_threshold=${sortedCuts.length - surfacedCuts.length}`,
+      );
+    }
+
     return {
       paragraphAnnotations: allAnnotations.paragraphAnnotations,
       essayLevelAnnotations: allAnnotations.essayLevelAnnotations,
@@ -898,6 +1098,7 @@ class DeepAnnotationService {
       annotationCount,
       surfacedCount,
       densityDiagnostics,
+      cutCandidates: finalCutCandidates,
       cost: totalCost,
       tokenUsage: totalTokenUsage,
       timingMs: Date.now() - startTime,
@@ -965,6 +1166,65 @@ says the essay rewards attention to vocabulary domain shifts, annotations
 about voice register and word choice carry more weight than generic
 structural observations. The reading strategy tells you what makes THIS
 essay tick — let your annotations match.
+`
+      : '';
+
+    // Stage 2.F: Model sentence variants — only inject directive when the
+    // feature flag is on. Off-state keeps the prompt byte-identical to
+    // pre-feature so the cached system-prompt prefix stays warm for
+    // unrolled-out essays.
+    const rewriteVariantsDirective = isRewriteVariantsEnabled()
+      ? `MODEL SENTENCE VARIANTS (Stage 2.F):
+For ACTION-mode annotations with priority 1 or 2, emit a \`rewriteVariants\` array with 2 or 3 entries. Each variant plays a different editorial angle:
+- \`tighten\`: cut words without losing meaning; preserve voice + claim.
+- \`specify\`: replace abstract phrases with concrete sensory or factual detail FROM ELSEWHERE IN THE ESSAY (do not invent). Use the fabrication-guard self-audit on every variant.
+- \`sharpen_voice\`: rewrite to make the writer's distinctive voice more present; preserve content.
+- \`restructure\`: change the sentence's syntactic shape (subordination, fronting, parallelism) for emphasis; preserve content.
+
+You do not need to use all 4 angles — pick the 2-3 most useful for THIS sentence. Each variant must stand alone. Variants must use DISTINCT angles — three "tighten" variants are not three variants, they're one variant emitted three times.
+
+The legacy \`rewriteExample\` field stays populated as the FIRST variant's text (back-compat). For priority 3-5 annotations, emit \`rewriteVariants: null\` and use \`rewriteExample\` alone.
+
+Per-variant schema:
+  { "angle": "tighten"|"specify"|"sharpen_voice"|"restructure", "text": "...", "rationale": "≤25 words — why this angle for this sentence", "netWordDelta": <revised_words − original_words> }
+
+Variant length budget: ≤80 words each. Variant array cap: 2 priority-1-2 ACTION annotations per paragraph emit variants; further ACTION annotations in the same paragraph use the single \`rewriteExample\` path.
+
+`
+      : '';
+
+    // Stage 2.F: Decisive cut-list — only inject directive when the feature
+    // flag is on. Cut candidates are gathered per-paragraph and aggregated
+    // essay-wide in the result envelope.
+    const cutListDirective = isCutListEnabled()
+      ? `DECISIVE CUT-LIST (Stage 2.F — separate from annotations):
+Scan THIS paragraph's text for sentences or sub-sentence phrases that should be CUT decisively (not just revised). Emit each candidate to the \`cutCandidates\` field at the top level of your JSON response (sibling to \`annotations\`).
+
+Per-candidate schema:
+  {
+    "textToDelete": "EXACT verbatim text from the paragraph — the post-call validator rejects any candidate whose textToDelete is not found in the paragraph verbatim",
+    "location": { "paragraphIndex": <P index>, "sentenceIndex": <S index>, "scope": "sentence"|"phrase" },
+    "confidence": <0.0-1.0> — only emit if ≥0.7; only entries ≥${CUT_LIST_SURFACE_THRESHOLD} will surface to the student,
+    "rationale": "≤25 words — what the cut accomplishes",
+    "pairedFindingId": "<[F#] reference if associated with a finding>"|null,
+    "pairedAnnotationId": null  // post-set if associated with an annotation in this paragraph
+  }
+
+Cut-list entries must be GENUINE deletions — the essay reads BETTER with the text gone. If you're unsure, set confidence <${CUT_LIST_SURFACE_THRESHOLD} and let it sit below the surfacing threshold.
+
+Avoid cutting:
+- Sentences carrying load-bearing thesis claims.
+- Sentences introducing specific narrative pivots.
+- Voice signatures the writer has earned (idiomatic phrasings, distinctive sentence shapes).
+
+Bias toward cutting:
+- Telling-not-showing summaries that the next sentence already enacts.
+- Stage-direction throat-clears ("I want to talk about...", "It is important to note...").
+- Filler transitions that don't advance the arc.
+- Redundant claims (the second time the writer says the same thing).
+
+When this paragraph has nothing worth cutting at ≥0.7 confidence, emit \`cutCandidates: []\`. Conservative is fine — over-cutting is worse than under-cutting.
+
 `
       : '';
 
@@ -1105,7 +1365,7 @@ The shared context may include a "COHERENCE RESOLUTIONS" block listing terminal-
 
 When in doubt about whether an annotation crosses a SUPPRESS signal, prefer not to surface it. Suppressed signals exist because L4 judged their evidence insufficient — re-surfacing them undoes the resolution.
 
-ANNOTATION STRUCTURE (JSON):
+${rewriteVariantsDirective}${cutListDirective}ANNOTATION STRUCTURE (JSON):
 {
   "annotations": [
     {
@@ -1126,9 +1386,24 @@ ANNOTATION STRUCTURE (JSON):
       "antiPatternExample": "Exact 5-12 word quoted phrase that IS the problem. Null for strength/structural.",
       "confidence": 0.85,
       "crossParagraphRefs": [3, 4],
-      "capacityBuildingNote": "In future writing, watch for moments where you claim an emotion instead of letting the reader feel it through detail."
+      "capacityBuildingNote": "In future writing, watch for moments where you claim an emotion instead of letting the reader feel it through detail."${
+        isRewriteVariantsEnabled()
+          ? `,
+      "rewriteVariants": [
+        { "angle": "tighten", "text": "Three-sentence revised version.", "rationale": "≤25 words.", "netWordDelta": -8 },
+        { "angle": "specify", "text": "Three-sentence revised version with concrete detail from elsewhere in essay.", "rationale": "≤25 words.", "netWordDelta": 2 }
+      ]`
+          : ''
+      }
     }
-  ]
+  ]${
+    isCutListEnabled()
+      ? `,
+  "cutCandidates": [
+    { "textToDelete": "verbatim sentence or phrase from THIS paragraph", "location": { "paragraphIndex": 2, "sentenceIndex": 4, "scope": "sentence" }, "confidence": 0.92, "rationale": "≤25 words", "pairedFindingId": "[F3]", "pairedAnnotationId": null }
+  ]`
+      : ''
+  }
 }
 
 Note: transferablePrinciple is populated POST-CALL by a deterministic technique matcher. Do NOT emit it in your output — it will be overwritten.
@@ -1138,7 +1413,7 @@ QUALITY BAR:
 - Every annotation must pass the teaching test.
 - At least 25% of annotations should be strength type.
 
-OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanation text.
+OUTPUT: JSON object with "annotations" array${isCutListEnabled() ? ' + "cutCandidates" array' : ''}. No markdown wrapping, no explanation text.
 
 ${buildFabricationGuardBlock()}`;
   }
@@ -1858,6 +2133,8 @@ ${buildFabricationGuardBlock()}`;
     paragraphRelevantContext?: string,
   ): Promise<{
     paragraphAnnotations: ParagraphAnnotations;
+    /** Stage 2.F: cut candidates the LLM emitted for THIS paragraph. */
+    cutCandidates: CutCandidate[];
     cost: number;
     tokenUsage: {
       inputTokens: number;
@@ -1870,6 +2147,7 @@ ${buildFabricationGuardBlock()}`;
     if (para.walkSkipped) {
       return {
         paragraphAnnotations: { paragraphIndex: para.index, annotations: [] },
+        cutCandidates: [],
         cost: 0,
         tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
       };
@@ -1930,11 +2208,23 @@ ${buildFabricationGuardBlock()}`;
     const rawOutput = this.parseRawOutput(response.content, para.index);
     const validAnnotations = this.validateAnnotations(rawOutput, para, phase, profile.paragraphs.length);
 
+    // ── Stage 2.F: parse + validate cutCandidates (flag-gated) ──
+    // The parser tolerates missing field (flag-off paragraphs return []);
+    // validateCutCandidates additionally rejects anything not verbatim in the
+    // paragraph text. Result is per-paragraph; aggregation happens in
+    // generateAnnotations across paragraphs.
+    let cutCandidates: CutCandidate[] = [];
+    if (isCutListEnabled()) {
+      const rawCutsContainer = response.content as RawParagraphAnnotationOutput | undefined;
+      cutCandidates = this.validateCutCandidates(rawCutsContainer?.cutCandidates, para);
+    }
+
     return {
       paragraphAnnotations: {
         paragraphIndex: para.index,
         annotations: validAnnotations,
       },
+      cutCandidates,
       cost,
       tokenUsage: {
         inputTokens: response.usage.input_tokens,
@@ -2153,6 +2443,93 @@ ${buildFabricationGuardBlock()}`;
         // ranker decides otherwise. `rankAndSurfaceAnnotations()` flips
         // beyond-Top-N entries to false after dedup + cross-paragraph merge.
         surfaced: true,
+        // Stage 2.F: model sentence variants — populated only for priority 1-2
+        // ACTION annotations when the flag is on and the LLM emitted distinct
+        // angles. Validator drops any variant whose `angle` is unrecognized
+        // and de-duplicates by angle so the array carries at most one entry
+        // per angle.
+        rewriteVariants: parseRewriteVariants(raw.rewriteVariants, teachingMode, raw.priority ?? 3),
+      });
+    }
+
+    return valid;
+  }
+
+  /**
+   * Stage 2.F: validate per-paragraph cutCandidates raw emissions against the
+   * paragraph text. Drops any candidate whose `textToDelete` is not verbatim
+   * in the paragraph (anti-fabrication code-side guard — the prompt-side
+   * fabricationGuard self-audit covers numbers, not arbitrary phrasing).
+   * Returns the validated set with stable UUID ids.
+   */
+  private validateCutCandidates(
+    rawCandidates: RawCutCandidate[] | undefined,
+    para: Readonly<ParagraphProfile>,
+  ): CutCandidate[] {
+    if (!Array.isArray(rawCandidates) || rawCandidates.length === 0) return [];
+
+    const validScopes = ['sentence', 'phrase'] as const;
+    const valid: CutCandidate[] = [];
+
+    for (const raw of rawCandidates) {
+      const textToDelete =
+        typeof raw.textToDelete === 'string' ? raw.textToDelete.trim() : '';
+      if (textToDelete.length === 0) continue;
+
+      // Anti-fabrication: must be verbatim in the paragraph. Try exact, then
+      // case-insensitive (mirrors the spanText match in validateAnnotations).
+      let verified: string | null = null;
+      if (para.text.includes(textToDelete)) {
+        verified = textToDelete;
+      } else {
+        const lowerPara = para.text.toLowerCase();
+        const lowerCut = textToDelete.toLowerCase();
+        if (lowerPara.includes(lowerCut)) {
+          const idx = lowerPara.indexOf(lowerCut);
+          verified = para.text.substring(idx, idx + textToDelete.length);
+        }
+      }
+      if (verified === null) {
+        console.warn(
+          `[L5 validateCutCandidates] Dropped cut candidate — textToDelete not in P${para.index}: ` +
+            `"${textToDelete.slice(0, 80)}..."`,
+        );
+        continue;
+      }
+
+      const confidence =
+        typeof raw.confidence === 'number'
+          ? Math.max(0, Math.min(1, raw.confidence))
+          : 0;
+      if (confidence === 0) continue; // No confidence signal → drop.
+
+      const rationale = typeof raw.rationale === 'string' ? raw.rationale.trim() : '';
+      if (rationale.length === 0) continue; // No rationale → drop.
+
+      const rawScope = raw.location?.scope;
+      const scope: 'sentence' | 'phrase' = validScopes.includes(rawScope as typeof validScopes[number])
+        ? (rawScope as 'sentence' | 'phrase')
+        : 'phrase';
+
+      const paragraphIndex =
+        typeof raw.location?.paragraphIndex === 'number' ? raw.location.paragraphIndex : para.index;
+      const sentenceIndex =
+        typeof raw.location?.sentenceIndex === 'number' ? raw.location.sentenceIndex : 0;
+
+      valid.push({
+        id: crypto.randomUUID(),
+        textToDelete: verified,
+        location: { paragraphIndex, sentenceIndex, scope },
+        confidence,
+        rationale,
+        pairedFindingId:
+          typeof raw.pairedFindingId === 'string' && raw.pairedFindingId.trim().length > 0
+            ? raw.pairedFindingId.trim()
+            : null,
+        pairedAnnotationId:
+          typeof raw.pairedAnnotationId === 'string' && raw.pairedAnnotationId.trim().length > 0
+            ? raw.pairedAnnotationId.trim()
+            : null,
       });
     }
 
