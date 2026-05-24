@@ -66,6 +66,7 @@ import type {
   ParagraphScoreMatrix,
   CoherenceIssue,
   CoherenceReport,
+  CoherenceResolution,
   CoachingMap,
   NorthStarEvolution,
   NorthStarAssessment,
@@ -78,6 +79,56 @@ import type {
 
 const SONNET = 'claude-sonnet-4-5-20250929';
 const HAIKU = 'claude-haiku-4-5-20251001';
+
+/**
+ * Stage 2.B (Coherence-Resolution): mandatory directive injected after the
+ * "COHERENCE REPORT" investigation block in every L4 prompt that produces
+ * `coherenceReport`. Forces L4 to assign a terminal state to every
+ * contradiction it surfaces, so L5 never renders a raw contradiction.
+ *
+ * Used by buildSystemPromptL4b, buildSystemPromptL4Composite, and
+ * buildSystemPromptL4Unified. The block text is identical across all three
+ * so the L4 system-prompt cache prefix stays stable byte-for-byte.
+ */
+const COHERENCE_RESOLUTION_DIRECTIVE = `
+CONTRADICTION HANDLING — MANDATORY (Stage 2.B):
+
+For EVERY contradiction you surface in \`coherenceReport.contradictions[]\` AND every L3.5 \`contradictionFlags\` provided in the user prompt, you MUST emit a terminal-state entry in \`coherenceReport.resolutions[]\`. Forbidden: leaving any contradiction unaddressed.
+
+Three terminal states:
+
+1. RESOLVED — one side wins on the available evidence.
+   - In \`reasoning\`, state which side wins and why the other is wrong (or partially wrong in a way the student should not act on).
+   - List the LOSING side's signal identifiers in \`suppressedSignals\` so L5 does not surface them.
+   - The WINNING side goes in \`surfaceSignals\`.
+   - USE WHEN the evidence is genuinely lopsided.
+
+2. FRAMED — both sides are partially true under different conditions.
+   - In \`reasoning\`, name BOTH conditions and BOTH partial truths in one sentence each, so the student sees a coherent both/and instead of a flat contradiction.
+   - Both sides' signal identifiers go in \`surfaceSignals\`; \`suppressedSignals\` is empty.
+   - USE WHEN both sides have real evidence and erasing either would falsify the picture.
+
+3. ESCALATED — the contradiction reflects a real student-decision ambiguity (e.g., "is this claim earned?" genuinely depends on a choice the student makes about scope).
+   - In \`reasoning\`, name the decision the student must make.
+   - Both sides go in \`surfaceSignals\`; \`suppressedSignals\` is empty.
+   - USE SPARINGLY — student decisions only, not pipeline uncertainty.
+
+Default-to-FRAMED rule: if you cannot reach a terminal state confidently, emit FRAMED with a "both signals see something real" framing. Do NOT silently drop either side. Do NOT default to RESOLVED unless the evidence is genuinely lopsided.
+
+Per-resolution schema:
+  {
+    "contradictionId": "stable identifier — e.g., 'coherenceReport.contradictions[0]', 'voiceMap.shiftPoints[1] vs voiceIdentity.dominantVoice', 'L3.5.contradictionFlags[2]'",
+    "state": "resolved" | "framed" | "escalated",
+    "reasoning": "the narrative the student-facing render will use (1-2 sentences)",
+    "surfaceSignals": ["section identifiers L5 may surface — e.g. '7b.strongestBreakoutDimension', 'voiceMap.shiftPoints[1]'"],
+    "suppressedSignals": ["section identifiers L5 must NOT surface — populated only for 'resolved'"]
+  }
+
+Distribution sanity (post-emission self-check):
+- If you emitted 0 contradictions, emit 0 resolutions. That is honest.
+- If you emitted N contradictions, emit at least N resolutions (one per contradiction). Prefer FRAMED over RESOLVED on the margin.
+- 'resolved' should not exceed ~70% of resolutions on any single essay; if it does, you are collapsing real signal.
+`;
 
 /**
  * L4a (legacy combined): North Star + Score Matrix in a single call.
@@ -691,6 +742,8 @@ PRESERVE THE SIGNATURE MOVE: If \`craftAssessment.signatureMove != null\`, prior
 
    isCoherent: false if ANY blocking contradictions exist.
 
+${COHERENCE_RESOLUTION_DIRECTIVE}
+
 3. COACHING MAP — structured improvement hierarchy.
    Beyond the flat prioritizedImprovements, produce a coachingMap with 5 sections:
 
@@ -738,6 +791,9 @@ Respond with a single JSON object. No markdown, no explanation, no code blocks.
   "coherenceReport": {
     "contradictions": [
       { "sectionA": "...", "claimA": "...", "sectionB": "...", "claimB": "...", "severity": "blocking"|"notable"|"minor", "suggestedResolution": "...", "nature": "free-text description of the tension", "routingCategory": "productive_tension"|"system_disagreement"|"essay_flaw"|"depth_signal", "canCoexist": true|false, "likelyResolution": "..."|null, "evidenceA": "...", "evidenceB": "..." }
+    ],
+    "resolutions": [
+      { "contradictionId": "coherenceReport.contradictions[0]", "state": "resolved"|"framed"|"escalated", "reasoning": "...", "surfaceSignals": ["..."], "suppressedSignals": ["..."] }
     ],
     "isCoherent": <boolean>
   }
@@ -1247,6 +1303,8 @@ severity:
 
 isCoherent: false if ANY blocking contradictions exist. Zero contradictions is a valid honest answer if the profile is consistent.
 
+${COHERENCE_RESOLUTION_DIRECTIVE}
+
 ==================================================================
 OUTPUT FORMAT
 ==================================================================
@@ -1290,6 +1348,9 @@ ${activeDims.includes('intentBridge') ? `    "intentBridge": { "studentIntent": 
   "coherenceReport": {
     "contradictions": [
       { "sectionA": "...", "claimA": "...", "sectionB": "...", "claimB": "...", "severity": "blocking"|"notable"|"minor", "suggestedResolution": "...", "nature": "...", "routingCategory": "productive_tension"|"system_disagreement"|"essay_flaw"|"depth_signal", "canCoexist": true|false, "likelyResolution": "..."|null, "evidenceA": "...", "evidenceB": "..." }
+    ],
+    "resolutions": [
+      { "contradictionId": "coherenceReport.contradictions[0]", "state": "resolved"|"framed"|"escalated", "reasoning": "...", "surfaceSignals": ["..."], "suppressedSignals": ["..."] }
     ],
     "isCoherent": <boolean>
   }
@@ -1641,6 +1702,8 @@ YOUR THREE OUTPUTS:
 
    isCoherent: false if ANY blocking contradictions exist. Zero contradictions is a valid honest answer if the profile is consistent.
 
+${COHERENCE_RESOLUTION_DIRECTIVE}
+
 3. COACHING MAP — structured improvement hierarchy. Five sections:
 
    transformativeInsight: The SINGLE most important thing about this essay — the insight that, if the student understood it, would unlock the most improvement. Include evidence locations and explain WHY this transforms understanding. Set requiresStudentAwareness if the student must understand this before any specific feedback makes sense.
@@ -1680,6 +1743,9 @@ MODE C OUTPUT SKELETON:
   "coherenceReport": {
     "contradictions": [
       { "sectionA": "...", "claimA": "...", "sectionB": "...", "claimB": "...", "severity": "blocking"|"notable"|"minor", "suggestedResolution": "...", "nature": "...", "routingCategory": "productive_tension"|"system_disagreement"|"essay_flaw"|"depth_signal", "canCoexist": true|false, "likelyResolution": "..."|null, "evidenceA": "...", "evidenceB": "..." }
+    ],
+    "resolutions": [
+      { "contradictionId": "coherenceReport.contradictions[0]", "state": "resolved"|"framed"|"escalated", "reasoning": "...", "surfaceSignals": ["..."], "suppressedSignals": ["..."] }
     ],
     "isCoherent": <boolean>
   }
@@ -1883,6 +1949,15 @@ interface RawCrystallizationOutput {
   coherenceReport: {
     contradictions: unknown[];
     isCoherent: boolean;
+    /**
+     * Stage 2.B: per-contradiction terminal-state resolutions. L4 emits one
+     * entry per contradiction in `contradictions[]` plus any L3.5
+     * `contradictionFlags`. Parsed by `buildCoherenceResolutions` into
+     * `CoherenceResolution[]` and attached to both
+     * `EssayNorthStar.coherenceResolutions` and
+     * `ParagraphScoreMatrix.coherenceResolutions`.
+     */
+    resolutions?: unknown[];
   };
 }
 
@@ -1924,6 +1999,8 @@ interface RawL4bOutput {
   coherenceReport: {
     contradictions: unknown[];
     isCoherent: boolean;
+    /** Stage 2.B: see RawCrystallizationOutput.coherenceReport.resolutions. */
+    resolutions?: unknown[];
   };
 }
 
@@ -2476,6 +2553,77 @@ function buildCoherenceReport(raw: RawCrystallizationOutput['coherenceReport']):
 }
 
 /**
+ * Stage 2.B (Coherence-Resolution): parse the `coherenceReport.resolutions[]`
+ * the L4 prompt now requires. Best-effort — when the LLM omits the field or
+ * truncates mid-array, return whatever well-formed entries we can extract and
+ * warn rather than fail (the L4 surface stays operative; L5 falls back to raw
+ * signal surfacing for any unaddressed contradiction).
+ *
+ * Validates terminal state ∈ {resolved, framed, escalated}; defaults to
+ * 'framed' on invalid input (the design's "if uncertain, FRAMED" rule). Arrays
+ * default to empty, strings default to empty — no entry is rejected outright
+ * unless `contradictionId` and `reasoning` are both missing (no useful signal).
+ */
+function buildCoherenceResolutions(
+  raw: unknown,
+  inputContradictionCount: number,
+): CoherenceResolution[] {
+  if (!Array.isArray(raw)) {
+    if (raw !== undefined) {
+      console.warn(
+        `[Crystallizer] coherenceReport.resolutions not an array (typeof=${typeof raw}) — ignoring.`,
+      );
+    }
+    return [];
+  }
+
+  const validStates = ['resolved', 'framed', 'escalated'] as const;
+  const resolutions: CoherenceResolution[] = [];
+
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const r = item as Record<string, unknown>;
+
+    const contradictionId = typeof r.contradictionId === 'string' ? r.contradictionId : '';
+    const reasoning = typeof r.reasoning === 'string' ? r.reasoning : '';
+    if (contradictionId === '' && reasoning === '') {
+      // No usable signal — skip.
+      continue;
+    }
+
+    const rawState = typeof r.state === 'string' ? r.state : 'framed';
+    const state = validStates.includes(rawState as typeof validStates[number])
+      ? (rawState as typeof validStates[number])
+      : 'framed';
+
+    const surfaceSignals = Array.isArray(r.surfaceSignals)
+      ? r.surfaceSignals.filter((s) => typeof s === 'string').map((s) => s as string)
+      : [];
+    const suppressedSignals = Array.isArray(r.suppressedSignals)
+      ? r.suppressedSignals.filter((s) => typeof s === 'string').map((s) => s as string)
+      : [];
+
+    resolutions.push({
+      contradictionId,
+      state,
+      reasoning,
+      surfaceSignals,
+      suppressedSignals,
+    });
+  }
+
+  if (inputContradictionCount > 0 && resolutions.length < inputContradictionCount) {
+    console.warn(
+      `[Crystallizer] coherenceReport.resolutions emitted ${resolutions.length} entries ` +
+        `for ${inputContradictionCount} input contradictions — ${inputContradictionCount - resolutions.length} ` +
+        `unaddressed. L5 will fall back to raw signal surfacing for the gap.`,
+    );
+  }
+
+  return resolutions;
+}
+
+/**
  * Parse prioritizedImprovements from raw LLM output (reused by both buildScoreMatrix and L4b path).
  */
 function parsePrioritizedImprovements(
@@ -2815,14 +2963,22 @@ export class CrystallizerService {
         unifiedScoreMatrix.coachingMap = buildCoachingMap(unifiedRawL4b.coachingMap, paragraphCount);
       }
       let unifiedCoherenceReport: CoherenceReport;
+      let unifiedCoherenceResolutions: CoherenceResolution[] = [];
       if (unifiedRawL4b.coherenceReport && typeof unifiedRawL4b.coherenceReport === 'object') {
         unifiedCoherenceReport = buildCoherenceReport(unifiedRawL4b.coherenceReport);
+        unifiedCoherenceResolutions = buildCoherenceResolutions(
+          unifiedRawL4b.coherenceReport.resolutions,
+          unifiedCoherenceReport.contradictions.length,
+        );
       } else {
         console.warn(
           '[Crystallizer] L4-unified Mode C coherenceReport missing or truncated — using empty default',
         );
         unifiedCoherenceReport = { contradictions: [], isCoherent: true };
       }
+      // Stage 2.B: stamp resolutions on both surfaces so L5 reads from either.
+      unifiedNorthStar.coherenceResolutions = unifiedCoherenceResolutions;
+      unifiedScoreMatrix.coherenceResolutions = unifiedCoherenceResolutions;
 
       const unifiedCoachingMapSections = unifiedScoreMatrix.coachingMap
         ? [
@@ -3008,14 +3164,22 @@ export class CrystallizerService {
 
       // Coherence report (truncation-tolerant — same default as L4b at :1957-1962)
       let compositeCoherenceReport: CoherenceReport;
+      let compositeCoherenceResolutions: CoherenceResolution[] = [];
       if (compositeRaw.coherenceReport && typeof compositeRaw.coherenceReport === 'object') {
         compositeCoherenceReport = buildCoherenceReport(compositeRaw.coherenceReport);
+        compositeCoherenceResolutions = buildCoherenceResolutions(
+          compositeRaw.coherenceReport.resolutions,
+          compositeCoherenceReport.contradictions.length,
+        );
       } else {
         console.warn(
           '[Crystallizer] L4 composite coherenceReport missing or truncated — using empty default',
         );
         compositeCoherenceReport = { contradictions: [], isCoherent: true };
       }
+      // Stage 2.B: stamp resolutions on both surfaces so L5 reads from either.
+      compositeNorthStar.coherenceResolutions = compositeCoherenceResolutions;
+      compositeScoreMatrix.coherenceResolutions = compositeCoherenceResolutions;
 
       // Post-parse diagnostics (W3.3 anti-clustering — same call as 3-call path)
       detectScoreClustering(compositeScoreMatrix);
@@ -3261,12 +3425,20 @@ export class CrystallizerService {
       }
 
       // Parse coherenceReport (may be truncated if LLM hit max tokens)
+      let l4bCoherenceResolutions: CoherenceResolution[] = [];
       if (l4bRaw.coherenceReport && typeof l4bRaw.coherenceReport === 'object') {
         coherenceReport = buildCoherenceReport(l4bRaw.coherenceReport);
+        l4bCoherenceResolutions = buildCoherenceResolutions(
+          l4bRaw.coherenceReport.resolutions,
+          coherenceReport.contradictions.length,
+        );
       } else {
         console.warn('[Crystallizer] L4b coherenceReport missing or truncated — using empty default');
         coherenceReport = { contradictions: [], isCoherent: true };
       }
+      // Stage 2.B: stamp resolutions on both surfaces so L5 reads from either.
+      northStar.coherenceResolutions = l4bCoherenceResolutions;
+      scoreMatrix.coherenceResolutions = l4bCoherenceResolutions;
 
       // Log L4b quality indicators
       const contradictionCount = coherenceReport.contradictions.length;

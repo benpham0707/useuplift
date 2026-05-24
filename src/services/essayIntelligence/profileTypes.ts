@@ -1542,6 +1542,19 @@ export interface EssayNorthStar {
 
   /** @deprecated Replaced by gapCandidates + Phase B essay-level emission. */
   specificsNeedEmissions?: SpecificsNeedEmission[];
+
+  /**
+   * Stage 2.B: terminal-state resolutions for essay-scope contradictions that
+   * L4 produced into `coherenceReport.contradictions`. Each entry tells L5 how
+   * to surface the underlying contradiction — resolved (one side suppressed),
+   * framed (both surface with framing reasoning), or escalated (student must
+   * decide). Optional for back-compat with profiles persisted before this
+   * field landed.
+   *
+   * See `CoherenceResolution` for the shape and L4b/composite prompts for the
+   * directive that produces it.
+   */
+  coherenceResolutions?: CoherenceResolution[];
 }
 
 /**
@@ -2741,6 +2754,17 @@ export interface ParagraphScoreMatrix {
   }>;
   /** Structured coaching hierarchy — replaces flat prioritizedImprovements when available */
   coachingMap?: CoachingMap;
+
+  /**
+   * Stage 2.B: terminal-state resolutions for paragraph-scope contradictions
+   * surfaced by L3.5 `contradictionFlags`. L4 must emit one resolution per
+   * paragraph-scope contradiction; L5 reads `suppressedSignals` before
+   * surfacing any annotation tied to a paragraph-scope signal. Optional for
+   * back-compat with profiles persisted before this field landed.
+   *
+   * See `CoherenceResolution`.
+   */
+  coherenceResolutions?: CoherenceResolution[];
 }
 
 /**
@@ -2797,6 +2821,58 @@ export interface CoherenceReport {
    * explicit evidence references.
    */
   programmaticContradictions?: ProgrammaticContradiction[];
+}
+
+/**
+ * Stage 2.B (Coherence-Resolution): terminal state assigned by L4 to every
+ * contradiction it surfaces, so the student-facing render never carries a raw
+ * contradiction. Three states:
+ *
+ *   - 'resolved'   — one side wins; the loser is in `suppressedSignals` and L5
+ *                    must not surface it.
+ *   - 'framed'     — both sides are partially true under different conditions;
+ *                    both surface, but only with the framing in `reasoning`.
+ *   - 'escalated'  — the contradiction reflects a genuine student decision;
+ *                    L5 surfaces it as an awareness annotation, not a fix.
+ *
+ * `contradictionId` is a stable string referencing either
+ * `CoherenceReport.contradictions[i]` (sectionA + sectionB form a natural key,
+ * or the index in the array prefixed `coherenceReport.`) or an L3.5
+ * `contradictionFlags[j]` (prefixed `contradictionFlags.`). The LLM picks the
+ * shape; downstream readers tolerate either.
+ *
+ * `surfaceSignals` and `suppressedSignals` identify which sides of the
+ * contradiction L5 should render. Signal IDs are free-text section identifiers
+ * (e.g., 'voiceMap.shiftPoints[1]', '7b.strongestBreakoutDimension').
+ *
+ * Lives on both `EssayNorthStar` (essay-scope) and `ParagraphScoreMatrix`
+ * (paragraph-scope); the L4 prompt produces resolutions on the appropriate
+ * surface based on the contradiction's scope.
+ */
+export interface CoherenceResolution {
+  /** Stable identifier for the contradiction this resolution terminates. */
+  contradictionId: string;
+  /** Terminal state. */
+  state: 'resolved' | 'framed' | 'escalated';
+  /**
+   * The resolution narrative.
+   *   - 'resolved': which side wins, why, and what the loser got wrong.
+   *   - 'framed':   the both/and the student should see, with conditions.
+   *   - 'escalated': the decision the student must make.
+   */
+  reasoning: string;
+  /**
+   * Signal IDs (free-text section identifiers) that L5 may surface. For
+   * 'resolved' this is the winning side; for 'framed' it is both sides; for
+   * 'escalated' it is both sides (the student needs to see what they're
+   * choosing between).
+   */
+  surfaceSignals: string[];
+  /**
+   * Signal IDs L5 must NOT surface. Populated for 'resolved' state only;
+   * empty for 'framed' and 'escalated'.
+   */
+  suppressedSignals: string[];
 }
 
 /**

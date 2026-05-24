@@ -561,6 +561,34 @@ class DeepAnnotationService {
       additionalShared.push(`\n=== CONTRADICTION FLAGS ===\n${contradictionFlags.join('\n')}`);
     }
 
+    // Stage 2.B (Coherence-Resolution): inject L4's terminal-state resolutions
+    // so L5 can respect `suppressedSignals` and surface `framed` contradictions
+    // with their framing reasoning rather than raw. Both surfaces carry the
+    // same array (stamped by the crystallizer); read either.
+    const coherenceResolutions =
+      profile.northStar?.coherenceResolutions ??
+      profile.scoreMatrix?.coherenceResolutions ??
+      [];
+    if (coherenceResolutions.length > 0) {
+      const resolutionLines = coherenceResolutions.map((r) => {
+        const suppressed = r.suppressedSignals.length > 0
+          ? ` | SUPPRESS: ${r.suppressedSignals.join(', ')}`
+          : '';
+        const surface = r.surfaceSignals.length > 0
+          ? ` | surface: ${r.surfaceSignals.join(', ')}`
+          : '';
+        return `  • [${r.state.toUpperCase()}] ${r.contradictionId} — ${r.reasoning}${surface}${suppressed}`;
+      });
+      additionalShared.push(
+        `\n=== COHERENCE RESOLUTIONS (from L4) ===\n` +
+          `For every contradiction L4 surfaced, it assigned a terminal state. Respect them:\n` +
+          `- RESOLVED: do NOT surface the SUPPRESS signals listed below in any annotation.\n` +
+          `- FRAMED: if you surface either side, include the resolution's reasoning as framing — never raw.\n` +
+          `- ESCALATED: surface as an AWARENESS annotation naming the decision the student must make.\n\n` +
+          resolutionLines.join('\n'),
+      );
+    }
+
     // Wave-3a Phase 3C: corpus-anchored craft moves — injected once into the
     // shared-context block so each paragraph's annotation call inherits the
     // same growth-target vocabulary. Retrieval keyed on the full essay text
@@ -1068,6 +1096,14 @@ Every annotation's northStarConnection must reference THIS essay's specific arch
 
 CROSS-PARAGRAPH AWARENESS:
 If an annotation's teaching point involves another paragraph, populate crossParagraphRefs with the other paragraph indices. The annotation still anchors to one primary location, but the reader can see the connection.
+
+COHERENCE RESOLUTIONS (Stage 2.B — when present in shared context):
+The shared context may include a "COHERENCE RESOLUTIONS" block listing terminal-state outcomes L4 assigned to every detected contradiction. Respect them:
+- RESOLVED entries: DO NOT emit any annotation that surfaces a signal listed in that resolution's SUPPRESS list. The losing side of a resolved contradiction is invisible to the student by design.
+- FRAMED entries: if your annotation would surface either side of a framed contradiction, include the resolution's reasoning as the annotation's framing — never present one side raw. The reader needs to see the both/and, not a flat assertion.
+- ESCALATED entries: surface as AWARENESS-mode annotations that name the decision the student must make. Do not pre-commit the choice for them.
+
+When in doubt about whether an annotation crosses a SUPPRESS signal, prefer not to surface it. Suppressed signals exist because L4 judged their evidence insufficient — re-surfacing them undoes the resolution.
 
 ANNOTATION STRUCTURE (JSON):
 {
