@@ -123,3 +123,22 @@ Recommendation: Haiku summary. Templates produce uniform-tone summaries that los
 - **Implementation gate**: before any code, Stage 2 must start with a thorough read of `coachingService/promptBlocks.ts` to confirm (a) current prompt section ordering, (b) current Diagnostic-Snapshot-like compaction (does anything similar already exist?), (c) current prior-turn rotation behavior. Only then proceed.
 - **Pre-existing assets**: `buildDiagnosticSnapshot` does NOT exist at HEAD (`coachingService/diagnosticSnapshot.ts` is new). `ContextRoute` mechanism per §10 — needs HEAD verification before §10 wiring claims.
 
+### CPR-C2 — design's mental model doesn't match HEAD prompt structure (2026-05-27 follow-up)
+
+Inspected `promptBlocks.ts:2328 buildCoachingPrompt()` and `coachingService.ts:2660 runStage3CoachingResponse` user-prompt assembly. **The design's premise — "essay text moves BEFORE verdicts" — does not apply.** Findings:
+
+1. **There is no single "essay text" block in the L6 prompt.** Essay-text content reaches the model through findings + checklist + improvementQueue + dynamicProfileContext sections, not as a literal verbatim block.
+2. **There are no "verdicts" as a distinct block either.** What the design calls "600-1100 tokens of verdict-laden injection" is distributed across ~20 small sidecar sections (sessionArc, journal, momentum, checklist, improvementQueue, edgeProtocol, priorStrategic, mirror, learningStyle, etc.). No single section is the "verdict" target.
+3. **The system prompt is the 17-block coaching identity assembly** (identity, voice, essayType, responseStructure, knowledge, dynamics, priorities, phase, …). It is byte-stable for caching and unrelated to per-turn verdict-vs-essay-text ordering.
+4. **The current "verdict-y" content is gated by relevance, not load-bearing.** Many sidecar sections emit `''` when conditions aren't met. The "compounding 1100 tokens per turn" claim needs measurement against actual turn fixtures before being treated as fact.
+
+**Implication for Stage 2:** the design as written cannot be implemented — there is no `verdicts` slot to reorder, no monolithic block to compact. Three options Tue can choose between:
+
+  - **(a) Rescope to "compact the sidecar list."** Audit the 20 sidecar sections, identify the 5-6 that under-deliver vs. their token cost, gate them more aggressively. Measurable, smaller delta, no schema change.
+  - **(b) Rescope to "Diagnostic Snapshot ABOVE the conversation."** Build a new ≤300-token summary block (Brief verdict + top 3 directives + phase + 1-line essay diagnosis) that prepends the user prompt. Net-new block, not a reorder.
+  - **(c) Drop Item 4 from Stage 2.** The L6 prompt isn't the bottleneck the design assumed.
+
+**Recommendation:** (b). Pairs naturally with Stage 2.A Executive Brief (now shipped flagged) — the Brief becomes the data source for the Diagnostic Snapshot block in L6. Requires a redesigned §4 and §5; current text targets the wrong structure.
+
+**Status:** Item 4 BLOCKED on Tue's choice between (a)/(b)/(c) and corresponding design rewrite.
+

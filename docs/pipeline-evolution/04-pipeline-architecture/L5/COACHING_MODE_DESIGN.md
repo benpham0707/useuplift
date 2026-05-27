@@ -177,3 +177,38 @@ Alternatives:
 ### CM-C3 — confirmed schema is greenfield
 - HEAD grep: zero hits for `askMode`, `askPayload`, the design's `questions` + `principle` + `exemplars` payload shape on L5 annotations. The full schema is net-new (just needs a non-colliding name).
 
+### CM-C4 — naming choice + interaction with shipped Items 2/3/6 (2026-05-27 follow-up)
+
+**Three name candidates Tue should pick between:**
+
+  - **`revisionMode`** — `'rewrite' | 'ask'`. Clear semantic: who-writes-the-revision. Concise. **My recommendation.**
+  - **`studentInvitation`** — `'rewrite_demo' | 'ask_for_revision'`. More explicit; clunkier.
+  - **`editorialMode`** — `'demonstrate' | 'invite'`. Maps to counselor mental model. Decent.
+
+**Interaction with shipped Stage 2 items:**
+
+- **Item 6 (Model Sentences)** already shipped a per-annotation `rewriteVariants: RewriteVariant[] | null` field. The Item 8 'ask' mode would be the *complement*: when the annotation chose `revisionMode='ask'`, `rewriteVariants` is null and a new `askPayload` (questions + principle + exemplars) is non-null. The two are mutually-exclusive sibling fields, both gated on ACTION-mode priority-1-2 annotations.
+- **Item 3 (Executive Brief)** is unaffected — the brief always emits `modelSentences` (rewrite demonstrations), never invitations. The 'ask' mode is annotation-scoped, not brief-scoped.
+- **Item 2 (Coherence-Resolution)** is unaffected — orthogonal layer.
+
+**Suggested revised §3 schema (pending Tue's name choice):**
+
+```ts
+export interface L5Annotation {
+  // ... existing fields ...
+  rewriteVariants: RewriteVariant[] | null;  // shipped in Item 6
+
+  /** Stage 2.D: editorial-mode toggle for ACTION priority-1-2 annotations. */
+  revisionMode: 'rewrite' | 'ask' | null;    // null when ineligible (non-action, priority 3-5, flag off)
+
+  /** Stage 2.D: ask-payload when revisionMode='ask'; null when 'rewrite' or null. */
+  askPayload: {
+    questions: string[];     // 2-3 questions guiding the student's own revision
+    principle: string;       // ≤30 words — the craft principle the rewrite would honor
+    exemplars: string[];     // 1-2 corpus exemplars showing the principle in action
+  } | null;
+}
+```
+
+**Status:** Item 8 BLOCKED on Tue's pick of name (recommend `revisionMode`). Once chosen, design body needs search-and-replace + the §3 update above + a §3.5 clarification that this is a SIBLING to rewriteVariants, not a replacement. Then Stage 2 implementation is straightforward (mirrors Item 6's shape).
+

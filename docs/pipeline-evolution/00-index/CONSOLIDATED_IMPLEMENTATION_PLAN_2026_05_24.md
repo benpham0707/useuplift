@@ -380,3 +380,49 @@ Items 1's "+$0.009/essay" cache cost is already banked in the cached prompts at 
 
 C1/C2 caught two stale design claims. CAL-C1/C2/C3 + S2C-C1/C2 + CW-C1 + CM-C1 catch six more. **Design docs must verify against HEAD before being treated as work-to-do.** Append CORRECTIONS rather than silently revise — the audit trail matters.
 
+---
+
+## §12 — Stage 2 mid-session state (2026-05-27)
+
+Four commits shipped on `fix/warm-edit-completedalllayers`:
+
+| Commit | Item | Status |
+|---|---|---|
+| `36112fd` | Stage 2 audit | Doc-only — CORRECTIONS to 8 design docs |
+| `5cb9b51` | Item 2 Coherence-Resolution | Shipped (additive, unflagged) |
+| `6ffe5bd` | Item 6 Model Sentences + Cut-list | Shipped (behind `ENABLE_REWRITE_VARIANTS` + `ENABLE_CUT_LIST`) |
+| `b1bc29b` | Item 3 Executive Brief | Shipped (behind `ENABLE_EXECUTIVE_BRIEF`) |
+
+**Items remaining (Stage 2):**
+
+| # | Item | HEAD verification update (2026-05-27) | Decision needed |
+|---|---|---|---|
+| 4 | L6 prompt restructure | Premise doesn't match HEAD — no single "essay text" or "verdicts" block in L6; ~20 distributed sidecars. Design as written cannot be implemented. See `COACHING_PROMPT_RESTRUCTURE_DESIGN.md` CPR-C2. | Pick (a) compact sidecars / (b) Diagnostic-Snapshot-above-conversation / (c) drop Item 4. Recommend (b). |
+| 5 | Signals→capability | Three named signals (`claimEarnednessMap`, `rhetoricalInventory`, `archetypeDistanceProfile`) confirmed zero hits across entire `src/` tree. They do not exist anywhere. Only nameable signal is `revisionIntelligence`, already wired. See `SIGNALS_TO_CAPABILITY_DESIGN.md` S2C-C4. | Pick (a) drop Item 5 / (b) build producers first / (c) audit actual inert prompts. Recommend (a). |
+| 7 | Corpus wiring (1-3 of 10) | `antiArchetypes` + `[AP-#]` resolver fully shipped at `corpusRetrievalBlocks.ts:104,470,475`. `patternId` producer + catalog + validator shipped (consumer-side resolver helper may still be missing). `readerBiasGuards` confirmed greenfield. | Ship readerBiasGuards as standalone next session — small clean delta. |
+| 8 | Coaching mode | Naming collision identified ✓. Recommended name `revisionMode` + sibling-to-`rewriteVariants` schema sketched at `COACHING_MODE_DESIGN.md` CM-C4. | Pick field name (recommend `revisionMode`), then Stage 2 ship is straightforward. |
+
+**Session discipline:**
+- $0 of $5 testing cap spent (Phase 6 regen remains pre-approved up to $1.70 per D11).
+- AnnotationV2 backend-handoff work preserved uncommitted across 3 stash cycles, zero conflicts in final pop state.
+- File-scoped `git add` on every commit; `tsc --noEmit` + `npx vitest run` (925 / 5 skipped) green at every commit boundary.
+
+**Next session entry points (in order of leverage):**
+
+1. **Phase 6 regen** — flip the three flags + run the Crochet fixture (≤$1.70 approved). Validates Items 2/3/6 + the May-5 cache_read question simultaneously. Highest-information single move.
+2. **Resolve Items 4, 5, 8** — three small Tue decisions (one prompt-restructure scope choice, one drop-or-rescope, one field name). All three unblock implementation work that mirrors Items 2/6's shape.
+3. **Item 7 standalone** — readerBiasGuards retrieval + L5 wire-up. Small clean delta. Can ship in parallel with Phase 6 regen since flag-gated.
+
+**Phase 6 regen command (subject to final pre-run sanity check):**
+
+```
+ENABLE_EXECUTIVE_BRIEF=true \
+ENABLE_REWRITE_VARIANTS=true \
+ENABLE_CUT_LIST=true \
+L4_UNIFIED_CACHE=true \
+ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
+  npx tsx tests/dump-full-profile.ts --fixture 14-harvard-2028-crochet
+```
+
+Item 2 (coherence-resolution) is unflagged (additive prompt directive + schema only) — no flag needed.
+

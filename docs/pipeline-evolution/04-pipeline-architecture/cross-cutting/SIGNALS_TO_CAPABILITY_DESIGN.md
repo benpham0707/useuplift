@@ -121,3 +121,27 @@ Recommendation: per-signal flags. Lets us A/B the highest-leverage signals indiv
 ### S2C-C3 — `signalRouter.ts` module path
 - HEAD grep: `src/services/essayIntelligence/capabilities/` directory — verify existence before creating the new module per §10. Path may need adjustment.
 
+### S2C-C4 — confirmed: the three named signals do not exist anywhere (2026-05-27 follow-up)
+
+Repeated HEAD grep across the **entire `src/` tree** (not just `essayIntelligence/`):
+
+| Signal | Hits across `src/**/*.ts` |
+|---|---|
+| `claimEarnednessMap` / `claimEarnedness` | **0** |
+| `rhetoricalInventory` | **0** |
+| `archetypeDistanceProfile` | **0** |
+
+These are not under different names. They are not built anywhere. The design's §3 table assumes they are inert "prompt inventory" awaiting capability conversion — but **there is nothing to convert.** No producer means no signal means nothing for the router to gate / consume / handle.
+
+**Implication for Stage 2:** the only nameable signal in the design's scope that actually has a producer is `revisionIntelligence`, and that one is **already fully wired** (producer at `history/revisionIntelligence.ts`, consumed at `coachingService.ts:2225`). Per S2C-C1, it is not inert.
+
+**Three options Tue can choose between:**
+
+  - **(a) Drop Item 5 entirely.** The premise — "loaded in prompt, no gate" — does not apply at HEAD. Nothing to ship.
+  - **(b) Rescope to "build the three signal producers first, then wire."** Substantially bigger project than the design implies — each signal is a new analysis pass. Likely a multi-session effort, not a Stage 2 commit.
+  - **(c) Rescope to "audit the actual inert prompt inventory."** Walk the system + user prompts for L4/L5/L6 and identify what IS loaded but never gates anything. The list may be entirely different from the design's three names.
+
+**Recommendation:** (a). The router architecture is sound but applies to no current signal — and shipping a router for zero inputs is dead code. If (c) produces a real inert-signal list later, the router idea can be revived.
+
+**Status:** Item 5 BLOCKED on Tue's choice between (a)/(b)/(c).
+
