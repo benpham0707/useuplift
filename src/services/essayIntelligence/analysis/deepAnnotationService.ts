@@ -87,6 +87,24 @@ function isRewriteVariantsEnabled(): boolean {
 function isCutListEnabled(): boolean {
   return process.env.ENABLE_CUT_LIST === 'true';
 }
+/**
+ * Stage 2.D (Item 8): per-annotation revisionMode toggle. When on, the LLM
+ * picks 'rewrite' vs 'ask' per priority-1-2 ACTION annotation:
+ *   - 'rewrite' → existing path (rewriteVariants populated, askPayload null)
+ *   - 'ask'     → student writes the revision (rewriteVariants null,
+ *                  askPayload populated with questions + principle + exemplars)
+ *
+ * When flag is off, all eligible annotations default to 'rewrite' — the
+ * existing student-visible behavior is preserved byte-for-byte.
+ *
+ * Pedagogical motivation: always providing the answer trains learned
+ * helplessness. 'Ask' mode lets the student build the skill instead of
+ * copying. Mutual exclusion is load-bearing — the *system* not solving the
+ * problem is what produces the learning effect.
+ */
+function isRevisionModeAskEnabled(): boolean {
+  return process.env.ENABLE_REVISION_MODE_ASK === 'true';
+}
 
 /**
  * Stage 2.F: parse the LLM's `rewriteVariants` raw output into a typed array,
@@ -131,6 +149,60 @@ function parseRewriteVariants(
 
   if (byAngle.size === 0) return null;
   return Array.from(byAngle.values());
+}
+
+/**
+ * Stage 2.D (Item 8): resolve a per-annotation revisionMode from the raw
+ * LLM output. Returns null when the annotation is ineligible (non-ACTION,
+ * priority 3+) regardless of flag state. When the flag is OFF, eligible
+ * annotations default to 'rewrite' so student-visible behavior matches
+ * pre-feature shipping. When ON, the LLM's choice is honored; an invalid
+ * value coerces to 'rewrite' (safer default).
+ */
+function resolveRevisionMode(
+  raw: unknown,
+  teachingMode: L5TeachingMode,
+  priority: number,
+): 'rewrite' | 'ask' | null {
+  if (teachingMode !== 'action') return null;
+  if (priority > 2) return null;
+  if (!isRevisionModeAskEnabled()) return 'rewrite';
+  if (raw === 'ask') return 'ask';
+  return 'rewrite';
+}
+
+/**
+ * Stage 2.D (Item 8): parse the LLM's `askPayload` raw output into a typed
+ * shape, dropping invalid entries. Returns null when revisionMode is not
+ * 'ask' (mutual exclusion with rewriteVariants), or when the payload is
+ * missing required fields. Empty arrays for questions/exemplars OR empty
+ * principle string → drop entire payload (no usable signal).
+ */
+function parseAskPayload(
+  raw: unknown,
+  revisionMode: 'rewrite' | 'ask' | null,
+): AskPayload | null {
+  if (revisionMode !== 'ask') return null;
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+
+  const questionsRaw = Array.isArray(r.questions) ? r.questions : [];
+  const questions = questionsRaw
+    .filter((q): q is string => typeof q === 'string' && q.trim().length > 0)
+    .map((q) => q.trim());
+  if (questions.length === 0) return null;
+
+  const principle = typeof r.principle === 'string' ? r.principle.trim() : '';
+  if (principle.length === 0) return null;
+
+  const exemplarsRaw = Array.isArray(r.exemplars) ? r.exemplars : [];
+  const exemplars = exemplarsRaw
+    .filter((e): e is string => typeof e === 'string' && e.trim().length > 0)
+    .map((e) => e.trim());
+  // Exemplars optional — empty array is acceptable; principle + questions
+  // alone is a valid Socratic payload.
+
+  return { questions, principle, exemplars };
 }
 
 /**
@@ -382,8 +454,57 @@ export interface L5Annotation {
    *   - The ENABLE_REWRITE_VARIANTS flag is off (variants array is null,
    *     legacy single-rewrite path holds).
    *   - The LLM judged a single rewrite was sufficient.
+   *   - revisionMode is 'ask' (mutual exclusion with askPayload).
    */
   rewriteVariants: RewriteVariant[] | null;
+
+  /**
+   * Stage 2.D (Item 8): per-annotation editorial mode for priority-1-2
+   * ACTION annotations. Two values:
+   *
+   *   - 'rewrite' — system provides the revision (rewriteVariants
+   *                  populated, askPayload null). Existing behavior.
+   *   - 'ask'     — student writes the revision (rewriteVariants null,
+   *                  askPayload populated with questions + principle +
+   *                  exemplars). Pedagogical fix for learned helplessness.
+   *
+   * Mutually exclusive with rewriteVariants and askPayload — exactly one
+   * of those is non-null when revisionMode is non-null. Null for non-
+   * ACTION modes, priority 3-5 annotations, or when the flag is off.
+   *
+   * When ENABLE_REVISION_MODE_ASK is off, all eligible annotations default
+   * to 'rewrite' so the student-visible behavior matches pre-feature
+   * shipping.
+   */
+  revisionMode: 'rewrite' | 'ask' | null;
+
+  /**
+   * Stage 2.D (Item 8): the "ask" mode payload. Populated only when
+   * revisionMode === 'ask'. Null otherwise.
+   *
+   * Contains the materials the student uses to write their OWN revision:
+   *   - questions: 2-3 questions guiding the student's revision
+   *   - principle: ≤30-word craft principle the rewrite would honor
+   *   - exemplars: 1-2 exemplar phrases (from elsewhere in this essay or
+   *                from the corpus) showing the principle in action
+   */
+  askPayload: AskPayload | null;
+}
+
+/**
+ * Stage 2.D (Item 8): the 'ask' mode payload. Provided to the student when
+ * the L5 LLM judged this annotation needs Socratic-style coaching rather
+ * than a rewrite demo. Mutually exclusive with rewriteVariants per the
+ * Stage 2 design — exactly one of them is populated when revisionMode is
+ * non-null.
+ */
+export interface AskPayload {
+  /** 2-3 questions guiding the student's own revision. */
+  questions: string[];
+  /** ≤30-word craft principle the rewrite would honor. */
+  principle: string;
+  /** 1-2 exemplar phrases (essay-internal or corpus) showing the principle. */
+  exemplars: string[];
 }
 
 /**
@@ -520,6 +641,10 @@ interface RawAnnotation {
   capacityBuildingNote?: string | null;
   /** Stage 2.F: candidate revisions for priority 1-2 ACTION annotations. */
   rewriteVariants?: unknown[];
+  /** Stage 2.D (Item 8): per-annotation 'rewrite' vs 'ask' toggle. */
+  revisionMode?: string;
+  /** Stage 2.D (Item 8): the 'ask' mode payload — questions + principle + exemplars. */
+  askPayload?: unknown;
 }
 
 interface RawCutCandidate {
@@ -1193,6 +1318,31 @@ Variant length budget: ≤80 words each. Variant array cap: 2 priority-1-2 ACTIO
 `
       : '';
 
+    // Stage 2.D (Item 8): 'rewrite' vs 'ask' per-annotation toggle. Only
+    // inject directive when flag is on. Off-state preserves byte-identical
+    // pre-feature behavior (eligible annotations default to 'rewrite').
+    const revisionModeDirective = isRevisionModeAskEnabled()
+      ? `REVISION MODE TOGGLE (Stage 2.D):
+For each ACTION-mode annotation with priority 1 or 2, you must additionally pick a \`revisionMode\`. The pedagogy is load-bearing — "always providing the answer" trains learned helplessness. Some annotations are better served by inviting the student to write the revision themselves.
+
+Two values, MUTUALLY EXCLUSIVE with the rewriteVariants path:
+
+- \`"revisionMode": "rewrite"\` — system demonstrates. Emit \`rewriteVariants\` per the MODEL SENTENCE VARIANTS contract above. Set \`askPayload: null\`.
+
+- \`"revisionMode": "ask"\` — student writes the revision. Set \`rewriteVariants: null\`. Emit an \`askPayload\` object with:
+    { "questions": ["2-3 questions that guide the student to discover the fix themselves"], "principle": "≤30-word craft principle the rewrite would honor", "exemplars": ["1-2 short phrases (essay-internal OR corpus) that show the principle in action — verbatim quotes"] }
+
+PICKING THE MODE — heuristic, not rule:
+- Use \`"ask"\` when the student likely has the skill but hasn't applied it here. A question can unlock the revision; a demo would short-circuit learning.
+- Use \`"ask"\` when the rewrite would be highly stylistic and the student's voice should drive it.
+- Use \`"rewrite"\` when the student lacks the craft vocabulary to find the fix on their own (e.g., they don't yet know what "fronting a subordinate clause for emphasis" looks like).
+- Use \`"rewrite"\` for time-sensitive fixes (final-polish phase) where demonstration is faster than discovery.
+
+Distribution sanity (post-emission self-check): if you emitted only "rewrite" across the whole essay, you may have under-used "ask". If you emitted only "ask", the student is probably not yet equipped to revise — bias toward "rewrite".
+
+`
+      : '';
+
     // Stage 2.F: Decisive cut-list — only inject directive when the feature
     // flag is on. Cut candidates are gathered per-paragraph and aggregated
     // essay-wide in the result envelope.
@@ -1365,7 +1515,7 @@ The shared context may include a "COHERENCE RESOLUTIONS" block listing terminal-
 
 When in doubt about whether an annotation crosses a SUPPRESS signal, prefer not to surface it. Suppressed signals exist because L4 judged their evidence insufficient — re-surfacing them undoes the resolution.
 
-${rewriteVariantsDirective}${cutListDirective}ANNOTATION STRUCTURE (JSON):
+${rewriteVariantsDirective}${revisionModeDirective}${cutListDirective}ANNOTATION STRUCTURE (JSON):
 {
   "annotations": [
     {
@@ -1393,6 +1543,12 @@ ${rewriteVariantsDirective}${cutListDirective}ANNOTATION STRUCTURE (JSON):
         { "angle": "tighten", "text": "Three-sentence revised version.", "rationale": "≤25 words.", "netWordDelta": -8 },
         { "angle": "specify", "text": "Three-sentence revised version with concrete detail from elsewhere in essay.", "rationale": "≤25 words.", "netWordDelta": 2 }
       ]`
+          : ''
+      }${
+        isRevisionModeAskEnabled()
+          ? `,
+      "revisionMode": "rewrite" | "ask"  // mutually exclusive with the askPayload/rewriteVariants pairing
+      "askPayload": null | { "questions": ["Q1", "Q2"], "principle": "≤30-word craft principle", "exemplars": ["short verbatim phrase"] }`
           : ''
       }
     }
@@ -2448,8 +2604,48 @@ ${buildFabricationGuardBlock()}`;
         // angles. Validator drops any variant whose `angle` is unrecognized
         // and de-duplicates by angle so the array carries at most one entry
         // per angle.
+        //
+        // Stage 2.D (Item 8): rewriteVariants and askPayload are MUTUALLY
+        // EXCLUSIVE — when revisionMode='ask', rewriteVariants is null and
+        // askPayload is non-null. resolveRevisionMode + parseAskPayload below
+        // enforce the dichotomy; this line is overridden in the post-push
+        // mutual-exclusion pass to keep the data invariant.
         rewriteVariants: parseRewriteVariants(raw.rewriteVariants, teachingMode, raw.priority ?? 3),
+        // Stage 2.D (Item 8): revisionMode + askPayload. resolveRevisionMode
+        // returns null for ineligible annotations regardless of flag; when
+        // the flag is off, eligible annotations default to 'rewrite' so
+        // pre-feature behavior is preserved.
+        revisionMode: resolveRevisionMode(raw.revisionMode, teachingMode, raw.priority ?? 3),
+        askPayload: null, // set below alongside mutual-exclusion enforcement
       });
+
+      // Stage 2.D (Item 8): mutual-exclusion enforcement. When the LLM picked
+      // revisionMode='ask', parse askPayload AND clear rewriteVariants. When
+      // 'rewrite' (or null for ineligible), askPayload stays null. If the
+      // LLM emitted both populated by accident, the schema invariant wins
+      // and rewriteVariants is the canonical demo path.
+      const built = valid[valid.length - 1];
+      if (built.revisionMode === 'ask') {
+        const parsedAsk = parseAskPayload(raw.askPayload, built.revisionMode);
+        if (parsedAsk !== null) {
+          built.askPayload = parsedAsk;
+          built.rewriteVariants = null; // mutual exclusion
+        } else {
+          // LLM picked 'ask' but emitted no usable payload — fall back to
+          // 'rewrite' rather than ship a broken ask. Diagnostic only;
+          // rewriteVariants stays as parsed above (possibly null if the
+          // LLM didn't emit those either, in which case the annotation
+          // surfaces as a CONSEQUENCE-shaped ACTION which the ranker can
+          // de-prioritize).
+          console.warn(
+            `[L5 validateAnnotations] revisionMode='ask' with no usable askPayload at ` +
+              `P${built.location.paragraphIndex}S${built.location.sentenceIndex ?? '?'}; ` +
+              `falling back to 'rewrite'.`,
+          );
+          built.revisionMode = 'rewrite';
+          built.askPayload = null;
+        }
+      }
     }
 
     return valid;
