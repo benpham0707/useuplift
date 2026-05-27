@@ -445,5 +445,45 @@ Walking through the remaining open-gate items in back-and-forth with Tue:
 - Sub-item 1 (readerBiasGuards) has zero authored data AND zero infrastructure. Shipping retrieval scaffolding for nonexistent data is the same anti-pattern as Item 5's "router for zero inputs."
 - **Correct sequence:** author the 14 entries first as domain-judgment work, then ship retrieval + L5 wire as a bundled change. See `CORPUS_WIRING_DESIGN.md` CW-C4 for the disposition + sequence.
 
-### Item 8 — Coaching mode → (pending decision, recommend `revisionMode` field name)
+### Item 8 — Coaching mode → DECIDED: revisionMode + askPayload (sibling, mutually exclusive)
+- Field name picked: `revisionMode` (`'rewrite' | 'ask' | null`). Resolves collision with existing per-turn `CoachingMode` + `L5TeachingMode`.
+- Schema shape (P): sibling to Item 6's `rewriteVariants` — mutually exclusive on ACTION priority-1-2 annotations.
+- Shipped at `da7765d`. Flag `ENABLE_REVISION_MODE_ASK` (off → eligible defaults to 'rewrite'; on → LLM picks per annotation).
+- Mutual-exclusion enforcement in `validateAnnotations`: when LLM picks 'ask' with unusable payload, falls back to 'rewrite' rather than ship broken state.
+
+---
+
+## §14 — Stage 2 final tally
+
+All 8 ranked quality items resolved.
+
+| # | Item | Outcome | Commit |
+|---|---|---|---|
+| 1 | Calibration few-shot | Closed — already shipped at HEAD | — |
+| 2 | Coherence-resolution | Shipped (additive, unflagged) | `5cb9b51` |
+| 3 | Executive Brief | Shipped (`ENABLE_EXECUTIVE_BRIEF`) | `b1bc29b` |
+| 4 | L6 prompt restructure | Shipped (`ENABLE_DIAGNOSTIC_SNAPSHOT`, rescoped to Diagnostic Snapshot) | `c95fd01` |
+| 5 | Signals → capability | Dropped — Phase 6.5 audit deferred | `84ea28a` |
+| 6 | Model sentences + cut-list | Shipped (`ENABLE_REWRITE_VARIANTS`, `ENABLE_CUT_LIST`) | `6ffe5bd` |
+| 7 | Corpus wiring | Dropped — 2/3 already shipped, readerBiasGuards needs data-first sequence | `e696f1d` |
+| 8 | Coaching mode | Shipped (`ENABLE_REVISION_MODE_ASK`) | `da7765d` |
+
+**Phase 6 regen command (final, all four flags wired):**
+
+```
+ENABLE_EXECUTIVE_BRIEF=true \
+ENABLE_DIAGNOSTIC_SNAPSHOT=true \
+ENABLE_REWRITE_VARIANTS=true \
+ENABLE_CUT_LIST=true \
+ENABLE_REVISION_MODE_ASK=true \
+L4_UNIFIED_CACHE=true \
+ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
+  npx tsx tests/dump-full-profile.ts --fixture 14-harvard-2028-crochet
+```
+
+Item 2 (coherence-resolution) is unflagged — fires automatically.
+
+**Deferred to future work:**
+- Phase 6.5 audit: walk L4/L5/L6 cached prompt blocks against downstream consumer paths after the regen surfaces per-layer token-cost data. Find real inert content. (Item 5 follow-up per S2C-C5.)
+- readerBiasGuards: author the 14 entries as domain-judgment work, then ship retrieval + L5 wire as a bundled change. (Item 7 follow-up per CW-C4.)
 
