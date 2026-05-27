@@ -1420,6 +1420,50 @@ export class AnalysisOrchestrator {
             `essayId=${input.essayId} iter=${currentIter}`,
         );
 
+        // ── Stage 2.A: Executive Brief ──────────────────────────────────────
+        // Post-L5 Sonnet micro-call: <300-word counselor-grade verdict +
+        // 5 directives + 3 model sentences. Sits at the top of every
+        // dump / coaching surface. Flag-gated; null when off or when the
+        // single-retry validator could not produce a conformant brief
+        // (orchestrator continues without — the dump is intact without it).
+        try {
+          const { generateExecutiveBrief, isExecutiveBriefEnabled } = await import('./executiveBrief');
+          if (isExecutiveBriefEnabled()) {
+            const briefStart = Date.now();
+            const brief = await generateExecutiveBrief({
+              profile: coordinator.getProfile() as EssayProfile,
+              l5Result,
+            });
+            if (brief !== null) {
+              // Mirror the aoFirstRead write pattern at :595-597: direct
+              // mutation through the coordinator-owned profile reference.
+              const briefProfile = coordinator.getProfile() as EssayProfile;
+              briefProfile.executiveBrief = brief;
+              costTracker.record('ExecutiveBrief', brief.cost, {
+                inputTokens: 0,
+                outputTokens: 0,
+                cacheReadTokens: 0,
+                cacheWriteTokens: 0,
+              }, brief.timingMs);
+              console.log(
+                `[Orchestrator] ExecutiveBrief: ${brief.totalWordCount}w, ` +
+                  `tier=${brief.targetTier}, truncated=${brief.truncated}, ` +
+                  `cost=$${brief.cost.toFixed(4)}, time=${Date.now() - briefStart}ms`,
+              );
+            } else {
+              console.warn('[Orchestrator] ExecutiveBrief generator returned null — no brief this run.');
+            }
+          }
+        } catch (briefErr) {
+          // Non-fatal: brief is an enhancement, not a load-bearing artifact.
+          // The dump remains usable without it. Log loudly so Phase 6 regen
+          // notices, but do not throw — the orchestrator continues to Phase 7.
+          console.error(
+            '[Orchestrator] ExecutiveBrief generation failed (non-fatal):',
+            briefErr instanceof Error ? briefErr.message : briefErr,
+          );
+        }
+
         // Checkpoint after L5
         await this.safeCheckpoint(coordinator, 'after_l5');
       } catch (error) {
