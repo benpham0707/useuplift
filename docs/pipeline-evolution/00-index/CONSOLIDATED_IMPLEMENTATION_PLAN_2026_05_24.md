@@ -426,3 +426,21 @@ ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
 
 Item 2 (coherence-resolution) is unflagged (additive prompt directive + schema only) — no flag needed.
 
+---
+
+## §13 — Stage 2 final-decision log (2026-05-27)
+
+Walking through the remaining open-gate items in back-and-forth with Tue:
+
+### Item 4 — L6 prompt restructure → DECIDED: (b) Diagnostic Snapshot
+- Locked sub-decisions: no model sentences, top 3 directives, phase level + focusAreas, include committeeOneLiner, independent `ENABLE_DIAGNOSTIC_SNAPSHOT` flag, partial-emit fallback.
+- Shipped at `c95fd01` — new `coaching/diagnosticSnapshot.ts` module + `coachingService.ts:2660` wire site.
+
+### Item 5 — Signals → capability → DECIDED: (a) drop
+- Stage 2 router would have zero inputs (three named signals don't exist). Dead code.
+- **Phase 6.5 deferred audit task** (documented in `SIGNALS_TO_CAPABILITY_DESIGN.md` S2C-C5): walk L4/L5/L6 cached prompt blocks against downstream consumer paths; classify each as load-bearing or inert with grep + read evidence. Run AFTER Phase 6 regen produces per-layer token-cost data so the audit has a real baseline. If real inert content surfaces, design the capability conversion against actual targets.
+
+### Item 7 — Corpus wiring → (pending decision, recommend ship readerBiasGuards only)
+
+### Item 8 — Coaching mode → (pending decision, recommend `revisionMode` field name)
+

@@ -145,3 +145,13 @@ These are not under different names. They are not built anywhere. The design's �
 
 **Status:** Item 5 BLOCKED on Tue's choice between (a)/(b)/(c).
 
+### S2C-C5 — final disposition: (a) drop, with Phase 6.5 follow-up (2026-05-27)
+
+Tue chose option (a). Item 5 is **dropped from Stage 2.**
+
+The underlying research finding (some prompt content is inert) is still worth investigating, but as a **Phase 6.5 post-regen audit task**, not as a Stage 2 commit. The Phase 6 regen ledger will produce per-layer token-cost data that makes a real audit possible — without it, we'd be guessing at the wrong targets, same failure mode as the original design's three ghost signals.
+
+**Phase 6.5 task (deferred):** Walk L4 / L5 / L6 cached prompt blocks against actual downstream consumer code paths. For each major block, classify as "load-bearing (consumed)" or "inert (no consumer)" with grep + read evidence. Output a list. THEN — and only then — design the capability conversion for any real inert content found.
+
+This design doc is otherwise frozen. No further iteration without a Phase 6.5 audit producing real targets.
+
