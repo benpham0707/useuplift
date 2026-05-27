@@ -174,3 +174,24 @@ If data is partial (e.g. only 6 of 14 readerBiasGuards populated), ship anyway �
 - Item 2 `antiArchetypes` + `[AP-#]` — mostly already shipped; only L5 consumer-side surface may be new.
 - Item 3 `patternId` resolver — needs HEAD verification before any code.
 
+### CW-C4 — final disposition: (B) drop Item 7 from Stage 2 (2026-05-27)
+
+Deeper HEAD verification + Tue's call. Final sub-item status:
+
+| Sub-item | Status | Evidence |
+|---|---|---|
+| 1. `readerBiasGuards` | NOT SHIPPED + NO DATA | `find src/services/essayIntelligence/corpus -name "*bias*"` returns zero; no data file, no resolver, no consumer wire. Authoring the 14 entries is content work outside Stage 2 scope. |
+| 2. `antiArchetypes` + `[AP-#]` | SHIPPED | Data at `corpus/antiArchetypes.ts`; resolver at `corpusRetrievalBlocks.ts:104, 470, 475`; fabrication-attribution scan at `analysisPass.ts:2087-2091`. |
+| 3. `patternId` resolver | SHIPPED | `getPatternById` consumed at `coaching/teachingContentRouter.ts:100-106`. Producer + catalog (`patternCatalogBlock.ts`) + validator (`analysisPass.ts:1633`) + consumer-side helper all live. |
+
+**Decision:** Item 7 is **dropped from Stage 2.** Two of three sub-items are already shipped at HEAD. Sub-item 1 (`readerBiasGuards`) is dropped because data-greenfield + retrieval-greenfield together would be premature scaffolding — empty section in the L5 prompt with no behavioral effect.
+
+**Correct future sequence for `readerBiasGuards`:**
+1. Author the 14 entries (one per archetype × bias-pattern). This is a domain-judgment task — what biases each archetype is at risk of reinforcing (model-minority, sympathy-bait, hero-savior, etc.) and what the L5 guard should flag.
+2. Define the schema in `corpus/readerBiasGuards.ts` (mirror `antiArchetypes.ts` shape).
+3. Ship retrieval + L5 consumer wire as a single bundled change, once data exists.
+
+Doing (1) without (2)+(3) is fine — content can land first, code follows. Doing (2)+(3) without (1) is the anti-pattern this disposition rejects.
+
+**Status:** Item 7 closed. The remaining 5 dormant types in the original design (`voiceArchetypeCompatibility`, `corpusLimits`, `schoolFitVectors`, `moveDependencies`, `contextualValidity`, `deliberateAbsences`) stay deferred per their original §1 dormant status.
+

@@ -440,7 +440,10 @@ Walking through the remaining open-gate items in back-and-forth with Tue:
 - Stage 2 router would have zero inputs (three named signals don't exist). Dead code.
 - **Phase 6.5 deferred audit task** (documented in `SIGNALS_TO_CAPABILITY_DESIGN.md` S2C-C5): walk L4/L5/L6 cached prompt blocks against downstream consumer paths; classify each as load-bearing or inert with grep + read evidence. Run AFTER Phase 6 regen produces per-layer token-cost data so the audit has a real baseline. If real inert content surfaces, design the capability conversion against actual targets.
 
-### Item 7 — Corpus wiring → (pending decision, recommend ship readerBiasGuards only)
+### Item 7 — Corpus wiring → DECIDED: drop
+- Sub-items 2 (antiArchetypes + [AP-#]) and 3 (patternId resolver) confirmed already shipped at HEAD. `getPatternById` is consumed at `coaching/teachingContentRouter.ts:100-106`; antiArchetypes data + resolver are live.
+- Sub-item 1 (readerBiasGuards) has zero authored data AND zero infrastructure. Shipping retrieval scaffolding for nonexistent data is the same anti-pattern as Item 5's "router for zero inputs."
+- **Correct sequence:** author the 14 entries first as domain-judgment work, then ship retrieval + L5 wire as a bundled change. See `CORPUS_WIRING_DESIGN.md` CW-C4 for the disposition + sequence.
 
 ### Item 8 — Coaching mode → (pending decision, recommend `revisionMode` field name)
 
