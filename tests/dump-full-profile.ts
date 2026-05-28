@@ -909,7 +909,16 @@ function renderParagraphProfiles(profile: EssayProfile): string {
       if (pa.strengthSignatures.length > 0) {
         lines.push('- Strength signatures:');
         for (const ss of pa.strengthSignatures) {
-          lines.push(`  - **${ss.quality}**: ${ss.evidence}`);
+          // Bucket C (2026-05-27): when evidence is verbatim the verdict
+          // (L3.5 occasionally pastes the verdict here instead of a short
+          // quoted fragment), drop the evidence — keep the quality label,
+          // which is still informative on its own. Defense-in-depth; the
+          // L3.5 prompt directive prevents the bug at source.
+          if (ss.evidence && ss.evidence.trim() !== pa.verdict.trim()) {
+            lines.push(`  - **${ss.quality}**: ${ss.evidence}`);
+          } else {
+            lines.push(`  - **${ss.quality}**`);
+          }
         }
       }
       if (pa.growthEdges.length > 0) {

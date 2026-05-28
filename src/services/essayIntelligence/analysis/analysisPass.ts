@@ -695,7 +695,12 @@ SCHEMA BREVITY CAPS (Scope 1 Phase 2):
 - weaknesses[].evidence: MAX 10 words — same
 - strengthSignatures[].evidence: MAX 10 words — same
 - growthEdges: MAX 3 entries per paragraph output. Pick the highest-leverage gaps; the system trims excess. Each description: ≤25 words — concrete and specific, not generic.
-- effectivenessReasoning: UNCAPPED — this is your load-bearing reasoning chain and is consumed downstream by L4 and coaching. Write it fully.${piqAntiClusteringLine}`;
+- effectivenessReasoning: UNCAPPED — this is your load-bearing reasoning chain and is consumed downstream by L4 and coaching. Write it fully.
+
+EVIDENCE CONTENT — FORBIDDEN PATTERNS (Bucket C, 2026-05-27):
+- NEVER paste the paragraph's verdict text into the evidence field of a strength signature or strength/weakness entry. The verdict belongs in \`paragraphVerdict\`; evidence is a SHORT QUOTED FRAGMENT from the paragraph text.
+- NEVER paste the paragraph text itself as evidence — evidence is a quote of the SPECIFIC fragment that demonstrates the signature.
+- If you cannot produce a ≤10-word quoted fragment, omit the evidence field rather than padding it with commentary or copy-paste from elsewhere in your output.${piqAntiClusteringLine}`;
 
   // Port B1: schema-extension appendix for pattern catalog emission. Kept
   // separate from the base prompt (and gated on essayType) so non-B1 call-
