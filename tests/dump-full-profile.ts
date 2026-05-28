@@ -1143,20 +1143,57 @@ function renderCoherenceReport(profile: EssayProfile): string {
   lines.push(`- **Is coherent**: ${cr.isCoherent}`);
   lines.push(`- **Contradictions found**: ${cr.contradictions.length}`);
 
-  if (cr.contradictions.length > 0) {
-    lines.push('\n**Contradictions:**\n');
+  // Bucket E (2026-05-27): resolution-first render. After Stage 2.B, every
+  // contradiction L4 surfaces should carry a CoherenceResolution. Lead with
+  // the OUTCOMES (state + reasoning + surface/suppress signals) rather than
+  // the raw contradiction wall (claimA/B/nature/routingCategory/canCoexist/
+  // likelyResolution/evidence/source) that duplicated §9 findings.
+  // Resolutions live on northStar OR scoreMatrix (both stamped identically
+  // by the crystallizer); read either.
+  const resolutions =
+    profile.northStar?.coherenceResolutions ??
+    profile.scoreMatrix?.coherenceResolutions ??
+    [];
+
+  if (resolutions.length > 0) {
+    lines.push(`- **Resolutions emitted**: ${resolutions.length}`);
+    lines.push('\n**Resolutions (terminal state per contradiction):**\n');
+    for (const r of resolutions) {
+      // contradictionId is free-text that typically names the contradicting
+      // sections — it serves as the A-vs-B summary.
+      lines.push(`### [${r.state.toUpperCase()}] ${r.contradictionId}`);
+      lines.push(`- **Reasoning**: ${r.reasoning}`);
+      if (r.surfaceSignals.length > 0) {
+        lines.push(`- **Surface**: ${r.surfaceSignals.join(', ')}`);
+      }
+      if (r.suppressedSignals.length > 0) {
+        lines.push(`- **Suppressed (do not surface)**: ${r.suppressedSignals.join(', ')}`);
+      }
+      lines.push('');
+    }
+    // Any contradiction count not covered by a resolution → flag the gap
+    // compactly so an unaddressed contradiction is visible, not hidden.
+    if (cr.contradictions.length > resolutions.length) {
+      lines.push(
+        `> ${cr.contradictions.length - resolutions.length} contradiction(s) lack a resolution — ` +
+          `L4 directive may have under-emitted. Compact list:\n`,
+      );
+      for (const c of cr.contradictions) {
+        lines.push(`- **${c.severity.toUpperCase()}** ${c.sectionA} vs ${c.sectionB}: ${c.suggestedResolution}`);
+      }
+      lines.push('');
+    }
+  } else if (cr.contradictions.length > 0) {
+    // Backward-compat fallback (pre-Stage-2.B profiles, or L4 didn't emit
+    // resolutions): compact contradiction render. Drop the verbose
+    // nature/routingCategory/canCoexist/likelyResolution/evidence/source
+    // fields — those duplicated findings or were diagnostic-for-own-sake.
+    lines.push('\n**Contradictions (no resolutions — compact view):**\n');
     for (const c of cr.contradictions) {
-      lines.push(`### ${c.severity.toUpperCase()}: ${c.sectionA} vs ${c.sectionB}\n`);
+      lines.push(`### ${c.severity.toUpperCase()}: ${c.sectionA} vs ${c.sectionB}`);
       lines.push(`- **Claim A**: ${c.claimA}`);
       lines.push(`- **Claim B**: ${c.claimB}`);
-      lines.push(`- **Nature**: ${safe(c.nature)}`);
-      lines.push(`- **Routing category**: ${safe(c.routingCategory)}`);
-      lines.push(`- **Can coexist**: ${c.canCoexist ?? 'N/A'}`);
       lines.push(`- **Suggested resolution**: ${c.suggestedResolution}`);
-      lines.push(`- **Likely resolution**: ${safe(c.likelyResolution)}`);
-      if (c.evidenceA) lines.push(`- **Evidence A**: "${c.evidenceA}"`);
-      if (c.evidenceB) lines.push(`- **Evidence B**: "${c.evidenceB}"`);
-      lines.push(`- **Source**: ${safe(c.source)}`);
       lines.push('');
     }
   }
