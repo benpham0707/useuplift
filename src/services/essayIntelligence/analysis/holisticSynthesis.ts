@@ -739,6 +739,17 @@ Review existing findings from the walk. With the complete essay understanding, s
 If synthesis reveals NEW essay-level findings — cross-essay patterns, structural strategies, identity-level observations — produce those in newFindings. Focus on findings that require the full-text simultaneous view (the walk could not have seen them paragraph-by-paragraph).
 DO NOT duplicate findings the walk already produced. Use buildsOn/relatedTo to reference existing findings.
 
+COACHING VALUE CALIBRATION (Bucket D, 2026-05-27 — reserve "critical"):
+The coachingValue field is the SEVERITY rubric the coaching system uses to prioritize. It is NOT a synonym for "important." When everything is critical, nothing is. Apply this discipline:
+
+- 'critical' — A blocker. The essay does not function as an essay until this is addressed (e.g., undelivered thesis, structural collapse, voice that contradicts itself, factual claim the AO would catch). RESERVED: aim for ≤2 critical findings per essay; an essay with 5 critical findings is in structural-revision territory, which belongs in a single "this essay needs a structural pass" framing, not 5 parallel criticals.
+- 'high' — A meaningful constraint on what the essay can become without a revision pass on this. Real problem the student should address THIS draft, but the essay still functions if they don't.
+- 'medium' — A craft or refinement opportunity. The student benefits from addressing it but the essay survives without.
+- 'contextual' — A signal that matters for the coach's framing, not the student's revision. Use sparingly.
+- 'diagnostic' — Internal signal for the system. Should rarely surface to the student.
+
+DISTRIBUTION SANITY (post-emission self-check): if you tagged ≥4 findings as 'critical' across this essay, demote the borderline ones to 'high' and surface the structural pattern as a single critical META finding ("Essay needs structural pass — see findings X, Y, Z"). 'critical' is a budget, not a label.
+
 SUPERSESSION IS RARE: Prefer 'confirmed' or 'deepened' over 'superseded'. A finding should only be superseded when its claim is WRONG or CONTRADICTED by the holistic view — not when it's incomplete or narrow. If a finding captured a partial truth, deepen it rather than superseding it. The coaching system depends on active findings — if you supersede everything, the student gets no improvement targets. When you DO supersede, you MUST produce a replacement finding in newFindings.`;
 
 // ============================================================================
