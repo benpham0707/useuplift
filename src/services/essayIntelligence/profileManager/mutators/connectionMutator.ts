@@ -555,37 +555,52 @@ export class ConnectionMutator {
   ): MutationType[] {
     const mutations: MutationType[] = [];
 
-    // Repeated elements → pairwise connections between occurrences
+    // Bucket A (2026-05-27): repeatedElements → ONE canonical pair-edge per
+    // element, NOT the C(N,2) pairwise explosion. The pairwise multiplicity
+    // was pure data noise — no downstream consumer walks N-choose-2 pairs
+    // and treats each pair differently. The `description` already lists all
+    // participants in prose ("P1S1 uses 'mage's staff'; P2S0 references
+    // 'enchanted broom'; P3S1 uses 'wizard'..."), so the information is
+    // preserved. The dump's §7 collapses from ~810 lines to ~150 lines, and
+    // L3/L4/L5 prompts no longer pay the duplicate-description token cost
+    // 4× downstream.
+    //
+    // Convention: first occurrence → last occurrence, with the full
+    // participant list rendered in the `description`/`significance` fields.
+    // Sentences in middle occurrences still appear in the description prose
+    // and remain queryable via the connection lookup graph.
     for (const elem of scout.repeatedElements) {
-      for (let i = 0; i < elem.occurrences.length; i++) {
-        for (let j = i + 1; j < elem.occurrences.length; j++) {
-          const fromOcc = elem.occurrences[i];
-          const toOcc = elem.occurrences[j];
-          const result = this.addConnection(profile, {
-            from: {
-              paragraph: fromOcc.paragraphIndex,
-              sentence: fromOcc.sentenceIndex,
-              label: `"${elem.element}" occurrence ${i + 1}`,
-            },
-            to: {
-              paragraph: toOcc.paragraphIndex,
-              sentence: toOcc.sentenceIndex,
-              label: `"${elem.element}" occurrence ${j + 1}`,
-            },
-            description: `Repeated element "${elem.element}": ${elem.potentialSignificance}`,
-            reverseIllumination: null,
-            significance: elem.potentialSignificance,
-            strengthCategory: 'tentative',
-            directionality: 'forward',
-            discoveredBy: 'scout',
-            routingTags: ['thematic'],
-            relatedFindings: [],
-          });
-          if (result.connectionId && result.mutations.length > 0) {
-            for (const m of result.mutations) {
-              if (!mutations.includes(m)) mutations.push(m);
-            }
-          }
+      if (elem.occurrences.length < 2) continue; // validator should guarantee, defense
+      const firstOcc = elem.occurrences[0];
+      const lastOcc = elem.occurrences[elem.occurrences.length - 1];
+      const participantsList = elem.occurrences
+        .map((o, idx) => `occurrence ${idx + 1} at P${o.paragraphIndex}S${o.sentenceIndex}`)
+        .join(', ');
+      const result = this.addConnection(profile, {
+        from: {
+          paragraph: firstOcc.paragraphIndex,
+          sentence: firstOcc.sentenceIndex,
+          label: `"${elem.element}" first occurrence`,
+        },
+        to: {
+          paragraph: lastOcc.paragraphIndex,
+          sentence: lastOcc.sentenceIndex,
+          label: `"${elem.element}" last occurrence`,
+        },
+        description:
+          `Repeated element "${elem.element}" across ${elem.occurrences.length} sentences (${participantsList}): ` +
+          `${elem.potentialSignificance}`,
+        reverseIllumination: null,
+        significance: elem.potentialSignificance,
+        strengthCategory: 'tentative',
+        directionality: 'forward',
+        discoveredBy: 'scout',
+        routingTags: ['thematic'],
+        relatedFindings: [],
+      });
+      if (result.connectionId && result.mutations.length > 0) {
+        for (const m of result.mutations) {
+          if (!mutations.includes(m)) mutations.push(m);
         }
       }
     }

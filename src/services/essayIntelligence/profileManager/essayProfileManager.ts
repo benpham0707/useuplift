@@ -1886,24 +1886,29 @@ export class EssayProfileCoordinator {
       discoveredBy: 'scout';
     }> = [];
 
-    // Repeated elements: create connections between each pair of occurrences
+    // Bucket A (2026-05-27): repeatedElements → ONE canonical pair-edge per
+    // element, NOT the C(N,2) pairwise explosion. See connectionMutator.ts
+    // addScoutLeads() for the full rationale. Keeps `from`/`to` at first/
+    // last occurrence; the description lists all participants in prose.
     for (const elem of scout.repeatedElements) {
-      for (let i = 0; i < elem.occurrences.length; i++) {
-        for (let j = i + 1; j < elem.occurrences.length; j++) {
-          const from = elem.occurrences[i];
-          const to = elem.occurrences[j];
-          flattenedLeads.push({
-            from: { paragraph: from.paragraphIndex, sentence: from.sentenceIndex, label: `P${from.paragraphIndex}S${from.sentenceIndex}` } as ConnectionEndpoint,
-            to: { paragraph: to.paragraphIndex, sentence: to.sentenceIndex, label: `P${to.paragraphIndex}S${to.sentenceIndex}` } as ConnectionEndpoint,
-            description: `Repeated element "${elem.element}": ${elem.potentialSignificance}`,
-            reverseIllumination: null,
-            significance: elem.potentialSignificance,
-            strengthCategory: 'tentative' as const,
-            directionality: 'forward' as const,
-            discoveredBy: 'scout' as const,
-          });
-        }
-      }
+      if (elem.occurrences.length < 2) continue;
+      const from = elem.occurrences[0];
+      const to = elem.occurrences[elem.occurrences.length - 1];
+      const participantsList = elem.occurrences
+        .map((o) => `P${o.paragraphIndex}S${o.sentenceIndex}`)
+        .join(', ');
+      flattenedLeads.push({
+        from: { paragraph: from.paragraphIndex, sentence: from.sentenceIndex, label: `P${from.paragraphIndex}S${from.sentenceIndex}` } as ConnectionEndpoint,
+        to: { paragraph: to.paragraphIndex, sentence: to.sentenceIndex, label: `P${to.paragraphIndex}S${to.sentenceIndex}` } as ConnectionEndpoint,
+        description:
+          `Repeated element "${elem.element}" across ${elem.occurrences.length} sentences (${participantsList}): ` +
+          `${elem.potentialSignificance}`,
+        reverseIllumination: null,
+        significance: elem.potentialSignificance,
+        strengthCategory: 'tentative' as const,
+        directionality: 'forward' as const,
+        discoveredBy: 'scout' as const,
+      });
     }
 
     // Tonal shifts: create connection from the shift point to the START of the next paragraph.
