@@ -93,12 +93,30 @@ function safe(val: unknown): string {
   return String(val);
 }
 
-/** Render observation entries as a markdown list */
+/**
+ * Render observation entries as a markdown list.
+ *
+ * Bucket B (2026-05-27): returns empty string for empty arrays so callers
+ * can guard whole header+body blocks via `if (out)` or by length-checking
+ * the input. Per-entry: skip `Confidence` when it's the default 0.5
+ * sentinel and skip `Evidence` when empty — both signal "no real signal"
+ * and shipped as visible lines on every populated entry, polluting §8.
+ */
 function renderObservations(obs: Array<{ observation: string; confidence: number; evidence: string }> | undefined): string {
-  if (!obs || obs.length === 0) return '  (none)\n';
-  return obs.map(o =>
-    `  - **${o.observation}**\n    - Confidence: ${o.confidence}\n    - Evidence: "${o.evidence}"`
-  ).join('\n') + '\n';
+  if (!obs || obs.length === 0) return '';
+  return obs.map(o => {
+    const parts: string[] = [`  - **${o.observation}**`];
+    // Skip default-0.5 confidence — it's the "no real confidence assigned"
+    // sentinel and renders as noise on every otherwise-meaningful entry.
+    if (o.confidence !== 0.5) {
+      parts.push(`    - Confidence: ${o.confidence}`);
+    }
+    // Skip empty evidence — same noise pattern.
+    if (o.evidence && o.evidence.length > 0) {
+      parts.push(`    - Evidence: "${o.evidence}"`);
+    }
+    return parts.join('\n');
+  }).join('\n') + '\n';
 }
 
 // ============================================================================
@@ -124,8 +142,8 @@ function renderPipelineOverview(result: PipelineResult, essayText: string, pipel
     lines.push(`- **Coaching lens**: ${ip.coachingLens}`);
     lines.push(`- **Readiness assessment**: ${ip.readinessAssessment}`);
     lines.push(`- **Near boundary**: ${ip.nearBoundary ?? 'N/A'}`);
-    lines.push(`- **Focus areas**: ${ip.focusAreas.join('; ') || '(none)'}`);
-    lines.push(`- **Deferred areas**: ${ip.deferredAreas.join('; ') || '(none)'}`);
+    if (ip.focusAreas.length > 0) lines.push(`- **Focus areas**: ${ip.focusAreas.join('; ')}`);
+    if (ip.deferredAreas.length > 0) lines.push(`- **Deferred areas**: ${ip.deferredAreas.join('; ')}`);
     lines.push(`- **Legacy readiness**: essay=${ip.legacyReadiness.essayLevel}, paragraph=${ip.legacyReadiness.paragraphLevel}, sentence=${ip.legacyReadiness.sentenceLevel}, word=${ip.legacyReadiness.wordLevel}`);
     if (ip.dimensionPhases.length > 0) {
       lines.push(`\n**Dimension Phases:**`);
@@ -202,7 +220,7 @@ function renderNorthStar(profile: EssayProfile): string {
     lines.push(`- **Central element**: ${tlm.centralElement}`);
     lines.push(`- **Element type**: ${tlm.elementType}`);
     lines.push(`- **Transformation**: ${tlm.transformation}`);
-    lines.push(`- **Connection refs**: ${tlm.connectionRefs.join(', ') || '(none)'}`);
+    if (tlm.connectionRefs.length > 0) lines.push(`- **Connection refs**: ${tlm.connectionRefs.join(', ')}`);
     lines.push('\n**Journey:**\n');
     for (const j of tlm.journey) {
       const loc = j.location.sentence !== undefined
@@ -250,7 +268,7 @@ function renderNorthStar(profile: EssayProfile): string {
   lines.push('\n### Distinctiveness Signature\n');
   const ds = ns.distinctivenessSignature;
   lines.push(`**Articulation**: ${ds.articulation}\n`);
-  lines.push(`**Entanglement refs**: ${ds.entanglementRefs.join(', ') || '(none)'}`);
+  if (ds.entanglementRefs.length > 0) lines.push(`**Entanglement refs**: ${ds.entanglementRefs.join(', ')}`);
   lines.push('\n**Non-interchangeable factors:**\n');
   for (const f of ds.nonInterchangeableFactors) {
     lines.push(`- ${f}`);
@@ -262,7 +280,7 @@ function renderNorthStar(profile: EssayProfile): string {
     const ib = ns.intentBridge;
     lines.push(`- **Student intent**: ${safe(ib.studentIntent)}`);
     lines.push(`- **System reading**: ${ib.systemReading}`);
-    lines.push(`- **Source insight IDs**: ${ib.sourceInsightIds.join(', ') || '(none)'}`);
+    if (ib.sourceInsightIds.length > 0) lines.push(`- **Source insight IDs**: ${ib.sourceInsightIds.join(', ')}`);
     if (ib.alignments.length > 0) {
       lines.push('\n**Alignments:**\n');
       for (const a of ib.alignments) {
@@ -386,7 +404,7 @@ function renderHolisticUnderstanding(profile: EssayProfile): string {
   if (vi) {
     lines.push(`- **Signature**: ${vi.signature}`);
     lines.push(`- **Register**: ${vi.register}`);
-    lines.push(`- **Distinctive patterns**: ${vi.distinctivePatterns.join('; ') || '(none)'}`);
+    if (vi.distinctivePatterns.length > 0) lines.push(`- **Distinctive patterns**: ${vi.distinctivePatterns.join('; ')}`);
     lines.push(`- **Evolution**: ${vi.evolution}`);
     if (vi.authenticVsPerformed.length > 0) {
       lines.push('\n**Authentic vs Performed:**\n');
@@ -445,7 +463,7 @@ function renderHolisticUnderstanding(profile: EssayProfile): string {
     // Tonal Disposition
     lines.push('\n**Tonal Disposition:**\n');
     lines.push(`- Baseline: ${vm.tonalDisposition.baseline}`);
-    lines.push(`- Dominant qualities: ${vm.tonalDisposition.dominantQualities?.join(', ') || '(none)'}`);
+    if ((vm.tonalDisposition.dominantQualities?.length ?? 0) > 0) lines.push(`- Dominant qualities: ${vm.tonalDisposition.dominantQualities!.join(', ')}`);
     for (const obs of vm.tonalDisposition.observations) {
       lines.push(`- P${obs.location.paragraph+1}: ${obs.observation}`);
     }
@@ -494,7 +512,7 @@ function renderHolisticUnderstanding(profile: EssayProfile): string {
   if (et) {
     lines.push(`- **Arc trajectory**: ${et.arcTrajectory}`);
     lines.push(`- **Authenticity assessment**: ${et.authenticityAssessment}`);
-    lines.push(`- **Undertones**: ${et.undertones.join('; ') || '(none)'}`);
+    if (et.undertones.length > 0) lines.push(`- **Undertones**: ${et.undertones.join('; ')}`);
 
     if (et.peakMoments.length > 0) {
       lines.push('\n**Peak Moments:**\n');
@@ -561,7 +579,7 @@ function renderHolisticUnderstanding(profile: EssayProfile): string {
     lines.push(`- **Thesis confidence**: ${ta.thesisConfidence}`);
     lines.push(`- **Thesis evolution**: ${ta.thesisEvolution}`);
     lines.push(`- **Subtext**: ${ta.subtext}`);
-    lines.push(`- **Contradictions**: ${ta.contradictions.join('; ') || '(none)'}`);
+    if (ta.contradictions.length > 0) lines.push(`- **Contradictions**: ${ta.contradictions.join('; ')}`);
 
     if (ta.threads.length > 0) {
       lines.push('\n**Thematic Threads:**\n');
@@ -622,11 +640,11 @@ function renderHolisticUnderstanding(profile: EssayProfile): string {
     if (cr.essayOnlyPortrait) {
       lines.push(`**Essay-Only Portrait:**\n\n> ${cr.essayOnlyPortrait}\n`);
     }
-    lines.push(`- **Values revealed**: ${cr.valuesRevealed.join('; ') || '(none)'}`);
+    if (cr.valuesRevealed.length > 0) lines.push(`- **Values revealed**: ${cr.valuesRevealed.join('; ')}`);
     lines.push(`- **Growth arc**: ${cr.growthArc}`);
     lines.push(`- **Intellectual fingerprint**: ${cr.intellectualFingerprint}`);
-    lines.push(`- **Blind spots**: ${cr.blindSpots.join('; ') || '(none)'}`);
-    lines.push(`- **Revealed qualities**: ${cr.revealedQualities.join('; ') || '(none)'}`);
+    if (cr.blindSpots.length > 0) lines.push(`- **Blind spots**: ${cr.blindSpots.join('; ')}`);
+    if (cr.revealedQualities.length > 0) lines.push(`- **Revealed qualities**: ${cr.revealedQualities.join('; ')}`);
   } else {
     lines.push('(not available)');
   }
@@ -747,7 +765,7 @@ function renderConnectionsAndEntanglements(profile: EssayProfile): string {
   const conns = profile.connections;
   if (conns) {
     lines.push(`- **Graph summary**: ${conns.graphSummary}`);
-    lines.push(`- **Structural islands**: ${conns.structuralIslands.length > 0 ? conns.structuralIslands.map(i => `P${i+1}`).join(', ') : '(none)'}`);
+    if (conns.structuralIslands.length > 0) lines.push(`- **Structural islands**: ${conns.structuralIslands.map(i => `P${i+1}`).join(', ')}`);
     lines.push(`- **Total connections**: ${conns.all.length}`);
 
     if (conns.imageRecurrences?.length > 0) {
@@ -856,7 +874,7 @@ function renderParagraphProfiles(profile: EssayProfile): string {
     const wordCount = para.text.split(/\s+/).length;
     lines.push(`### Paragraph ${para.index + 1} (${wordCount} words, ${para.sentences.length} sentences)\n`);
     lines.push(`**Text**: ${para.text.slice(0, 200)}${para.text.length > 200 ? '...' : ''}\n`);
-    lines.push(`**Tags**: ${para.tags.join(', ') || '(none)'}`);
+    if (para.tags.length > 0) lines.push(`**Tags**: ${para.tags.join(', ')}`);
 
     if (para.walkSkipped) {
       lines.push(`\n**WALK SKIPPED**: Failed at ${para.walkSkipped.failedAt} — ${para.walkSkipped.errorSummary}`);
@@ -910,8 +928,11 @@ function renderParagraphProfiles(profile: EssayProfile): string {
       if (sent.understanding) {
         const su = sent.understanding;
         lines.push('**Understanding:**\n');
-        lines.push('*Observed Functions:*\n');
-        lines.push(renderObservations(su.observedFunctions));
+        // Bucket B: skip Observed Functions section when empty (was emitting "(none)" per sentence).
+        if (su.observedFunctions && su.observedFunctions.length > 0) {
+          lines.push('*Observed Functions:*\n');
+          lines.push(renderObservations(su.observedFunctions));
+        }
         // R3 fix: suppress always-empty schema stubs. The previous renderer
         // emitted "*Inferred Intents:* (none)", "*Narrative Contributions:*
         // (none)", "Rhetorical functions: (none)", "Tags: (none)",
@@ -975,10 +996,15 @@ function renderParagraphProfiles(profile: EssayProfile): string {
         lines.push(`- Reasoning: ${sa.effectivenessReasoning}`);
         lines.push(`- Is strength: ${sa.isStrength}, Is problem: ${sa.isProblem}`);
         lines.push(`- Priority for improvement: ${sa.priorityForImprovement}`);
-        lines.push('- Strengths:');
-        lines.push(renderObservations(sa.strengths));
-        lines.push('- Weaknesses:');
-        lines.push(renderObservations(sa.weaknesses));
+        // Bucket B: skip Strengths/Weaknesses sections when empty.
+        if (sa.strengths && sa.strengths.length > 0) {
+          lines.push('- Strengths:');
+          lines.push(renderObservations(sa.strengths));
+        }
+        if (sa.weaknesses && sa.weaknesses.length > 0) {
+          lines.push('- Weaknesses:');
+          lines.push(renderObservations(sa.weaknesses));
+        }
       }
       lines.push('');
     }
