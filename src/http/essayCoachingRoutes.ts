@@ -25,6 +25,7 @@ import type {
   LearningStyleObservations,
   StudentTheory,
 } from '@/services/essayIntelligence/profileTypes';
+import { buildEditProcessResponse } from './editProcessResponse';
 import {
   CREDIT_COSTS,
   atomicDebit,
@@ -79,6 +80,12 @@ function classifyError(err: unknown): ClassifiedError {
 }
 
 const essayCoachingRouter = Router();
+
+// EditProcessResult → HTTP response shape lives in ./editProcessResponse.
+// Extracted as a pure module to keep the four-branch logic unit-testable
+// without pulling in this route file's transitive dependencies. F-04
+// closure (D-1.16-prefix 2026-04-30) — see editProcessResponse.ts
+// top-of-file comment for the branch mapping and rationale.
 
 // ============================================================================
 // SESSION STORE (in-memory hot cache — backed by DB persistence)
@@ -410,6 +417,41 @@ essayCoachingRouter.post('/essay-coaching/start', requireAuth, async (req: Reque
         includeAnnotations: false, checkpointStore,
         userId, // Port A2 (Wave-1a): enables cross-essay voice prior + persistence when env-flagged
       });
+      // [D-1.12 C5 closure 2026-04-29] Pre-fix this site read result.profile
+      // unconditionally, ignoring result.completedAllLayers / result.layersFailed.
+      // A partial result (when L1 / L2 / L3 / L3.75 / L3.5 / L4 / L5 had a fatal
+      // failure inside analysisOrchestrator's buildPartialResult path) carries a
+      // placeholder profile with no iterationLedger, no findingStore, no
+      // northStar — coaching would run against a near-empty profile and surface
+      // garbage to the user. Repo-wide grep confirmed ZERO consumers of
+      // completedAllLayers / layersFailed outside the orchestrator file. The
+      // boundary now surfaces the failure as a 503 with structured layersFailed
+      // info so the user / monitoring sees the genuine state instead of garbage.
+      if (!result.completedAllLayers) {
+        const failedLayerNames = result.layersFailed.map((l) => l.layer).join(', ');
+        console.error(
+          `[essay-coaching/start] Partial pipeline result for essay ${essayId}: ` +
+            `failed layers=[${failedLayerNames}]. Refusing to seed a coaching session ` +
+            `against a degraded profile.`,
+        );
+        return res.status(503).json({
+          error: 'analysis_pipeline_failed',
+          message:
+            'Essay analysis did not complete. Coaching cannot start until the analysis pipeline finishes successfully.',
+          // [D-1.12 ratification fix 2026-04-29] LayerError shape is
+          // { layer, errorType, message, ... } — the `message` field is
+          // top-level, not nested under `.error`. The original `l.error?.message`
+          // read a non-existent path; optional chaining masked the bug
+          // from typecheck so every entry reported 'unknown' at runtime,
+          // defeating the diagnostic intent of the 503 body.
+          layersFailed: result.layersFailed.map((l) => ({
+            layer: l.layer,
+            errorType: l.errorType,
+            message: l.message,
+            paragraphIndex: l.paragraphIndex,
+          })),
+        });
+      }
       profile = result.profile as EssayProfile;
       pipelineCost = result.costSummary.totalCost;
       pipelinePhase = result.improvementPhase?.level ?? 'unknown';
@@ -597,10 +639,11 @@ essayCoachingRouter.post('/essay-coaching/edit', requireAuth, async (req: Reques
 
     const editResult = await session.orchestrator.processEdit(oldText, newText);
 
-    return res.json({
-      success: true,
-      data: { mode: editResult.mode, reanalysisTriggered: editResult.reanalysisTriggered, totalCost: editResult.totalCost },
-    });
+    // [F-04 closure D-1.16-prefix 2026-04-30] Branch the response on
+    // EditProcessResult.deferReason. See buildEditProcessResponse top-of-file
+    // comment for the 4-case mapping.
+    const { status, body } = buildEditProcessResponse(editResult);
+    return res.status(status).json(body);
   } catch (error: unknown) {
     console.error('[essay-coaching/edit] Error:', error);
     return res.status(500).json({ success: false, error: error instanceof Error ? error.message : 'Failed to process edit' });

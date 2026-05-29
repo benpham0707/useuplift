@@ -2654,10 +2654,18 @@ ${stalenessNote}`;
     }
     const l6CorpusSection = l6CorpusMovesBlock ? `\n\n${l6CorpusMovesBlock}\n` : '';
 
+    // ── Stage 2.G: Diagnostic Snapshot (Item 4 rescope per plan §12) ──────
+    // Lead the user prompt with a ~220-token calibrated frame sourcing the
+    // Executive Brief (Item 3) when present. Falls back to committeeOneLiner
+    // + phase when Brief is null. Empty string when nothing's available.
+    // Flag-gated; null when ENABLE_DIAGNOSTIC_SNAPSHOT is off.
+    const { buildDiagnosticSnapshot } = await import('./diagnosticSnapshot');
+    const diagnosticSnapshotSection = buildDiagnosticSnapshot(profile);
+
     // User message = dynamic per-turn content + findings + teaching content
     // Findings are here (not in system prompt) because they change per turn based on focus paragraphs.
     // This keeps the system prompt stable for Anthropic prompt caching.
-    const userPrompt = `${findingSection ? `${findingSection}\n\n` : ''}${l6CorpusSection}${dynamicProfileContext ? `===STUDENT CONTEXT (this session)===\n${dynamicProfileContext}\n\n` : ''}===CONVERSATION===
+    const userPrompt = `${diagnosticSnapshotSection ? `${diagnosticSnapshotSection}\n\n` : ''}${findingSection ? `${findingSection}\n\n` : ''}${l6CorpusSection}${dynamicProfileContext ? `===STUDENT CONTEXT (this session)===\n${dynamicProfileContext}\n\n` : ''}===CONVERSATION===
 ${conversationText}
 
 STUDENT (current message):

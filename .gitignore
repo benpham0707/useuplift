@@ -52,3 +52,22 @@ yarn-error.log*
 
 # Supabase CLI temp state
 supabase/.temp/
+
+# External corpus (scraped admit essays + AO commentary — third-party copyright,
+# transformative-use only, not for redistribution)
+src/services/essayIntelligence/corpus/external/raw/
+src/services/essayIntelligence/corpus/external/essays/
+src/services/essayIntelligence/corpus/external/transcripts/
+
+# Temp UI-iteration screenshots (Chrome DevTools MCP captures, disposable)
+.tmp-screenshots/
+
+# Nested sub-project dependencies (clerk-nextjs/ and mcp-uplift-portfolio/ are
+# self-contained sub-projects living in the tree; never track their node_modules)
+clerk-nextjs/node_modules/
+mcp-uplift-portfolio/node_modules/
+
+# Generated test dumps (keep curated reference artifacts in tests/output/ committed
+# explicitly; ignore transient JSON/JSONL dumps and phase dumps)
+tests/output/**/*.jsonl
+tests/output/phase-b-dump.json

@@ -61,6 +61,10 @@ import type {
   ImprovementEntry,
   ImprovementCandidate,
   ImprovementCandidateStoreSnapshot,
+  IterationLedger,
+  IterationRecord,
+  EditChangeType,
+  CarryForwardDecision,
 } from '../profileTypes';
 
 import type { StructuralCartography } from '../types';
@@ -77,8 +81,8 @@ import { structuralCartographerService } from './structuralCartographer';
 import type { StructuralCartographyResult } from './structuralCartographer';
 import { scoutPassService } from './scoutPass';
 import type { ScoutPassResult } from './scoutPass';
-import { sequentialDeepWalkService } from './sequentialDeepWalk';
 import type { L3WalkResult } from './sequentialDeepWalk';
+import { runEssayLevelL3Walk, adaptEssayLevelOutputToL3WalkResult } from './essayLevelL3Walk';
 import { holisticSynthesisService, synthesizeUnderstandingProse } from './holisticSynthesis';
 import type { HolisticSynthesisResult, DeltaSynthesisResult, SynthesisIterationResult } from './holisticSynthesis';
 
@@ -88,7 +92,6 @@ import {
   buildStepRecord,
   dispatchDeepDives,
   mergeFindingsFromDeepDive,
-  mergeFindingsFromReRead,
   analyzeMaturityGaps,
   maturityGapsToQuestions,
   MAX_ITERATIONS,
@@ -98,7 +101,6 @@ import {
 import type { StepResult } from './growthEngine';
 import { QuestionQueueManager } from './questionQueueManager';
 import { runDeepDive } from './deepDiveRunner';
-import { runTargetedReRead } from './fullContextReReader';
 import { analysisPassService } from './analysisPass';
 import { runAOFirstRead } from './aoFirstRead';
 import type { AOFirstReadResult } from './aoFirstRead';
@@ -113,8 +115,29 @@ import { consumeContradictions } from './contradictionConsumer';
 import type { ContradictionConsumptionResult } from './contradictionConsumer';
 import { detectProgrammaticContradictions } from '../profileManager/validation/crossDomainValidation';
 
+// Phase 0a.3 — promote L3.5 paragraph analyses into FindingStore so L4 / L5 /
+// L6 can cite findings by ID instead of re-narrating them.
+import { promoteAnalysisFindings } from './findingPromotion';
+
 // Profile manager
-import { EssayProfileCoordinator } from '../profileManager/essayProfileManager';
+import {
+  EssayProfileCoordinator,
+  getCurrentIteration,
+  incrementIteration,
+} from '../profileManager/essayProfileManager';
+import {
+  l5AnnotationsToTaughtMoves,
+  bufferTaughtMoves,
+  flushTaughtMovesForIteration,
+  clearTaughtMovesForIteration,
+} from './taughtMoveBuilder';
+import {
+  flushEventsForIteration,
+  clearEventsForIteration,
+  emitIterationEvent,
+} from '../telemetry/iterationTelemetry';
+import { safeAppendCarryForwardDecision } from './carryForwardSynthesis';
+import { buildEditScopeFromBrief } from './editScopeBuilder';
 import { ImprovementCandidateStore } from '../improvements/improvementCandidateStore';
 import { InMemoryCheckpointStore } from '../profileManager/checkpointStore';
 
@@ -191,6 +214,118 @@ export interface PipelineInput {
    * pre-port-identical behavior.
    */
   userId?: string;
+  /**
+   * D-1.8: LLM-judged overall edit significance from upstream
+   * `editUnderstandingService.understandEdit()`. Populated by
+   * `reanalysisOrchestrator` for edit-triggered re-analysis runs; absent
+   * on cold first-pass calls (where there is no prior text to compare).
+   *
+   * When present, the orchestrator's priorAnnotations wire-up applies this
+   * uniformly to every changed paragraph's `EditSignal.significance`
+   * (locked decision: never discard paid LLM output to redo a coarser
+   * derivation; the LLM judged the whole edit at this level, propagate
+   * that judgment honestly). When absent, mechanical-significance
+   * fallback in `buildPerParagraphEdits` derives the bucket from
+   * `changeRatio` cuts (D-1.8 §4).
+   */
+  editSignificance?: 'minor' | 'moderate' | 'significant' | 'transformative';
+  /**
+   * D-1.8: prior-iteration essay text, supplied directly by the caller
+   * when available. The orchestrator prefers this over the
+   * `iterationLedger.iterations[]` snapshot when both are present (caller's
+   * intent is more authoritative than a stale ledger entry). Absent →
+   * orchestrator falls back to `getPriorIterationSnapshotText` against
+   * the profile's iterationLedger; if that's also undefined, the wire-up
+   * gracefully degrades to `priorAnnotations: undefined` (structural
+   * absence, not silent fallback).
+   *
+   * Producer: `reanalysisOrchestrator.triggerReanalysis()` populates this
+   * from `versionTracker.getPreviousAnalyzedText()` when an edit triggered
+   * the re-analysis. Direct `analyzeEssay()` callers leave it undefined.
+   */
+  priorEssayText?: string;
+  /**
+   * D-1.10: seed for the new coordinator's `iterationLedger`. When supplied,
+   * `EssayProfileCoordinator.createNew(...)` deep-clones this onto the new
+   * profile in place of the default empty ledger. This is the seam that
+   * lets `reanalysisOrchestrator` carry iteration history across the
+   * `createNew` boundary (without it, every re-analysis silently resets
+   * the ledger to currentIteration=0 and loses prior taughtMoves and
+   * iterations).
+   *
+   * Validation: `validateAndNormalizeIterationLedger` runs at the seed point inside
+   * `createInitialProfile`; a corrupt seed throws fail-fast before any
+   * layer runs.
+   *
+   * Producer: `reanalysisOrchestrator.triggerReanalysis()` captures
+   * `this.coordinator.getProfile().iterationLedger` BEFORE invoking
+   * `analyzeEssay`. Direct `analyzeEssay()` callers (cold first-pass)
+   * leave it undefined → fresh empty ledger.
+   *
+   * Consumer: `createInitialProfile` (new optional input field).
+   */
+  priorIterationLedger?: IterationLedger;
+  /**
+   * D-1.10: how the iteration was triggered. Recorded on the IterationRecord
+   * the orchestrator commits at iteration end. Defaults to `'first_pass'`
+   * when absent (cold direct call to `analyzeEssay`). `reanalysisOrchestrator`
+   * sets this to `'edit'` when an edit-understanding fired upstream, or
+   * `'student_request'` when re-analysis was triggered without an edit.
+   *
+   * Used at commit time to populate `IterationRecord.triggeredBy` and to
+   * gate the optional `editScope` field (only populated when triggeredBy
+   * === 'edit').
+   */
+  triggeredBy?: IterationRecord['triggeredBy'];
+  /**
+   * D-1.10: the LLM-classified change types from upstream
+   * `editUnderstandingService.understandEdit()`. Threaded through to populate
+   * `IterationRecord.editScope.changeTypes` when triggeredBy === 'edit'.
+   * Absent on first-pass and student-request triggers.
+   *
+   * Producer: `reanalysisOrchestrator.triggerReanalysis()` reads
+   * `this.lastEditUnderstanding.changeTypes`.
+   */
+  editChangeTypes?: EditChangeType[];
+  /**
+   * D-1.11: escalation level set by `focusedAnalyzer` when re-analysis
+   * triggered an escalation ladder step. Levels per
+   * ITERATION_LOOP_DESIGN §6.4:
+   *   0 — no escalation (focused / focused_structural / comprehensive ran clean)
+   *   1 — re-walk affected paragraphs only
+   *   2 — re-walk + neighbor sentences
+   *   3 — re-walk + targeted lens re-runs
+   *   4 — comprehensive escalation
+   *
+   * Threaded through to populate `IterationRecord.escalationLevel` (the
+   * D-1.10 stub at analysisOrchestrator.ts ~line 1851 hardcodes 0). Absent
+   * on first-pass; defaults to 0 when not threaded by the re-analysis
+   * caller.
+   *
+   * Producer: `reanalysisOrchestrator.triggerReanalysis()` reads from
+   *   `focusedResult.escalationLevel` when re-analysis ran focused-mode.
+   * Consumer: `commitIterationRecord` (D-1.11 amendment).
+   */
+  focusedEscalationLevel?: 0 | 1 | 2 | 3 | 4;
+  /**
+   * D-1.11 DP-1: carry-forward decision for mode selection. Populated by
+   * `reanalysisOrchestrator.processEditAndMaybeReanalyze` AFTER
+   * FocusedAnalyzer.selectAnalysisMode runs but BEFORE analyzeEssay is
+   * invoked. Threaded through here so analyzeEssay can append it to
+   * `iterationLedger.recentDecisions[]` AFTER `incrementIteration` runs
+   * (the append-time iteration validator requires the decision's
+   * iteration number to equal the post-increment currentIteration).
+   *
+   * Shape: every CarryForwardDecision field EXCEPT `iteration` (which is
+   * filled in by analyzeEssay at append time, since the iteration counter
+   * is bumped inside this function, not at the caller).
+   *
+   * Absent on cold first-pass and on focused-mode reanalyses (those don't
+   * call analyzeEssay so the decision has no iteration to attach to —
+   * documented gap to be closed when a focused-mode IterationRecord
+   * commit deliverable lands).
+   */
+  modeSelectionDecision?: Omit<CarryForwardDecision, 'iteration'>;
 }
 
 /** Complete pipeline result */
@@ -279,6 +414,17 @@ export class AnalysisOrchestrator {
 
     const checkpointStore = input.checkpointStore ?? new InMemoryCheckpointStore();
 
+    // ── D-1.10: hoist iteration-lifecycle values to the top so they're in
+    // scope for every buildPartialResult call site (including L1-fatal at
+    // ~line 397 before coordinator creation) and for the success-path
+    // commit. `triggeredBy` is determined entirely from the input shape and
+    // doesn't depend on any layer running. `iterationStartedAt` is derived
+    // from `startTime` (already declared above), so the ISO conversion is
+    // pure formatting.
+    // eslint-disable-next-line no-silent-fallback -- mode-selection: structural default for cold-call analyzeEssay (where no caller context exists to specify the trigger). Re-analysis path (reanalysisOrchestrator.triggerReanalysis) ALWAYS supplies an explicit triggeredBy of 'edit' or 'student_request'; this default only fires for direct first-pass calls.
+    const triggeredBy: IterationRecord['triggeredBy'] = input.triggeredBy ?? 'first_pass';
+    const iterationStartedAt = new Date(startTime).toISOString();
+
     console.log(
       `[Orchestrator] Starting full analysis — essayId=${input.essayId}, ` +
       `type=${input.essayType}, textLength=${input.essayText.length}`,
@@ -290,7 +436,15 @@ export class AnalysisOrchestrator {
 
     // ── L1: First Impressions (FATAL) + AO First Read (non-fatal) — PARALLEL ──
     // GAP-4: AO First Read runs alongside L1 at zero added latency.
-    // L1 failure is FATAL. AO failure is gracefully degraded (null on profile).
+    // L1 failure is FATAL. AO First Read failure is non-fatal BY DESIGN —
+    // every downstream consumer is null-guarded (profileTypes.ts:2354 types
+    // aoFirstRead as optional+nullable; coachingService.ts:2799/2876,
+    // edgeProtocol.ts:157, presentation/renderAnalysisForStudent.ts:151
+    // all skip cleanly when absent). On rejection we emit a structured
+    // telemetry event for the audit trail and push to layersFailed[] —
+    // this is NOT charter-banned graceful degradation, because no
+    // fake/placeholder data is injected; consumers see the genuine
+    // "AO read absent" state. [F-2 closure 2026-04-29.]
     let l1Result: FirstImpressionsResult;
     let aoFirstReadResult: AOFirstReadResult | null = null;
 
@@ -304,7 +458,7 @@ export class AnalysisOrchestrator {
       const msg = l1Settled.reason instanceof Error ? l1Settled.reason.message : String(l1Settled.reason);
       console.error('[Orchestrator] L1 FATAL:', msg);
       layersFailed.push(this.buildLayerError('L1', l1Settled.reason, 0));
-      return this.buildPartialResult(null, layersCompleted, layersFailed, costTracker, startTime);
+      return await this.buildPartialResult(null, layersCompleted, layersFailed, costTracker, startTime, iterationStartedAt, triggeredBy, input);
     }
     l1Result = l1Settled.value;
     costTracker.record('L1', l1Result.cost, l1Result.tokenUsage, l1Result.timingMs);
@@ -314,7 +468,7 @@ export class AnalysisOrchestrator {
       `cost=$${l1Result.cost.toFixed(4)}, time=${l1Result.timingMs}ms`,
     );
 
-    // Handle AO First Read (non-fatal — graceful degradation)
+    // Handle AO First Read (non-fatal by design — see block comment above).
     if (aoSettled.status === 'fulfilled') {
       aoFirstReadResult = aoSettled.value;
       costTracker.record('AOFirstRead', aoFirstReadResult.cost, aoFirstReadResult.tokenUsage, aoFirstReadResult.timingMs);
@@ -323,10 +477,43 @@ export class AnalysisOrchestrator {
         `cost=$${aoFirstReadResult.cost.toFixed(4)}, time=${aoFirstReadResult.timingMs}ms`,
       );
     } else {
-      console.warn(
-        `[Orchestrator] AO First Read failed (non-fatal): ` +
-        `${aoSettled.reason instanceof Error ? aoSettled.reason.message : String(aoSettled.reason)}`,
-      );
+      // [F-2 closure 2026-04-29] Pre-fix this branch only `console.warn`-ed
+      // and silently set aoFirstReadResult=null — invisible to the audit
+      // trail and to the orchestrator's own layersFailed ledger. Now we:
+      //   1. Emit a structured `status:'failed'` telemetry event so the
+      //      iterationLedger / external observers see the rejection.
+      //   2. Push to layersFailed[] for parity with L1's failure path
+      //      (see line 449), so PipelineResult.layersFailed callers get
+      //      a uniform shape regardless of which layer rejected.
+      //   3. Preserve the existing `aoFirstReadResult = null` semantic
+      //      (no assignment — it was already null at declaration).
+      // iteration=-1 is the documented sentinel for "pre-iteration step"
+      // (matches emitStepFailure's removed sentinel pattern). AO First
+      // Read runs before incrementIteration (line 521) and before the
+      // coordinator is constructed (line 493), so no live iteration
+      // counter exists yet. The telemetry consumer can filter iteration
+      // < 1 if it only cares about per-iteration steps; the audit trail
+      // still has the rejection on record.
+      const errMsg = aoSettled.reason instanceof Error
+        ? aoSettled.reason.message
+        : String(aoSettled.reason);
+      console.warn(`[Orchestrator] AO First Read failed (non-fatal): ${errMsg}`);
+      emitIterationEvent(input.essayId, {
+        iteration: -1,
+        step: 'AOFirstRead',
+        status: 'failed',
+        error: {
+          message: errMsg,
+          code: 'ao_first_read_rejected',
+          context: {
+            nonFatal: true,
+            downstreamBehavior:
+              'profile.aoFirstRead remains null; all consumers null-guarded.',
+          },
+        },
+        timestamp: new Date().toISOString(),
+      });
+      layersFailed.push(this.buildLayerError('AOFirstRead', aoSettled.reason, 0));
     }
 
     // ── Parse essay structure from L1 output ──
@@ -358,7 +545,42 @@ export class AnalysisOrchestrator {
         promptText: input.promptText,
       },
       checkpointStore,
+      // D-1.10: thread the prior-iteration ledger from re-analysis callers.
+      // When absent (cold first-pass), createInitialProfile uses the default
+      // empty ledger block. When present, the ledger is validated and
+      // deep-cloned onto the new profile, preserving iteration history
+      // across the createNew boundary.
+      priorIterationLedger: input.priorIterationLedger,
     });
+
+    // ── D-1.10: Iteration lifecycle — entry increment ───────────────────
+    // Closes Dead Wire #1 (incrementIteration had zero production callers
+    // before this step). The increment happens AFTER the coordinator is
+    // built (so the profile has an iterationLedger to mutate) and BEFORE
+    // any layer-applying coordinator mutation (applyFirstImpressions on
+    // line ~449), so every layer that reads getCurrentIteration sees the
+    // post-increment value. `triggeredBy` and `iterationStartedAt` were
+    // hoisted to the top of analyzeEssay so they're in scope for every
+    // buildPartialResult call site (including L1-fatal before this point).
+    incrementIteration(coordinator.getProfile(), triggeredBy);
+
+    // ── D-1.11 DP-1: append the mode-selection CarryForwardDecision ──────
+    // The decision was made by FocusedAnalyzer.selectAnalysisMode upstream
+    // (in reanalysisOrchestrator.processEditAndMaybeReanalyze, BEFORE this
+    // function ran). The decision was threaded through `input.modeSelectionDecision`
+    // (every CarryForwardDecision field except `iteration`); we fill in
+    // the iteration here, post-increment. Absent on cold first-pass
+    // (no mode-selection happened) and on focused-mode reanalyses (which
+    // don't go through analyzeEssay so the decision can't be attached
+    // to a new IterationRecord — documented gap, deferred to a future
+    // focused-mode iteration commit deliverable).
+    if (input.modeSelectionDecision) {
+      const currentIter = getCurrentIteration(coordinator.getProfile());
+      safeAppendCarryForwardDecision(input.essayId, coordinator.getProfile(), {
+        ...input.modeSelectionDecision,
+        iteration: currentIter,
+      });
+    }
 
     // ── Seed prior findings for re-analysis evolution (BEFORE any layer runs) ──
     if (input.priorFindings && input.priorFindings.length > 0) {
@@ -408,7 +630,7 @@ export class AnalysisOrchestrator {
       );
     } catch (error) {
       layersFailed.push(this.buildLayerError('L2/L2.5', error, costTracker.summarize(0).totalCost));
-      return this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime);
+      return await this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime, iterationStartedAt, triggeredBy, input);
     }
 
     // ── Checkpoint after Phase 1 ──
@@ -441,33 +663,81 @@ export class AnalysisOrchestrator {
     try {
       const profile = coordinator.getProfile();
 
-      // Build reanalysis context string for L3 walk injection (Fix A3.1)
-      let l3ReanalysisContext: string | undefined;
+      // Step 6 (Option 5 architecture, 2026-05-03): essay-level L3 walk
+      // replaces the per-paragraph sequential walk. One Sonnet call with
+      // full-essay context produces all paragraph summaries + findings +
+      // connections + gap candidates simultaneously. Step 5 isolated test
+      // on Crochet showed 12 findings (vs 0 from per-paragraph) and $0.16
+      // cost (vs $0.46). Adapter translates the essay-level output into
+      // the legacy per-paragraph L3WalkResult shape so the existing
+      // applyUnderstandingWalkStep loop, finding-store routing, connection
+      // mutator, and downstream layers work unchanged.
+      //
+      // Step 9 (2026-05-04): re-analysis context + prior FindingStore now
+      // threaded into the essay-level walk. On first analyses (no
+      // reanalysisBrief, empty findingStore) both render as empty strings
+      // — pre-Step-9 behavior preserved. On re-analysis they front-load
+      // the "what changed" framing and expose prior finding IDs for
+      // buildsOn/relatedTo edges, mirroring the legacy walk's contract.
+      let essayWalkReanalysisContext: string | undefined;
       if (input.reanalysisBrief) {
         const brief = input.reanalysisBrief;
         const staleLines = brief.staleAreas.map((a) => `• ${a}`).join('\n');
-        l3ReanalysisContext = `${brief.summaryForPrompt}${staleLines ? `\n\nSTALE AREAS:\n${staleLines}` : ''}`;
+        essayWalkReanalysisContext = `${brief.summaryForPrompt}${
+          staleLines ? `\n\nSTALE AREAS:\n${staleLines}` : ''
+        }`;
       }
+      const essayWalkFindingStore = coordinator.getFindingStore();
 
-      // Pass FindingStore to walk so it can see prior findings (re-analysis evolution)
-      const walkFindingStore = coordinator.getFindingStore();
-
-      l3Result = await sequentialDeepWalkService.walkEssay(
+      const essayWalkResult = await runEssayLevelL3Walk(
         input.essayText,
-        profile as EssayProfile,
+        l1Result.impressions,
         structuralMap,
         scoutOutput,
-        l1Result.impressions,
+        profile as EssayProfile,
         {
-          reanalysisContext: l3ReanalysisContext,
-          findingStore: walkFindingStore.size > 0 ? walkFindingStore : undefined,
-          essayId: input.essayId,
+          reanalysisContext: essayWalkReanalysisContext,
+          findingStore:
+            essayWalkFindingStore.size > 0 ? essayWalkFindingStore : undefined,
         },
+      );
+
+      l3Result = adaptEssayLevelOutputToL3WalkResult(
+        essayWalkResult.output,
+        essayWalkResult.cost,
+        essayWalkResult.tokenUsage,
+        essayWalkResult.timingMs,
       );
 
       // Apply each walk step to the coordinator
       for (const walkOutput of l3Result.walkOutputs) {
         coordinator.applyUnderstandingWalkStep(walkOutput);
+      }
+
+      // ── D-1.11 DP-3a: append walk findingEvolutions decisions ──────────
+      // The walk LLM produces findingEvolutions[] for each paragraph
+      // (W1.3 design — see UnderstandingWalkOutput.findingEvolutions).
+      // Each evolution is a per-finding carry-forward decision: confirm
+      // (carry), deepen (partial_refresh), or supersede (rederive). The
+      // arbitrationMechanism is 'llm_judgment' — the walk LLM judged the
+      // evolution based on new sentence-level understanding.
+      const dp3aIter = getCurrentIteration(coordinator.getProfile());
+      for (const walkOutput of l3Result.walkOutputs) {
+        if (!walkOutput.findingEvolutions || walkOutput.findingEvolutions.length === 0) continue;
+        for (const evo of walkOutput.findingEvolutions) {
+          const decisionType: CarryForwardDecision['decision'] =
+            evo.newMaturity === 'superseded' ? 'rederive' : 'partial_refresh';
+          const supersedesNote = evo.supersedes ? ` (supersedes ${evo.supersedes})` : '';
+          safeAppendCarryForwardDecision(input.essayId, coordinator.getProfile(), {
+            iteration: dp3aIter,
+            itemKey: evo.findingId,
+            decision: decisionType,
+            rationale: `walk maturity → ${evo.newMaturity}${supersedesNote}: ${evo.reasoning}`,
+            costSavedIfCarry: 0, // bundled in walk cost; cost-attribution refinement is D-4.11+
+            costSpentIfRederive: 0,
+            arbitrationMechanism: 'llm_judgment',
+          });
+        }
       }
 
       // Scope 2 Phase 5: Harvest L3 improvement candidates from sentence
@@ -493,7 +763,7 @@ export class AnalysisOrchestrator {
     } catch (error) {
       layersFailed.push(this.buildLayerError('L3', error, costTracker.summarize(0).totalCost));
       await this.safeCheckpoint(coordinator, 'after_l3');
-      return this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime);
+      return await this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime, iterationStartedAt, triggeredBy, input);
     }
 
     // ── Checkpoint after Phase 2 ──
@@ -533,6 +803,28 @@ export class AnalysisOrchestrator {
       coordinator.applyHolisticSynthesis(growthResult.finalSynthesis);
       growthReadingStrategy = growthResult.readingStrategy;
 
+      // ── D-1.11 DP-3b: append synthesis findingEvolutions decisions ─────
+      // L3.75's holistic synthesis can also produce findingEvolutions
+      // (HolisticSynthesisOutput.findingEvolutions). Same shape and
+      // semantics as DP-3a's walk evolutions; arbitrationMechanism is
+      // 'llm_judgment' (the synthesis LLM produced the evolution).
+      const dp3bIter = getCurrentIteration(coordinator.getProfile());
+      const synthesisEvolutions = growthResult.finalSynthesis.findingEvolutions ?? [];
+      for (const evo of synthesisEvolutions) {
+        const decisionType: CarryForwardDecision['decision'] =
+          evo.newMaturity === 'superseded' ? 'rederive' : 'partial_refresh';
+        const supersedesNote = evo.supersedes ? ` (supersedes ${evo.supersedes})` : '';
+        safeAppendCarryForwardDecision(input.essayId, coordinator.getProfile(), {
+          iteration: dp3bIter,
+          itemKey: evo.findingId,
+          decision: decisionType,
+          rationale: `L3.75 synthesis maturity → ${evo.newMaturity}${supersedesNote}: ${evo.reasoning}`,
+          costSavedIfCarry: 0,
+          costSpentIfRederive: 0,
+          arbitrationMechanism: 'llm_judgment',
+        });
+      }
+
       // ── Port A2 (Wave-1a): persist derived voice back to voice_profiles ──
       // Fire-and-forget. If persistence fails, the analysis result still stands
       // — we never throw from this path. Catch + log only.
@@ -547,11 +839,14 @@ export class AnalysisOrchestrator {
         coordinator.addImprovementCandidates(l375Candidates, { source: 'L3.75' });
       }
 
-      // Record aggregate L3.75 cost
-      costTracker.record('L3.75', growthResult.totalCost, {
-        inputTokens: 0, outputTokens: 0,
-        cacheReadTokens: 0, cacheWriteTokens: 0,
-      }, Date.now() - startTime);
+      // H-2 fix (Quality Gap 1): the aggregate `L3.75` cost row previously
+      // double-counted with the per-iteration `L3.75_iter_N` rows already
+      // recorded inside the growth cycle (and `understanding_prose_iter_N`,
+      // and the new `synthesizeSignatureMove` call's cost which is part of
+      // each iter's totalCost). Adding a sub-call to L3.75 without this fix
+      // would WORSEN the double-count. The per-iter rows are authoritative;
+      // we no longer record an aggregate row here. The growth cycle's total
+      // cost remains visible via the per-layer log line below.
       layersCompleted.push('L3.75');
 
       console.log(
@@ -567,7 +862,7 @@ export class AnalysisOrchestrator {
       );
     } catch (error) {
       layersFailed.push(this.buildLayerError('L3.75', error, costTracker.summarize(0).totalCost));
-      return this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime);
+      return await this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime, iterationStartedAt, triggeredBy, input);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -602,6 +897,45 @@ export class AnalysisOrchestrator {
         coordinator.applyAnalysisPassResult(paragraphAnalysis);
       }
 
+      // ─── Phase 0a.3: FindingStore promotion ─────────────────────────────
+      // Promote L3.5 paragraph analyses into the FindingStore so L4
+      // crystallization (line ~949), Phase 5.55 essay-level emission
+      // (line ~1213), and L5 deepAnnotation (line ~1284) can cite findings
+      // by ID rather than re-narrate observations as prose.
+      //
+      // Gated on iteration === 1. The reanalysisOrchestrator re-entry path
+      // (reanalysisOrchestrator.ts:795 → analyzeEssay) seeds the FindingStore
+      // with prior findings via coordinator.seedPriorFindings; re-promoting
+      // here on iter ≥ 2 would generate fresh IDs for the same observations
+      // and grow the store unbounded. Maturity evolution + walk-side
+      // findingEvolutions handle iter ≥ 2 (option `i` in Phase 0a.3 design).
+      //
+      // Warm-edit / focusedAnalyzer.ts:1549 path intentionally NOT wired:
+      // focusedAnalyzer's synthetic AnalysisPassOutput hardcodes
+      // `evidence: ''` (line 1524, 1527), and the promoter's evidence guard
+      // (findingPromotion.ts:119) skips empty-evidence observations.
+      // Productive warm-path promotion requires a focusedAnalyzer-side
+      // change to emit real evidence text — properly scoped to Phase 8.
+      if (getCurrentIteration(coordinator.getProfile()) === 1) {
+        const promotionResult = promoteAnalysisFindings(
+          coordinator.getFindingStore(),
+          l35Result.paragraphAnalyses,
+        );
+        console.log(
+          `[Orchestrator] L3.5 FindingStore promotion: ` +
+          `${promotionResult.promoted} promoted, ` +
+          `${promotionResult.skipped} skipped, ` +
+          `byKind=${JSON.stringify(promotionResult.byKind)}, ` +
+          `errors=${promotionResult.errors.length}`,
+        );
+        if (promotionResult.errors.length > 0) {
+          console.warn(
+            '[Orchestrator] L3.5 promotion errors (first 5):',
+            promotionResult.errors.slice(0, 5),
+          );
+        }
+      }
+
       // ── Apply computed improvement phase to profile BEFORE L5 starts ──
       coordinator.updateImprovementPhase(l35Result.improvementPhase);
 
@@ -616,7 +950,7 @@ export class AnalysisOrchestrator {
     } catch (error) {
       layersFailed.push(this.buildLayerError('L3.5', error, costTracker.summarize(0).totalCost));
       await this.safeCheckpoint(coordinator, 'after_l3_5');
-      return this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime);
+      return await this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime, iterationStartedAt, triggeredBy, input);
     }
 
     // ── Checkpoint after Phase 4 ──
@@ -636,25 +970,19 @@ export class AnalysisOrchestrator {
         ? profileForCrystal.northStar
         : undefined;
 
-      // Build FindingStore and ConnectionGraph for adversarial pass context
-      const findingStoreForL4 = coordinator.getFindingStore();
-      const connectionGraphForL4 = ConnectionGraph.fromArray(
-        (profileForCrystal as EssayProfile).connections.all,
-      );
-
       // Scope 2 Phase 6a: pass the candidate store into L4 so L4b can
       // consolidate instead of re-derive. crystallizer.ts fails fast if
       // the store is empty (should be impossible post-Phase-5).
       const candidateStoreForL4 = coordinator.getImprovementCandidateStore();
 
+      // Phase 1 Cut B (2026-05-12): findingStore + connectionGraph args
+      // dropped — they only fed the now-removed L4-Haiku adversarial pass.
       l4Result = await crystallizerService.crystallize(
         profileForCrystal as EssayProfile,
         input.essayType,
         input.essayText,
         candidateStoreForL4,
         priorNorthStar,
-        findingStoreForL4.size > 0 ? findingStoreForL4 : undefined,
-        connectionGraphForL4.totalCount > 0 ? connectionGraphForL4 : undefined,
         input.essayId,
       );
 
@@ -716,7 +1044,7 @@ export class AnalysisOrchestrator {
       );
     } catch (error) {
       layersFailed.push(this.buildLayerError('L4', error, costTracker.summarize(0).totalCost));
-      return this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime);
+      return await this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime, iterationStartedAt, triggeredBy, input);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -760,11 +1088,30 @@ export class AnalysisOrchestrator {
         );
       }
     } catch (error) {
-      // Contradiction consumption is NOT fatal — log and continue
-      console.error(
-        '[Orchestrator] W4.4: Contradiction consumption failed (non-fatal):',
-        error instanceof Error ? error.message : String(error),
-      );
+      // [D-1.12 H5 closure 2026-04-29] Pre-fix this catch logged "(non-fatal)"
+      // and continued silently. Failure means contradictions detected by L4
+      // are NOT consumed into FindingStore + annotation flags NOT generated;
+      // downstream L5 misses contradiction-aware annotations. Now: emit
+      // structured iterationTelemetry (parity with F-2). Continue semantics
+      // preserved — Phase 5.5 is genuinely downstream-optional within a
+      // single iteration; the audit trail is the missing piece.
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('[Orchestrator] W4.4: Contradiction consumption failed (non-fatal):', msg);
+      const iter = getCurrentIteration(coordinator.getProfile());
+      emitIterationEvent(input.essayId, {
+        iteration: iter,
+        step: 'phase5_5_contradiction_consumption',
+        status: 'failed',
+        error: {
+          message: msg,
+          code: 'contradiction_consumption_failed',
+          context: {
+            downstreamBehavior:
+              'Pipeline continues; L5 will not see contradiction-aware findings/flags from this iteration.',
+          },
+        },
+        timestamp: new Date().toISOString(),
+      });
     }
 
     // ═════════════════════════════════���═════════════════════════════════════
@@ -814,15 +1161,149 @@ export class AnalysisOrchestrator {
               `isSubstantive=${deltaResult.output.isSubstantive}, ` +
               `cost=$${deltaResult.cost.toFixed(4)}`,
             );
+
+            // ── D-1.11 DP-4: append delta-synthesis decisions ─────────────
+            // One CarryForwardDecision per affected holistic section. The
+            // arbitrationMechanism is 'comprehensive_rule' (the contradiction
+            // detector — a deterministic rule applied over L4 output —
+            // triggered the synthesis, not an LLM judgment). decision
+            // type: 'rederive' if the synthesis output was substantive
+            // (the section was meaningfully rewritten); 'partial_refresh'
+            // otherwise (touched but largely preserved).
+            const dp4Iter = getCurrentIteration(coordinator.getProfile());
+            const dp4DecisionType: CarryForwardDecision['decision'] = deltaResult.output.isSubstantive
+              ? 'rederive'
+              : 'partial_refresh';
+            const dp4PerSectionCost = deltaResult.cost / Math.max(1, affectedSections.length);
+            for (const section of affectedSections) {
+              safeAppendCarryForwardDecision(input.essayId, coordinator.getProfile(), {
+                iteration: dp4Iter,
+                itemKey: section,
+                decision: dp4DecisionType,
+                rationale:
+                  `delta synthesis triggered by blocking contradiction; isSubstantive=${deltaResult.output.isSubstantive}`,
+                costSavedIfCarry: 0,
+                costSpentIfRederive: dp4PerSectionCost,
+                arbitrationMechanism: 'comprehensive_rule',
+              });
+            }
           }
         } catch (error) {
-          // Delta synthesis failure is NOT fatal — pipeline continues with existing holistic sections
-          console.error(
-            '[Orchestrator] W5.4a: Delta synthesis failed (non-fatal):',
-            error instanceof Error ? error.message : String(error),
+          // [D-1.12 H6 closure 2026-04-29] Pre-fix this catch was silent;
+          // when blocking contradictions can't be resolved by delta synthesis,
+          // the contradictions remain in the coherence report but no synthesis
+          // ran and no DP-4 decisions were appended. Now: emit telemetry so
+          // the audit trail captures the resolution failure. Continue
+          // semantics preserved.
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('[Orchestrator] W5.4a: Delta synthesis failed (non-fatal):', msg);
+          const iter = getCurrentIteration(coordinator.getProfile());
+          emitIterationEvent(input.essayId, {
+            iteration: iter,
+            step: 'phase5_75_w54a_delta_synthesis',
+            status: 'failed',
+            error: {
+              message: msg,
+              code: 'blocking_contradiction_synthesis_failed',
+              context: {
+                blockingContradictionCount: blockingContradictions.length,
+                downstreamBehavior:
+                  'Pipeline continues with existing holistic sections; blocking contradictions remain unresolved.',
+              },
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PHASE 5.55: Essay-level emission decision (Option 5 rebuild — Phase B)
+    //
+    // Single Sonnet call that reads ALL per-layer artifacts (L3 walk
+    // findings + gap candidates, L3.5 weaknesses/growthEdges, L3.75
+    // holistic synthesis, L4 northStar, FindingStore stuck findings) +
+    // the full essay text + concept library, and decides 0-3 specifics-
+    // need emissions for the essay. Replaces the prior round 1.8
+    // architecture's 5 distributed emission services + D-2.6 maturity-
+    // refresh + L3 post-walk consolidation. Single decision point with
+    // full context = naturally enforces the 3-cap, prevents concept tag
+    // fragmentation, eliminates cross-layer anti-repetition coordination.
+    //
+    // Silence path: when there are zero gap candidates AND no stuck
+    // findings, skips the LLM call entirely (saves ~$0.25).
+    //
+    // Failure semantics: wrapped in try/catch — Phase B failure does NOT
+    // block Phase 5.6 aggregation or Phase 6 L5. Empty
+    // profile.specificsNeedEmissions falls through to Phase 5.6 silence
+    // path automatically.
+    // ═══════════════════════════════════════════════════════════════════════
+    try {
+      const profileForPhaseB = coordinator.getProfile();
+      const findingStoreForPhaseB = coordinator.getFindingStore();
+      if (findingStoreForPhaseB) {
+        const { runEssayLevelEmissionPass, applyEssayLevelEmissionsToProfile } = await import(
+          './essayLevelEmissionService'
+        );
+        const phaseBResult = await runEssayLevelEmissionPass(
+          profileForPhaseB,
+          findingStoreForPhaseB,
+        );
+        applyEssayLevelEmissionsToProfile(profileForPhaseB, phaseBResult.emissions);
+        if (phaseBResult.emissions.length > 0 || phaseBResult.cost > 0) {
+          costTracker.record(
+            'phase_b_essay_level_emissions',
+            phaseBResult.cost,
+            phaseBResult.tokenUsage,
+            phaseBResult.timingMs,
+          );
+          console.log(
+            `[Orchestrator] Phase 5.55 essay-level emissions: ` +
+              `${phaseBResult.emissions.length} emissions, ` +
+              `cost=$${phaseBResult.cost.toFixed(4)}, time=${phaseBResult.timingMs}ms`,
           );
         }
       }
+    } catch (phaseBError) {
+      const msg =
+        phaseBError instanceof Error ? phaseBError.message : String(phaseBError);
+      console.error(
+        '[Orchestrator] Phase 5.55 essay-level emission pass failed (non-blocking):',
+        msg,
+      );
+      emitIterationEvent(input.essayId, {
+        iteration: getCurrentIteration(coordinator.getProfile()),
+        step: 'phase5_55_essay_level_emissions',
+        status: 'failed',
+        error: {
+          message: msg,
+          code: 'phase_b_essay_level_emissions_failed',
+          context: {
+            downstreamBehavior:
+              'Phase 5.6 aggregation continues with empty profile.specificsNeedEmissions; queue gets no new specifics-need mints this iteration but other queue mutations (curated questions from L3.75 growth cycle) still apply.',
+          },
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PHASE 5.6: Specifics-need aggregation (reads from
+    // profile.specificsNeedEmissions[] populated by Phase 5.55 above).
+    // Pure deterministic dedup + queue mint — no LLM call. Failure caught
+    // here surfaces telemetry; pipeline continues to Phase 6.
+    // ═══════════════════════════════════════════════════════════════════════
+    {
+      const profileForAgg = coordinator.getProfile();
+      const aggIter = getCurrentIteration(profileForAgg);
+      const { runSpecificsNeedAggregationWithTelemetry } = await import(
+        './specificsNeedAggregatorIntegration'
+      );
+      runSpecificsNeedAggregationWithTelemetry(
+        profileForAgg,
+        aggIter,
+        input.essayId,
+      );
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -841,13 +1322,59 @@ export class AnalysisOrchestrator {
         // when rendering the coaching map lineage block.
         const candidateStoreForL5 = coordinator.getImprovementCandidateStore();
 
+        // D-1.8: Carry-forward intelligence — replace the literal `undefined`
+        // with the per-paragraph priorAnnotations Map composed from the
+        // iterationLedger's prior taughtMoves[]. The composer encapsulates
+        // the full D-1.6/D-1.7/D-1.8 surface (snapshot lookup → diff →
+        // remap → per-paragraph edits → landing detection → grouping). On
+        // iter ≤ 1 or missing snapshot, returns `undefined` (structural
+        // absence — L5 prompt at deepAnnotationService.ts:1402–1416 already
+        // handles this branch). On any helper throw, propagates to Phase 6's
+        // existing catch → buildPartialResult per the no-fallback charter.
+        const { buildPriorAnnotationsForOrchestrator } = await import('./priorAnnotationsBuilder');
+        const priorAnnotationsForL5 = await buildPriorAnnotationsForOrchestrator({
+          essayId: input.essayId,
+          profile: profileForAnnotations,
+          currentEssayText: input.essayText,
+          priorEssayTextOverride: input.priorEssayText,
+          editSignificance: input.editSignificance,
+        });
+
+        // ── D-1.11 DP-2: append per-paragraph priorAnnotations decisions ──
+        // For each paragraph that received a priorAnnotationContext, the
+        // composer made a 'partial_refresh' choice (carry the prior context
+        // forward + walk the paragraph fresh in this iteration). For
+        // paragraphs the composer DIDN'T cover (no entry in priorAnnotationsForL5),
+        // they're either unchanged-with-no-priors (no decision needed) or
+        // first-pass / pre-D-1.10-snapshot iterations (priorAnnotationsForL5
+        // is undefined; no decisions to record). We only emit decisions
+        // for paragraphs we ACTUALLY composed prior context for.
+        if (priorAnnotationsForL5 instanceof Map) {
+          const dp2Iter = getCurrentIteration(profileForAnnotations);
+          for (const [paragraphIndex, ctx] of priorAnnotationsForL5) {
+            const addressedCount = ctx.priorAnnotations.filter((a) => a.addressedByEdit).length;
+            const totalCount = ctx.priorAnnotations.length;
+            safeAppendCarryForwardDecision(input.essayId, profileForAnnotations as EssayProfile, {
+              iteration: dp2Iter,
+              itemKey: `L5.P${paragraphIndex}.annotations`,
+              decision: 'partial_refresh',
+              rationale:
+                `priorAnnotations carried into L5 prompt (paragraph ${paragraphIndex}): ` +
+                `${totalCount} prior moves, ${addressedCount} marked addressed by edit`,
+              costSavedIfCarry: 0,
+              costSpentIfRederive: 0,
+              arbitrationMechanism: 'validity_test',
+            });
+          }
+        }
+
         l5Result = await deepAnnotationService.generateAnnotations(
           profileForAnnotations as EssayProfile,
           input.reanalysisBrief,
           contradictionAnnotationFlags,
           findingStoreForL5.size > 0 ? findingStoreForL5 : undefined,
           growthReadingStrategy,
-          undefined, // priorAnnotations
+          priorAnnotationsForL5,
           candidateStoreForL5,
           input.essayId,
         );
@@ -862,11 +1389,86 @@ export class AnalysisOrchestrator {
           `cost=$${l5Result.cost.toFixed(4)}, time=${l5Result.timingMs}ms`,
         );
 
+        // ── D-1.10: buffer L5-output TaughtMoves ──────────────────────────
+        // Closes Dead Wire #2 (bufferTaughtMoves had zero production callers
+        // before this step). Transform the L5AnnotationResult into TaughtMove
+        // objects (one per paragraph annotation + essay-level + cross-para)
+        // and push to the iteration's transient buffer. The buffer is
+        // flushed onto profile.iterationLedger.taughtMoves[] at iteration
+        // end via commitIterationRecord. If commit fails, the buffer is
+        // preserved (Step 6 design) so a forensic recovery can still find
+        // the moves in memory.
+        //
+        // Failure surface: bufferTaughtMoves throws ONLY on invariant
+        // violations (negative iter, non-array moves) — both programmer
+        // errors. Not silently degraded. The throw routes through the
+        // surrounding try/catch at Phase 6 → buildPartialResult per the
+        // no-fallback charter (Q9 in the D-1.10 plan).
+        const currentIter = getCurrentIteration(coordinator.getProfile());
+        const taughtMoves = l5AnnotationsToTaughtMoves(
+          l5Result.paragraphAnnotations,
+          l5Result.essayLevelAnnotations,
+          l5Result.crossParagraphAnnotations,
+          currentIter,
+        );
+        // D-1.11 Step 0: essay-keyed buffer prevents cross-essay collision
+        // when two essays at iter=N run in the same process (defense-in-depth
+        // before any future shared-worker refactor).
+        bufferTaughtMoves(input.essayId, currentIter, taughtMoves);
+        console.log(
+          `[Orchestrator] D-1.10: buffered ${taughtMoves.length} TaughtMoves for ` +
+            `essayId=${input.essayId} iter=${currentIter}`,
+        );
+
+        // ── Stage 2.A: Executive Brief ──────────────────────────────────────
+        // Post-L5 Sonnet micro-call: <300-word counselor-grade verdict +
+        // 5 directives + 3 model sentences. Sits at the top of every
+        // dump / coaching surface. Flag-gated; null when off or when the
+        // single-retry validator could not produce a conformant brief
+        // (orchestrator continues without — the dump is intact without it).
+        try {
+          const { generateExecutiveBrief, isExecutiveBriefEnabled } = await import('./executiveBrief');
+          if (isExecutiveBriefEnabled()) {
+            const briefStart = Date.now();
+            const brief = await generateExecutiveBrief({
+              profile: coordinator.getProfile() as EssayProfile,
+              l5Result,
+            });
+            if (brief !== null) {
+              // Mirror the aoFirstRead write pattern at :595-597: direct
+              // mutation through the coordinator-owned profile reference.
+              const briefProfile = coordinator.getProfile() as EssayProfile;
+              briefProfile.executiveBrief = brief;
+              costTracker.record('ExecutiveBrief', brief.cost, {
+                inputTokens: 0,
+                outputTokens: 0,
+                cacheReadTokens: 0,
+                cacheWriteTokens: 0,
+              }, brief.timingMs);
+              console.log(
+                `[Orchestrator] ExecutiveBrief: ${brief.totalWordCount}w, ` +
+                  `tier=${brief.targetTier}, truncated=${brief.truncated}, ` +
+                  `cost=$${brief.cost.toFixed(4)}, time=${Date.now() - briefStart}ms`,
+              );
+            } else {
+              console.warn('[Orchestrator] ExecutiveBrief generator returned null — no brief this run.');
+            }
+          }
+        } catch (briefErr) {
+          // Non-fatal: brief is an enhancement, not a load-bearing artifact.
+          // The dump remains usable without it. Log loudly so Phase 6 regen
+          // notices, but do not throw — the orchestrator continues to Phase 7.
+          console.error(
+            '[Orchestrator] ExecutiveBrief generation failed (non-fatal):',
+            briefErr instanceof Error ? briefErr.message : briefErr,
+          );
+        }
+
         // Checkpoint after L5
         await this.safeCheckpoint(coordinator, 'after_l5');
       } catch (error) {
         layersFailed.push(this.buildLayerError('L5', error, costTracker.summarize(0).totalCost));
-        return this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime);
+        return await this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime, iterationStartedAt, triggeredBy, input);
       }
     } else {
       console.log('[Orchestrator] L5 skipped: annotations disabled');
@@ -1010,6 +1612,29 @@ export class AnalysisOrchestrator {
     // mutation — updating only index would be clobbered by the next refresh.
     (finalProfile as EssayProfile).index.confidenceLevel = computedConfidence;
     (finalProfile as EssayProfile).metadata.confidenceLevel = computedConfidence;
+
+    // ── D-1.10: commit IterationRecord at orchestrator end ────────────────
+    // The success-path commit. NO try/catch here — the helper throws a
+    // structured PipelineError on checkpoint failure, and the failure must
+    // propagate to the caller so they see "iteration N did not persist;
+    // rerun" with the inner cause. Per the no-fallback charter and the
+    // plan's atomicity decision: in-memory ledger has the new record;
+    // checkpoint failure leaves the persisted store at pre-iteration state;
+    // caller decides whether to retry. This unblocks D-1.8 (snapshotText)
+    // and D-1.11 (carryForwardSummary read paths).
+    const successRationale =
+      `${triggeredBy} iteration completed with layers=[${layersCompleted.join(',')}]` +
+      (layersFailed.length > 0 ? `, failed=[${layersFailed.map((f) => f.layer).join(',')}]` : '');
+    await this.commitIterationRecord(
+      coordinator,
+      costSummary,
+      layersCompleted,
+      layersFailed,
+      iterationStartedAt,
+      triggeredBy,
+      input,
+      successRationale,
+    );
 
     return {
       profile: finalProfile,
@@ -1191,155 +1816,13 @@ export class AnalysisOrchestrator {
         }
       }
 
-      // ── Step 2: Re-reads run BEFORE convergence check ──
-      // Re-read findings enter the FindingStore (coaching's data source) and connections
-      // enter the profile (router's data source). These are valuable even when L3.75
-      // reports convergence. Running them before the convergence break ensures they
-      // always execute.
-
-      // ── Step 2a: Run re-reads L3.75 flagged ──
-      // L3.75 curated these candidates — respect its ordering. Budget check stops when
-      // we can't afford more. No hard cap beyond the budget backstop. (LLM-first Rule 2)
-      for (const reRead of currentSynthesis.reReadCandidates) {
-        if (state.budgetRemaining < MIN_BUDGET_FOR_STEP) break;
-
-        try {
-          const reReadResult = await runTargetedReRead(
-            reRead.paragraph,
-            essayText,
-            profile,
-            currentSynthesis.synthesis,
-            currentSynthesis.readingStrategy,
-            reRead.reason,
-          );
-
-          state.budgetRemaining -= reReadResult.cost;
-          costTracker.record(
-            `reread_P${reRead.paragraph}`,
-            reReadResult.cost,
-            reReadResult.tokenUsage,
-            reReadResult.timingMs,
-          );
-
-          // Merge findings from re-read into cumulativeFindings AND findingStore
-          let reReadFindingsAbsorbed = 0;
-          if (reReadResult.findings.length > 0) {
-            const newFindingObjects = reReadResult.findings.map((f, idx) => ({
-              ...f,
-              id: `FR${state.iteration}_${reRead.paragraph}_${idx}`,
-              source: 'holistic_synthesis' as const,
-              buildsOn: f.buildsOn ?? [],
-              relatedTo: f.relatedTo ?? [],
-              raisesQuestions: f.raisesQuestions ?? [],
-              lineage: [],
-              createdAt: new Date().toISOString(),
-              lastUpdated: new Date().toISOString(),
-            })) as Finding[];
-            cumulativeFindings = mergeFindingsFromReRead(cumulativeFindings, newFindingObjects);
-
-            // W3.4: Absorb findings into FindingStore so they aren't orphaned
-            if (findingStore) {
-              for (const finding of newFindingObjects) {
-                try {
-                  // Filter buildsOn/relatedTo to only IDs that exist in the store
-                  // (LLM may reference IDs it generated that aren't in our store)
-                  const safeBuildsOn = finding.buildsOn.filter(id => findingStore.has(id));
-                  const safeRelatedTo = finding.relatedTo.filter(id => findingStore.has(id));
-                  findingStore.add({
-                    ...finding,
-                    buildsOn: safeBuildsOn,
-                    relatedTo: safeRelatedTo,
-                  });
-                  reReadFindingsAbsorbed++;
-                } catch (e) {
-                  console.warn(
-                    `[Orchestrator] Failed to absorb re-read finding ${finding.id} into FindingStore: ` +
-                    `${e instanceof Error ? e.message : String(e)}`,
-                  );
-                }
-              }
-              if (reReadFindingsAbsorbed > 0) {
-                console.log(
-                  `[Orchestrator] Absorbed ${reReadFindingsAbsorbed}/${newFindingObjects.length} ` +
-                  `findings from re-read P${reRead.paragraph} into FindingStore`,
-                );
-              }
-            }
-          }
-
-          // W3.4: Absorb connections from re-read into profile via ConnectionMutator
-          // (duplicate detection, connectionRef management, mutation tracking)
-          let reReadConnectionsAbsorbed = 0;
-          if (reReadResult.newConnections.length > 0) {
-            const connectionsToAdd = reReadResult.newConnections.map(conn => ({
-              from: conn.from,
-              to: conn.to,
-              description: conn.description,
-              reverseIllumination: conn.reverseIllumination,
-              significance: conn.significance,
-              strengthCategory: conn.strengthCategory,
-              directionality: conn.directionality,
-              discoveredBy: 'holistic_synthesis' as const,
-            }));
-
-            if (coordinator) {
-              // Route through coordinator → ConnectionMutator for proper integrity
-              const { connectionIds } = coordinator.addConnections(connectionsToAdd);
-              reReadConnectionsAbsorbed = connectionIds.filter(id => id !== '').length;
-            } else {
-              // Fallback: direct push (should not happen in normal pipeline)
-              console.warn(
-                `[Orchestrator] No coordinator available for re-read connection absorption — ` +
-                `falling back to direct push (bypasses duplicate detection + connectionRef management)`,
-              );
-              for (const conn of connectionsToAdd) {
-                try {
-                  profile.connections.all.push({
-                    id: `CR${state.iteration}_P${reRead.paragraph}_${reReadConnectionsAbsorbed}`,
-                    from: conn.from,
-                    to: conn.to,
-                    description: conn.description,
-                    reverseIllumination: conn.reverseIllumination,
-                    significance: conn.significance,
-                    strengthCategory: conn.strengthCategory,
-                    directionality: conn.directionality,
-                    discoveredBy: conn.discoveredBy,
-                    routingTags: [],
-                    status: 'active',
-                    relatedFindings: [],
-                    createdAt: new Date().toISOString(),
-                  });
-                  reReadConnectionsAbsorbed++;
-                } catch (e) {
-                  console.warn(
-                    `[Orchestrator] Failed to absorb re-read connection from P${reRead.paragraph}: ` +
-                    `${e instanceof Error ? e.message : String(e)}`,
-                  );
-                }
-              }
-            }
-
-            if (reReadConnectionsAbsorbed > 0) {
-              console.log(
-                `[Orchestrator] Absorbed ${reReadConnectionsAbsorbed}/${reReadResult.newConnections.length} ` +
-                `connections from re-read P${reRead.paragraph} into profile`,
-              );
-            }
-          }
-
-          const reReadStep: StepResult = {
-            findingsAdded: reReadFindingsAbsorbed,
-            cost: reReadResult.cost,
-            discoveryNote: reReadResult.discoveryNote,
-          };
-          state.activityLog.push(buildStepRecord(`reread_P${reRead.paragraph}`, reReadStep));
-        } catch (error) {
-          console.warn(
-            `[Orchestrator] Re-read P${reRead.paragraph} failed (non-fatal):`,
-            error instanceof Error ? error.message : String(error),
-          );
-        }
-      }
+      // ── Step 2 — REMOVED 2026-05-12 (Phase 1 Cut A) ──
+      // Targeted L3.75 re-reads (runTargetedReRead) were dropped: ~$0.107/run saved.
+      // FindingStore is now populated end-to-end via L3.5 findingPromotion + L3
+      // walk emissions, so the re-read pass's incremental findings contribution
+      // does not justify the per-paragraph Sonnet sub-call. L3.75 still emits
+      // walkDisagreements + readingStrategy; the convergence check below moves
+      // up to fire immediately after Step 1 synthesis.
 
       // ── Step 3.5: Maturity gap analysis (Gap 4) ──
       // Detect stuck findings and feed investigation questions into the persistent queue
@@ -1355,8 +1838,9 @@ export class AnalysisOrchestrator {
         );
       }
 
-      // ── Step 3: Convergence check (after re-reads, before deep dives) ──
-      // Moved here from Step 2 so re-reads always run (their findings enter FindingStore).
+      // ── Step 3: Convergence check ──
+      // Re-reads were removed in Phase 1 Cut A (2026-05-12); convergence check
+      // fires immediately after Step 1 synthesis + Step 3.5 maturity gap analysis.
       // Deep dives are skipped regardless, so convergence here stops the loop cleanly.
       if (currentSynthesis.selfAssessedConvergence.hasConverged) {
         state.isConverged = true;
@@ -1554,6 +2038,22 @@ export class AnalysisOrchestrator {
 
   /**
    * Safe checkpoint — never lets checkpoint failure kill the pipeline.
+   *
+   * [D-1.12 H4 closure 2026-04-29] Pre-fix this method swallowed
+   * checkpoint failures with `console.error` only — across 8 call sites
+   * in this file (`after_l1_l2`, `after_l3` ×2, `after_l3_5` ×2,
+   * `after_l5`, plus inside the L3 + L3.5 + L5 catches). The persistence
+   * failure was invisible to telemetry / iterationLedger; consumers
+   * reading from the checkpoint store would see stale state with no
+   * signal that the write didn't happen.
+   *
+   * The "non-fatal within a single run" semantics are correct (per
+   * D-1.10 §"Failure-surface design": checkpoints are recovery
+   * affordances, not load-bearing for the in-memory iteration). What
+   * was missing was the audit trail. Now we emit a structured
+   * iterationTelemetry event (parity with F-2's AO First Read closure)
+   * so external observers + iterationLedger.events[] capture the
+   * rejection. Continue semantics preserved — the caller proceeds.
    */
   private async safeCheckpoint(
     coordinator: EssayProfileCoordinator,
@@ -1562,11 +2062,215 @@ export class AnalysisOrchestrator {
     try {
       await coordinator.checkpoint(reason);
     } catch (error) {
-      console.error(
-        `[Orchestrator] Checkpoint failed (${reason}):`,
-        error instanceof Error ? error.message : String(error),
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error(`[Orchestrator] Checkpoint failed (${reason}):`, msg);
+      // Emit telemetry. essayId via the new getEssayId() accessor (D-1.12
+      // Commit C). iteration via getCurrentIteration; safe to read since
+      // checkpoint failures only fire after the pipeline has progressed
+      // to at least one layer (which means the coordinator was already
+      // constructed with a valid iterationLedger).
+      const iter = getCurrentIteration(coordinator.getProfile() as EssayProfile);
+      emitIterationEvent(coordinator.getEssayId(), {
+        iteration: iter,
+        step: `checkpoint.${reason}`,
+        status: 'failed',
+        error: {
+          message: msg,
+          code: 'checkpoint_write_failed',
+          context: {
+            reason,
+            downstreamBehavior:
+              'In-memory iteration continues; persisted checkpoint store does not have this write. ' +
+              'Recovery from a fresh process load will see stale state.',
+          },
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // D-1.10: Iteration lifecycle commit
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Build an IterationRecord from the iteration's runtime state and append
+   * it to `iterationLedger.iterations[]`, alongside flushing the
+   * `taughtMoves` transient buffer onto `iterationLedger.taughtMoves[]`.
+   *
+   * This is THE method that closes Dead Wires #2 (consumer side), #4
+   * (telemetry flush), and #5 (`iterations[]` write), and activates D-1.8's
+   * `snapshotText` consumer (records the post-iteration text so iter N+1's
+   * priorAnnotations composer can compute the diff against this iteration's
+   * text rather than degrading to `undefined`).
+   *
+   * Atomicity per the D-1.10 plan §"Atomic-commit decision": write all
+   * mutations to the in-memory profile, then `coordinator.checkpoint()`.
+   * If checkpoint throws, propagate the structured error WITHOUT clearing
+   * the transient buffers — buffer state is preserved for forensic recovery
+   * and so a retry can re-attempt the persistence. The caller (the
+   * orchestrator's BUILD RESULT block, or `buildPartialResult`) decides
+   * whether to re-throw or swallow per its contract.
+   *
+   * D-1.11 stub fields documented inline. They are NOT TODOs to silently
+   * fix later — they are scope-bounded handoffs to the next deliverable.
+   */
+  private async commitIterationRecord(
+    coordinator: EssayProfileCoordinator,
+    costSummary: CostSummary,
+    layersCompleted: string[],
+    layersFailed: LayerError[],
+    startedAt: string,
+    triggeredBy: IterationRecord['triggeredBy'],
+    input: PipelineInput,
+    rationale: string,
+  ): Promise<void> {
+    const profile = coordinator.getProfile() as EssayProfile;
+    const iter = getCurrentIteration(profile);
+    const finishedAt = new Date().toISOString();
+
+    // ── Drain telemetry events (non-destructive read; clear after success) ──
+    // [D-1.11 Step 15 closed at bcc5be6] Telemetry buffer is essay-keyed end-
+    // to-end; cross-essay collision impossible at the type level. Sister to
+    // the TaughtMove buffer keying immediately below.
+    const events = flushEventsForIteration(input.essayId, iter);
+
+    // ── Drain TaughtMoves buffer (non-destructive; clear after success) ──
+    // [D-1.11 Step 0] Essay-keyed to prevent concurrent-essay collision.
+    const flushedMoves = flushTaughtMovesForIteration(input.essayId, iter);
+
+    // ── Build editScope (only when edit-triggered) ──────────────────────
+    // [D-1.15 deferred-item closure 2026-04-30 Item 6] Extracted to a pure
+    // helper at `analysis/editScopeBuilder.ts` so the live derivation chain
+    // (computeEditDiff → reanalysisBrief → editScope) is testable as a unit.
+    // Zero behavioral change — the helper carries the same counts-from-
+    // netChanges logic the inline block had (D-1.11 Step 13).
+    const editScope = buildEditScopeFromBrief(
+      triggeredBy,
+      input.reanalysisBrief,
+      input.editSignificance,
+      input.editChangeTypes,
+    );
+
+    // ── Build per-layer cost breakdown from CostSummary.layers ──────────
+    const costBreakdown: Record<string, number> = {};
+    for (const layer of costSummary.layers) {
+      // CostTracker may emit multiple entries for the same layer (e.g.,
+      // delta_synthesis on top of L3.75); accumulate.
+      costBreakdown[layer.layer] = (costBreakdown[layer.layer] ?? 0) + layer.cost;
+    }
+
+    // ── D-1.11 Step 13: synthesize carryForwardSummary from recentDecisions ──
+    // Replaces D-1.10's empty-arrays stub. Reads decisions appended by
+    // DP-1 through DP-4 during this iteration (filtered by iteration ===
+    // iter) and rolls them up into the carried/rederived/refreshed
+    // buckets. Synthesis runs BEFORE record construction so the rolled-up
+    // summary is fresh; runs AFTER all decision-point appends because
+    // every DP fires inside analyzeEssay UPSTREAM of commitIterationRecord
+    // (verified by the call-site ordering: DP-1 at line ~537, DP-2 at
+    // ~1052, DP-3a/b/c during L3/L3.75 phases, DP-4 inside W5.4a, ALL
+    // before this commit helper executes at orchestrator end).
+    const { synthesizeCarryForwardSummary } = await import('./carryForwardSynthesis');
+    const carryForwardSummary = synthesizeCarryForwardSummary(
+      profile.iterationLedger.recentDecisions,
+      iter,
+    );
+
+    // ── Construct the IterationRecord ───────────────────────────────────
+    const record: IterationRecord = {
+      iteration: iter,
+      triggeredBy,
+      ...(editScope ? { editScope } : {}),
+      // D-1.11 Step 13: real synthesized summary, not the empty-arrays stub.
+      // Empty arrays now MEAN "no decisions appended this iteration" (true
+      // first-pass with no prior context, or focused-mode-deferred DPs),
+      // not "stub not yet implemented."
+      carryForwardSummary,
+      costBreakdown,
+      // D-1.11 STUB (carryover) — true comprehensive baseline cost
+      // requires a per-layer baseline reference table (D-4.11+). For
+      // first-pass: actual cost IS the comprehensive baseline. For
+      // edit-triggered: degenerate equality is documented honestly via
+      // the rationale string. NOT D-1.11's scope to fix.
+      comprehensiveBaselineCost: costSummary.totalCost,
+      carryForwardSavings: 0, // = comprehensiveBaselineCost - sum(costBreakdown); for first_pass = 0
+      // D-1.11 Step 13: escalationLevel threaded from
+      // PipelineInput.focusedEscalationLevel (set by reanalysisOrchestrator
+      // when focused-mode escalation fired). Default 0 for cold first-pass
+      // and for re-analyses where no escalation occurred.
+      // [F-1 wire-up closure 2026-04-29] Producer wired at
+      // reanalysisOrchestrator.ts:1255 (passes focusedResult?.escalationLevel
+      // into triggerReanalysis, which threads it into PipelineInput here).
+      // Pre-fix this field always read 0 because the focused result was
+      // discarded between runComprehensiveMode and triggerReanalysis.
+      escalationLevel: input.focusedEscalationLevel ?? 0,
+      rationale,
+      startedAt,
+      finishedAt,
+      ...(events.length > 0 ? { events } : {}),
+      // D-1.10: snapshotText is the post-iteration essay text. Activates
+      // D-1.8's `getPriorIterationSnapshotText` consumer for iter N+1.
+      snapshotText: input.essayText,
+    };
+
+    // ── Mutate ledger in memory ─────────────────────────────────────────
+    profile.iterationLedger.iterations.push(record);
+    if (flushedMoves.length > 0) {
+      profile.iterationLedger.taughtMoves.push(...flushedMoves);
+    }
+
+    console.log(
+      `[Orchestrator] D-1.10: committing iter ${iter} record ` +
+        `(triggeredBy=${triggeredBy}, taughtMoves=+${flushedMoves.length}, ` +
+        `events=${events.length}, layers=[${Object.keys(costBreakdown).join(',')}])`,
+    );
+
+    // ── Persist (atomic boundary). On failure: throw, do NOT clear buffers.
+    try {
+      await coordinator.checkpoint('after_iteration_commit');
+    } catch (error) {
+      // The in-memory ledger HAS the new record; the persisted store does
+      // not. Per the plan's atomicity interpretation: throw with structured
+      // context, leave buffers intact for forensic recovery, let the caller
+      // surface "iteration N did not persist; rerun." We do NOT clear the
+      // transient buffers because a rerun may want to reuse them.
+      throw PipelineError.wrap(
+        'iteration_commit',
+        error,
+        `[Orchestrator] D-1.10: checkpoint failed during iteration commit ` +
+          `(iter=${iter}, triggeredBy=${triggeredBy}). In-memory ledger has the record; ` +
+          `transient buffers preserved for retry. Checkpoint store may be down or rejecting writes.`,
       );
     }
+
+    // ── Clear transient buffers ONLY after successful checkpoint ─────────
+    clearEventsForIteration(input.essayId, iter);
+    clearTaughtMovesForIteration(input.essayId, iter);
+
+    // ── D-1.11 Step 13: prune recentDecisions to last 5 iterations ──
+    // Per IterationLedger.recentDecisions JSDoc: "Pruned to the last 5
+    // iterations at iteration end (decisions are dense and only audit-
+    // relevant short-term)." Iteration-NUMBER window: at iter N with
+    // keepLastN=5, retain decisions where d.iteration >= N-4. Runs AFTER
+    // successful checkpoint so a checkpoint-failed retry replays
+    // unpruned data (per D-1.11 Plan agent §6 ordering).
+    const { pruneRecentDecisions } = await import('../profileManager/essayProfileManager');
+    pruneRecentDecisions(profile, 5);
+
+    console.log(
+      `[Orchestrator] D-1.10: iter ${iter} committed; ledger now has ` +
+        `${profile.iterationLedger.iterations.length} iterations, ` +
+        `${profile.iterationLedger.taughtMoves.length} cumulative taughtMoves, ` +
+        `${profile.iterationLedger.recentDecisions.length} recent decisions ` +
+        `(carried=${record.carryForwardSummary.carried.length}, ` +
+        `rederived=${record.carryForwardSummary.rederived.length}, ` +
+        `refreshed=${record.carryForwardSummary.refreshed.length})`,
+    );
+    // Reference layersCompleted/layersFailed to silence unused-param lints
+    // and to leave a debug breadcrumb if a future change wants to inspect
+    // the post-commit summary at this site.
+    void layersCompleted;
+    void layersFailed;
   }
 
   /**
@@ -1667,14 +2371,37 @@ export class AnalysisOrchestrator {
 
   /**
    * Build a partial result when the pipeline aborts early due to a fatal error.
+   *
+   * D-1.10: now async. When `coordinator !== null`, commits a partial
+   * IterationRecord to preserve the `iterations[N-1]` = audit-for-iter-N
+   * invariant (per profileTypes.ts:5150). Without this commit, an iteration
+   * that incremented `currentIteration` (analysisOrchestrator.ts entry) but
+   * aborted at L2/L3/L3.75/L3.5/L4/L5 would create a hole in `iterations[]`,
+   * silently breaking every downstream consumer's slot-based lookup.
+   *
+   * Per the D-1.10 plan §"Failure-surface design" Q4: this is the SOLE
+   * place where checkpoint-write-failure is logged-and-swallowed instead
+   * of thrown. The contract of `buildPartialResult` is "always returns a
+   * PipelineResult, never throws" — masking the partial-commit failure
+   * with the original abort failure is correct here. Buffers are NOT
+   * cleared on commit failure (Step 6's design) so a forensic recovery
+   * can still find the events/moves.
+   *
+   * When `coordinator === null` (L1 fatal — coordinator never built),
+   * skip commit entirely. `currentIteration` was never incremented for
+   * this run (the increment lives at line ~459 AFTER coordinator creation),
+   * so no hole is created.
    */
-  private buildPartialResult(
+  private async buildPartialResult(
     coordinator: EssayProfileCoordinator | null,
     layersCompleted: string[],
     layersFailed: LayerError[],
     costTracker: CostTracker,
     startTime: number,
-  ): PipelineResult {
+    iterationStartedAt: string,
+    triggeredBy: IterationRecord['triggeredBy'],
+    input: PipelineInput,
+  ): Promise<PipelineResult> {
     const totalTimingMs = Date.now() - startTime;
     const costSummary = costTracker.summarize(totalTimingMs);
 
@@ -1702,6 +2429,57 @@ export class AnalysisOrchestrator {
       `  reason:    ${layersFailed[layersFailed.length - 1]?.message ?? 'unknown'}\n` +
       `${'▓'.repeat(72)}\n`,
     );
+
+    // D-1.10: commit a partial IterationRecord when coordinator is non-null.
+    // The abort happened AFTER incrementIteration ran, so currentIteration
+    // is the new value; without committing a record, iterations[N-1] would
+    // be missing. Commit failure here is logged and swallowed (see method
+    // JSDoc) because buildPartialResult's contract is to always return.
+    if (coordinator) {
+      const failedLayers = layersFailed.map((f) => `${f.layer}(${f.errorType})`).join(',');
+      const lastReason = layersFailed[layersFailed.length - 1]?.message ?? 'unknown';
+      const partialRationale =
+        `aborted iteration: layers=[${layersCompleted.join(',') || 'none'}], ` +
+        `failed=[${failedLayers}], reason="${lastReason}"`;
+      try {
+        await this.commitIterationRecord(
+          coordinator,
+          costSummary,
+          layersCompleted,
+          layersFailed,
+          iterationStartedAt,
+          triggeredBy,
+          input,
+          partialRationale,
+        );
+      } catch (commitErr) {
+        // [round-1 audit §4.C / T1.4 closure] Surface the secondary
+        // failure as structured telemetry BEFORE the console.error so
+        // audit grep finds it (charter §8). The no-throw contract of
+        // buildPartialResult is preserved — we still log + return
+        // without re-throwing because the original abort is the primary
+        // failure and masking it with the secondary commit failure
+        // would lose user-facing diagnostic.
+        const iter = getCurrentIteration(coordinator.getProfile());
+        emitIterationEvent(input.essayId, {
+          iteration: iter,
+          step: 'iteration_commit_secondary_failure',
+          status: 'failed',
+          error: {
+            message: commitErr instanceof Error ? commitErr.message : String(commitErr),
+            code: 'partial_result_commit_failure',
+            context: { triggeredBy, layersCompleted, layersFailed: layersFailed.map((f) => f.layer) },
+          },
+          timestamp: new Date().toISOString(),
+        });
+        console.error(
+          `[Orchestrator] D-1.10: partial-result iteration commit ALSO failed (the ` +
+            `original abort is the primary failure; not re-throwing this secondary one):`,
+          commitErr instanceof Error ? commitErr.message : String(commitErr),
+        );
+        // Buffers stay populated for forensic recovery (Step 6 design).
+      }
+    }
 
     return {
       profile,

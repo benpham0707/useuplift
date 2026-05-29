@@ -148,6 +148,52 @@ export interface FocusedAnalysisResult {
   cost: LayerCost[];
   /** Total cost across all calls */
   totalCost: number;
+
+  /**
+   * [D-1.12 Commit B closure 2026-04-29] True iff every step of the
+   * focused pipeline that was attempted completed cleanly. False when
+   * any step (Step 1 understanding, Step 2 analysis, Level 2 re-walk,
+   * Level 3 holistic refresh, Level 2→3 upgrade synthesis, snapshot
+   * creation, delta application) caught an error.
+   *
+   * Pre-fix: each catch left `escalationLevel` at the value the success
+   * path WOULD have set, with no signal to the caller. F-1 had just
+   * wired `escalationLevel` through reanalysisOrchestrator → PipelineInput
+   * → IterationRecord.escalationLevel — a load-bearing audit field. The
+   * catches therefore fed a load-bearing field with hardcoded/stale
+   * values indistinguishable from real success outcomes.
+   *
+   * Post-fix: the caller reads this flag. When false, the caller MUST
+   * NOT pass escalationLevel into IterationRecord (it must pass
+   * undefined so the consumer's `?? 0` defaults honestly). The caller
+   * is also responsible for emitting iteration telemetry for each
+   * entry in `failedSteps` — focusedAnalyzer does not have essayId in
+   * scope and would need a signature change to emit telemetry directly,
+   * so the orchestrator (which has essayId) is the emitter.
+   *
+   * Default true; set to false on any catch path.
+   */
+  escalationLevelTrustworthy: boolean;
+  /**
+   * Names of every step that caught an error. Empty when the run
+   * completed cleanly. Sorted in execution order. The orchestrator
+   * iterates this list to emit one iterationTelemetry event per
+   * failed step (parity with F-2's AO First Read closure pattern).
+   */
+  failedSteps: Array<
+    | 'step1_understanding'
+    | 'step2_analysis'
+    | 'level2_rewalk'
+    | 'level3_holistic'
+    | 'l2_to_l3_upgrade'
+    | 'snapshot_creation'
+    | 'understanding_delta_apply'
+    | 'understanding_delta_restore'
+    | 'analysis_delta_apply'
+    | 'analysis_delta_restore'
+    | 'phase_recompute'
+    | 'w54c_delta_synthesis'
+  >;
 }
 
 // ============================================================================
@@ -804,6 +850,13 @@ export class FocusedAnalyzer {
     const overallStart = Date.now();
     const costs: LayerCost[] = [];
 
+    // [D-1.12 Commit B 2026-04-29] failedSteps + escalationLevelTrustworthy
+    // are populated as catches fire. Default trustworthy=true; set to
+    // false on any catch path. The orchestrator reads these and emits
+    // telemetry per failed step (it has essayId in scope; this layer
+    // does not).
+    const failedSteps: FocusedAnalysisResult['failedSteps'] = [];
+
     // Identify all changed sentences from the diff; use the most impactful (first) for focused pipeline
     const changedSentences = this.identifyChangedSentences(editOutput);
     const { paragraphIndex, sentenceIndex } = changedSentences[0] ?? { paragraphIndex: 0, sentenceIndex: 0 };
@@ -984,7 +1037,14 @@ export class FocusedAnalyzer {
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error(`[FocusedAnalyzer] Step 1 (understanding delta) failed: ${errorMsg}`);
-      // No fallback fabrication — return clear error state
+      // [D-1.12 Commit B 2026-04-29] Pre-fix this catch hardcoded
+      // escalationLevel: 1 (semantically "no ripple") — indistinguishable
+      // from a real "Step 1 succeeded with no ripple" outcome. F-1 had
+      // just wired this field into IterationRecord, so the catch was
+      // feeding a load-bearing audit field with a hardcoded lie. Now we
+      // mark the result untrustworthy so the orchestrator passes
+      // undefined (not 1) to triggerReanalysis, and emits telemetry.
+      failedSteps.push('step1_understanding');
       return {
         mode: 'focused',
         escalationLevel: 1,
@@ -995,6 +1055,8 @@ export class FocusedAnalyzer {
         phaseUpdate: null,
         cost: costs,
         totalCost: costs.reduce((acc, c) => acc + c.cost, 0),
+        escalationLevelTrustworthy: false,
+        failedSteps,
       };
     }
 
@@ -1086,7 +1148,12 @@ export class FocusedAnalyzer {
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         console.error(`[FocusedAnalyzer] Step 2 (analysis delta) failed: ${errorMsg}`);
-        // Step 2 failure is non-fatal — return understanding delta without analysis
+        // [D-1.12 Commit B 2026-04-29] Pre-fix returned escalationLevel: 1
+        // (hardcoded), indistinguishable from "no understanding changes
+        // detected, skipped Step 2". Now: mark untrustworthy, signal the
+        // orchestrator to emit telemetry + pass undefined to the
+        // IterationRecord wire.
+        failedSteps.push('step2_analysis');
         return {
           mode: 'focused',
           escalationLevel: 1,
@@ -1097,6 +1164,8 @@ export class FocusedAnalyzer {
           phaseUpdate: null,
           cost: costs,
           totalCost: costs.reduce((acc, c) => acc + c.cost, 0),
+          escalationLevelTrustworthy: false,
+          failedSteps,
         };
       }
     } else {
@@ -1169,7 +1238,11 @@ export class FocusedAnalyzer {
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         console.error(`[FocusedAnalyzer] Level 2 paragraph re-walk failed: ${errorMsg}`);
-        // Non-fatal — remain at Level 2 with what we have
+        // [D-1.12 Commit B] Pre-fix this catch left escalationLevel at 2
+        // with stale walk data — IterationRecord would then claim "Level 2
+        // re-walk completed" when it actually crashed mid-flight. Mark
+        // untrustworthy. Caller passes undefined to the audit field.
+        failedSteps.push('level2_rewalk');
       }
     }
     // Level 3: Ripple beyond paragraph → targeted holistic refresh
@@ -1223,7 +1296,9 @@ export class FocusedAnalyzer {
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         console.error(`[FocusedAnalyzer] Level 3 holistic refresh failed: ${errorMsg}`);
-        // Non-fatal — remain at Level 3 with what we have
+        // [D-1.12 Commit B] Same shape as Level 2 — escalationLevel stays
+        // at 3 with no synthesis applied. Mark untrustworthy.
+        failedSteps.push('level3_holistic');
       }
     }
     // Level 4: Holistic shift from initial delta → escalate to comprehensive immediately
@@ -1273,6 +1348,8 @@ export class FocusedAnalyzer {
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : String(error);
           console.error(`[FocusedAnalyzer] Level 3 upgrade holistic refresh failed: ${errorMsg}`);
+          // [D-1.12 Commit B] Level 2→3 upgrade synthesis catch.
+          failedSteps.push('l2_to_l3_upgrade');
         }
       } else {
         console.log('[FocusedAnalyzer] Level 3 (from Level 2 upgrade) — holistic synthesis already completed, skipping duplicate call');
@@ -1310,6 +1387,10 @@ export class FocusedAnalyzer {
             };
           } catch {
             console.warn('[FocusedAnalyzer] Failed to create pre-mutation snapshot — proceeding without rollback safety');
+            // [D-1.12 Commit B] Pre-mutation snapshot disabled silently;
+            // subsequent restore branches will skip with no signal. Mark
+            // failed so orchestrator knows rollback safety was lost.
+            failedSteps.push('snapshot_creation');
             return null;
           }
         })()
@@ -1402,6 +1483,9 @@ export class FocusedAnalyzer {
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : String(error);
           console.error(`[FocusedAnalyzer] Failed to apply understanding delta to coordinator: ${errorMsg}`);
+          // [D-1.12 Commit B] Profile mutation failed; result claims a
+          // delta was produced but coordinator state may not reflect it.
+          failedSteps.push('understanding_delta_apply');
           // Restore pre-mutation snapshot to prevent inconsistent profile state
           if (preMutationSnapshot) {
             try {
@@ -1416,6 +1500,8 @@ export class FocusedAnalyzer {
               console.log('[FocusedAnalyzer] Restored pre-mutation snapshot after understanding delta failure');
             } catch (restoreErr) {
               console.error('[FocusedAnalyzer] Failed to restore snapshot:', restoreErr);
+              // [D-1.12 Commit B] Doubly-broken state silently swallowed.
+              failedSteps.push('understanding_delta_restore');
             }
           }
         }
@@ -1471,6 +1557,8 @@ export class FocusedAnalyzer {
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : String(error);
           console.error(`[FocusedAnalyzer] Failed to apply analysis delta to coordinator: ${errorMsg}`);
+          // [D-1.12 Commit B] Same shape as understanding-delta-apply.
+          failedSteps.push('analysis_delta_apply');
           // Restore pre-mutation snapshot to prevent inconsistent profile state
           if (preMutationSnapshot) {
             try {
@@ -1485,6 +1573,7 @@ export class FocusedAnalyzer {
               console.log('[FocusedAnalyzer] Restored pre-mutation snapshot after analysis delta failure');
             } catch (restoreErr) {
               console.error('[FocusedAnalyzer] Failed to restore snapshot:', restoreErr);
+              failedSteps.push('analysis_delta_restore');
             }
           }
         }
@@ -1524,7 +1613,10 @@ export class FocusedAnalyzer {
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         console.warn(`[FocusedAnalyzer] Phase re-computation failed (non-fatal): ${errorMsg}`);
-        // Non-fatal — phase remains unchanged
+        // [D-1.12 Commit B] Phase drives feedback zoom per L1K design.
+        // Stale phase silently kept = soft fallback masquerading as
+        // non-fatal. Mark failed so orchestrator emits telemetry.
+        failedSteps.push('phase_recompute');
       }
     }
 
@@ -1588,11 +1680,15 @@ export class FocusedAnalyzer {
           `cost=$${deltaResult.cost.toFixed(4)}`,
         );
       } catch (error) {
-        // Delta synthesis failure is NOT fatal — focused analysis result is still valid
+        // [D-1.12 Commit B] Delta synthesis failure means cross-paragraph
+        // ripple isn't reflected in the holistic sections. Mark failed
+        // so the orchestrator emits telemetry; result is still returned
+        // since holistic carry-forward is genuinely non-fatal.
         console.error(
-          '[FocusedAnalyzer] W5.4c: Delta synthesis failed (non-fatal):',
+          '[FocusedAnalyzer] W5.4c: Delta synthesis failed (non-fatal but tracked):',
           error instanceof Error ? error.message : String(error),
         );
+        failedSteps.push('w54c_delta_synthesis');
       }
     }
 
@@ -1615,6 +1711,12 @@ export class FocusedAnalyzer {
       phaseUpdate,
       cost: costs,
       totalCost,
+      // [D-1.12 Commit B 2026-04-29] escalationLevelTrustworthy is true
+      // iff every step that was attempted completed cleanly. The catches
+      // throughout this method push to failedSteps; if the array is
+      // empty here, no catch fired and the escalation level is honest.
+      escalationLevelTrustworthy: failedSteps.length === 0,
+      failedSteps,
     };
   }
 

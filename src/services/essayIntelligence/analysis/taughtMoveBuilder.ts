@@ -1,0 +1,290 @@
+// ============================================================================
+// TAUGHT MOVE BUILDER (Phase 1 D-1.2)
+// ============================================================================
+// Spec: docs/pipeline-evolution/04-pipeline-architecture/L5/L5_ITERATION_LOOP_DESIGN.md
+//   §7.1 (TaughtMove type), §7.2 (taughtMoves[] appended at L5 end).
+// Companion type: TaughtMove in profileTypes.ts (D-0.1).
+//
+// Two responsibilities, kept narrow:
+//   1. Pure transformation: l5AnnotationToTaughtMove(annotation,
+//      iteration) maps an L5Annotation into a TaughtMove with a stable,
+//      deterministic id.
+//   2. Transient buffering: between L5 emission and the iteration-end
+//      commit (D-1.10), the orchestrator buffers TaughtMoves keyed by
+//      iteration number; D-1.10 flushes the buffer into
+//      iterationLedger.taughtMoves[] atomically with the IterationRecord.
+//
+// Why a separate module from iterationTelemetry: the buffers have
+// different lifetimes (telemetry events accumulate during the iteration;
+// TaughtMoves accumulate post-L5-emission only) and different commit
+// semantics (telemetry events end up on IterationRecord.events[];
+// TaughtMoves end up on iterationLedger.taughtMoves[]). Keeping the
+// buffers separate makes each concern auditable in isolation.
+//
+// ID derivation: `M-${iteration}-${annotation.location.paragraphIndex}-${annotation.id}`.
+// The contract names the format `M-{iteration}-{paragraphIndex}-{sequenceInParagraph}`;
+// using L5Annotation.id as the trailing segment satisfies both the
+// contract's "stable across runs" requirement (D-1.13) and the
+// "unique within (iteration, paragraphIndex)" requirement (L5Annotation.id
+// is unique within an L5AnnotationResult). A running per-paragraph
+// counter would NOT be deterministic across runs because annotation
+// generation order is not guaranteed stable.
+
+import type { L5Annotation } from './deepAnnotationService';
+import type { TaughtMove } from '../profileTypes';
+
+// ─── ID derivation ─────────────────────────────────────────────────────
+
+/**
+ * Derive the TaughtMove id from an L5Annotation + iteration.
+ *
+ * Stable: same (annotation, iteration) → same id across any number of
+ * runs (D-1.13 property test enforces this). The annotation's .id is
+ * itself stable (assigned at L5 generation time and treated as
+ * immutable; the L5 prompt is instructed to keep IDs deterministic).
+ *
+ * Throws if any required field is missing — fail-fast per the D-1.2
+ * contract: "TaughtMove construction throws on missing required
+ * L5Annotation fields → fail-fast; iteration halts before commit."
+ */
+export function generateTaughtMoveId(
+  annotation: L5Annotation,
+  iteration: number,
+): string {
+  if (!Number.isFinite(iteration) || iteration < 0) {
+    throw new Error(
+      `[taughtMoveBuilder.generateTaughtMoveId] iteration must be a non-negative finite number; got ${JSON.stringify(iteration)}.`,
+    );
+  }
+  if (!annotation || typeof annotation !== 'object') {
+    throw new Error(
+      `[taughtMoveBuilder.generateTaughtMoveId] annotation is missing or not an object.`,
+    );
+  }
+  if (!annotation.id || typeof annotation.id !== 'string') {
+    throw new Error(
+      `[taughtMoveBuilder.generateTaughtMoveId] annotation.id is missing or not a string; got ${JSON.stringify(annotation.id)}.`,
+    );
+  }
+  if (!annotation.location || typeof annotation.location.paragraphIndex !== 'number') {
+    throw new Error(
+      `[taughtMoveBuilder.generateTaughtMoveId] annotation.location.paragraphIndex is missing or not a number ` +
+        `(annotation.id=${annotation.id}); got ${JSON.stringify(annotation.location)}.`,
+    );
+  }
+  return `M-${iteration}-${annotation.location.paragraphIndex}-${annotation.id}`;
+}
+
+// ─── Annotation → TaughtMove transformer ───────────────────────────────
+
+/**
+ * Pure transformation. Maps an L5Annotation to a TaughtMove ready for
+ * append. `landing` is intentionally undefined — populated by the
+ * landing detector (D-1.3 / D-1.6) on the iteration AFTER delivery.
+ *
+ * Type coercions:
+ *   - L5Annotation.location.sentenceIndex: number | null
+ *     → TaughtMove.location.sentenceIndex?: number   (null → undefined)
+ *   - L5Annotation.location.spanText: string | null
+ *     → TaughtMove.location.spanText?: string         (null → undefined)
+ *   - L5Annotation.stakes: string | null
+ *     → TaughtMove.stakesSnapshot?: string            (null → undefined)
+ *
+ * findingId: L5Annotation does not currently carry a finding link;
+ *   left undefined here. Future Phase 1+ deliverable can populate when
+ *   the L5 prompt emits findingId per the SpecificsNeed signal flow.
+ *
+ * contentSummary: pass-through of L5Annotation.content. Per the
+ *   TaughtMove JSDoc the field carries a 1-2 sentence content snapshot;
+ *   the full annotation prose lives in the iteration checkpoint via
+ *   annotationId. If L5 emits multi-paragraph content, that's a prompt
+ *   quality concern, not a transformer concern.
+ */
+export function l5AnnotationToTaughtMove(
+  annotation: L5Annotation,
+  iteration: number,
+): TaughtMove {
+  const id = generateTaughtMoveId(annotation, iteration);
+  if (!annotation.teachingMode) {
+    throw new Error(
+      `[taughtMoveBuilder.l5AnnotationToTaughtMove] annotation.teachingMode is missing ` +
+        `(annotation.id=${annotation.id}, derivedId=${id}).`,
+    );
+  }
+  if (typeof annotation.content !== 'string') {
+    throw new Error(
+      `[taughtMoveBuilder.l5AnnotationToTaughtMove] annotation.content must be a string ` +
+        `(annotation.id=${annotation.id}, derivedId=${id}); got ${typeof annotation.content}.`,
+    );
+  }
+  return {
+    id,
+    annotationId: annotation.id,
+    // findingId stays undefined; populate when L5 emits the linkage.
+    location: {
+      paragraphIndex: annotation.location.paragraphIndex,
+      sentenceIndex:
+        annotation.location.sentenceIndex !== null
+          ? annotation.location.sentenceIndex
+          : undefined,
+      spanText:
+        annotation.location.spanText !== null
+          ? annotation.location.spanText
+          : undefined,
+    },
+    taughtAtIteration: iteration,
+    teachingMode: annotation.teachingMode,
+    contentSummary: annotation.content,
+    stakesSnapshot: annotation.stakes !== null ? annotation.stakes : undefined,
+    // landing left undefined — populated post-detection by
+    // priorAnnotationsBuilder per the D-1.15.0 carve-out (D-1.6.5
+    // closure). [D-1.6.6 closure 2026-04-30] deepenedBy / supersededBy
+    // removed from TaughtMove type; chain-tracking dropped from
+    // Phase 1 scope until a producer + consumer co-land in a future
+    // deliverable.
+  };
+}
+
+/**
+ * Convenience: transform every annotation in an L5AnnotationResult-like
+ * collection into TaughtMoves. Walks paragraphAnnotations, essay-level,
+ * and cross-paragraph annotations in that fixed order so the resulting
+ * TaughtMove array is itself deterministic for a given input.
+ *
+ * Inputs are the three annotation arrays from L5AnnotationResult;
+ * extracted as separate parameters rather than the full result so this
+ * transformer doesn't depend on the cost / timing fields of the result.
+ */
+export function l5AnnotationsToTaughtMoves(
+  paragraphAnnotations: Array<{ paragraphIndex: number; annotations: L5Annotation[] }>,
+  essayLevelAnnotations: L5Annotation[],
+  crossParagraphAnnotations: L5Annotation[],
+  iteration: number,
+): TaughtMove[] {
+  const moves: TaughtMove[] = [];
+  for (const para of paragraphAnnotations) {
+    for (const annotation of para.annotations) {
+      moves.push(l5AnnotationToTaughtMove(annotation, iteration));
+    }
+  }
+  for (const annotation of essayLevelAnnotations) {
+    moves.push(l5AnnotationToTaughtMove(annotation, iteration));
+  }
+  for (const annotation of crossParagraphAnnotations) {
+    moves.push(l5AnnotationToTaughtMove(annotation, iteration));
+  }
+  return moves;
+}
+
+// ─── Transient buffer ──────────────────────────────────────────────────
+//
+// The buffer holds TaughtMoves between L5 emission and iteration-end
+// commit (D-1.10). Keyed by (essayId, iteration) compound key. The orchestrator:
+//   1. After deepAnnotationService.generateAnnotations returns, calls
+//      bufferTaughtMoves(essayId, iteration, transformedMoves).
+//   2. At iteration end (D-1.10), calls flushTaughtMovesForIteration
+//      to retrieve the moves, pushes them onto profile.iterationLedger.
+//      taughtMoves[] atomically with the IterationRecord, then calls
+//      clearTaughtMovesForIteration to free the buffer.
+//
+// If the iteration crashes between buffer + commit, the buffer entries
+// are lost — that's correct. No half-committed audit trail.
+//
+// [thread-safety / D-1.11 Step 0 (audit fix)] The buffer is module-level
+// shared across the process. Pre-D-1.11 the key was `iteration: number` only —
+// two essays both running iter=1 in the same process would cross-pollinate
+// each other's buffered moves (the flush returned a `.slice()` copy, so
+// both essays' commits would see the merged set). Apr-28 5-agent audit
+// surfaced this as a 🔴 latent bug: not actively triggering today (one
+// orchestrator instance per essay session, single-essay-at-a-time runtime),
+// but defense-in-depth before any future shared-worker / batch-analysis
+// refactor silently corrupts audit trails. Compound (essayId, iter) keying
+// makes cross-essay collision impossible at the type level.
+
+/**
+ * Compound key for the transient buffer. We use a string concatenation
+ * with the ASCII Unit Separator (U+001F, `\x1F`) as the delimiter —
+ * chosen because (a) it's a non-printable control character so it
+ * cannot appear naturally in a user-supplied or UUID-derived essayId,
+ * eliminating ambiguity at the parse boundary, and (b) it's documented
+ * in the ASCII spec as a record/unit separator so the intent is
+ * greppable for future maintainers. Map keying on objects/arrays is
+ * by reference so a tuple wouldn't work; a structurally-unique string
+ * is the simplest correct approach.
+ *
+ * [Round 2 audit MED-1 closure 2026-04-28] Pre-fix the delimiter byte
+ * was a NUL (`\0`) but the JSDoc claimed it was `\x1F`. Harmonized to
+ * match the JSDoc claim and the sibling `iterationTelemetry.ts:bufferKey`
+ * (D-1.11 Step 15) so both buffers use the same scheme.
+ */
+function bufferKey(essayId: string, iteration: number): string {
+  return `${essayId}${iteration}`;
+}
+
+const taughtMoveBuffer: Map<string, TaughtMove[]> = new Map();
+
+/**
+ * Append moves to the buffer for the given (essayId, iteration). Pushed
+ * onto the existing entry or initializes a new one.
+ *
+ * Defensive: throws if `essayId` is not a non-empty string, `iteration`
+ * is invalid, or `moves` is not an array.
+ */
+export function bufferTaughtMoves(
+  essayId: string,
+  iteration: number,
+  moves: TaughtMove[],
+): void {
+  if (typeof essayId !== 'string' || essayId.length === 0) {
+    throw new Error(
+      `[taughtMoveBuilder.bufferTaughtMoves] essayId must be a non-empty string; got ${JSON.stringify(essayId)}.`,
+    );
+  }
+  if (!Number.isFinite(iteration) || iteration < 0) {
+    throw new Error(
+      `[taughtMoveBuilder.bufferTaughtMoves] iteration must be non-negative finite number; got ${JSON.stringify(iteration)}.`,
+    );
+  }
+  if (!Array.isArray(moves)) {
+    throw new Error(
+      `[taughtMoveBuilder.bufferTaughtMoves] moves must be an array; got ${typeof moves}.`,
+    );
+  }
+  const k = bufferKey(essayId, iteration);
+  const existing = taughtMoveBuffer.get(k);
+  if (existing) {
+    existing.push(...moves);
+  } else {
+    taughtMoveBuffer.set(k, [...moves]);
+  }
+}
+
+/**
+ * Read the buffered moves for an (essayId, iteration) without removing
+ * them. Returns a defensive copy so the caller can't mutate the buffer.
+ */
+export function flushTaughtMovesForIteration(
+  essayId: string,
+  iteration: number,
+): TaughtMove[] {
+  return taughtMoveBuffer.get(bufferKey(essayId, iteration))?.slice() ?? [];
+}
+
+/**
+ * Clear the buffer for an (essayId, iteration). Called by the
+ * orchestrator AFTER a successful flush + commit so memory doesn't grow
+ * unboundedly.
+ */
+export function clearTaughtMovesForIteration(
+  essayId: string,
+  iteration: number,
+): void {
+  taughtMoveBuffer.delete(bufferKey(essayId, iteration));
+}
+
+/**
+ * Test-only reset. Clears every (essayId, iteration) entry's buffer.
+ */
+export function __resetTaughtMoveBufferForTesting(): void {
+  taughtMoveBuffer.clear();
+}

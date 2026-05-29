@@ -479,7 +479,7 @@ specific_resources: {
 
 #### Task 6: Update Documentation (1 hour)
 **Files to Update**:
-- `docs/COLLEGE_OVERLAY_ARCHITECTURAL_FIX_COMPLETE.md`
+- `docs/archived/overlay/COLLEGE_OVERLAY_ARCHITECTURAL_FIX_COMPLETE.md`
 - Add examples of targeted enhancements
 - Update architecture diagrams
 

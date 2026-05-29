@@ -1,18 +1,22 @@
 /**
- * Essay Intelligence System — Core Type Definitions
+ * Essay Intelligence System — Core Type Definitions (legacy support)
  *
- * 5-level hierarchical understanding model:
- *   EssayUnderstanding → ParagraphUnderstanding → SentenceUnderstanding → WordAnnotation
- *
- * Also defines:
- *   - RunningUnderstanding (Layer 3 accumulator)
+ * Defines:
  *   - StructuralCartography (Layer 2 output)
+ *   - SentenceUnderstanding + WordAnnotation
  *   - ParagraphDeepAnalysis (Layer 3 per-paragraph output)
  *   - EssayDNA + ParagraphScoreMatrix (Layer 4 crystallization)
  *   - ConversationInsight (Layer 6 enrichment)
  *   - AnalysisPass (tracking metadata)
+ *   - DiffResult (text-change detection)
  *
- * Consumed by: all essayIntelligence/* modules, enhancedWorkshop, inlineEditor, coaching
+ * NOTE: The live EssayUnderstanding and ParagraphUnderstanding shapes
+ * live in `./profileTypes.ts`. Shadow duplicates of those types — and
+ * the RunningUnderstanding accumulator + its manager + the
+ * MeaningfulDiffResult helper — were removed 2026-05-24 after
+ * grep-verified zero importers (Stage 0.A of the cost+quality plan).
+ *
+ * Consumed by: essayIntelligence/* modules, enhancedWorkshop, inlineEditor, coaching
  */
 
 import type { NarrativeArcType, NarrativeAnalysisResult, ParagraphFunctionAnalysis, ParagraphFunction } from '../../workshop/scoring/narrativeAnalyzerTypes';
@@ -156,79 +160,6 @@ export interface StructuralCartography {
   /** Pacing assessment */
   pacingNotes: string;
   flatSpots: number[];
-}
-
-// ============================================================================
-// LAYER 3: RUNNING UNDERSTANDING (ACCUMULATOR)
-// ============================================================================
-
-/** The compounding accumulator that grows with each paragraph analysis */
-export interface RunningUnderstanding {
-  // ── THESIS & THEME ──
-  emergingThesis: string;
-  thesisConfidence: number;
-  thematicThreads: Array<{
-    thread: string;
-    introducedAt: number;
-    lastSeenAt: number;
-    strength: ThreadStrength;
-  }>;
-
-  // ── NARRATIVE ARC ──
-  arcSoFar: string;
-  arcType: NarrativeArcType | null;
-  currentMomentum: ArcMomentum;
-  turningPointDetected: number | null;
-
-  // ── VOICE SIGNATURE ──
-  voiceFingerprint: {
-    dominantRegister: string;
-    authenticMoments: string[];
-    voiceDrifts: Array<{
-      paragraph: number;
-      from: string;
-      to: string;
-    }>;
-    consistencyScore: number;
-  };
-
-  // ── EMOTIONAL JOURNEY ──
-  emotionalArc: Array<{
-    paragraph: number;
-    register: string;
-    depth: number;
-    isEarned: boolean;
-  }>;
-  emotionalPeak: { paragraph: number; moment: string } | null;
-
-  // ── STRENGTH / WEAKNESS MAP ──
-  strengthsFound: Array<{
-    quality: string;
-    paragraph: number;
-    evidence: string;
-  }>;
-  weaknessesFound: Array<{
-    quality: string;
-    paragraph: number;
-    description: string;
-    severity: WeaknessSeverity;
-  }>;
-
-  // ── CROSS-PARAGRAPH CONNECTIONS ──
-  connections: Array<{
-    type: ConnectionType;
-    paragraphs: [number, number];
-    description: string;
-  }>;
-  redundancies: Array<{
-    paragraphs: number[];
-    overlappingContent: string;
-  }>;
-
-  // ── ADMISSIONS LENS ──
-  aoTakeaway: string;
-  memorabilityFactor: string | null;
-  revealedQualities: string[];
 }
 
 // ============================================================================
@@ -469,105 +400,6 @@ export interface SentenceUnderstanding {
   studentExplanation: string | null;
 }
 
-/** Level 3: Paragraph-level understanding */
-export interface ParagraphUnderstanding {
-  index: number;
-  /** Populated at load time from essay text, NOT stored in JSONB */
-  text: string;
-  textHash: string;
-  stale: boolean;
-
-  /** Layer 1: Paragraph function classification */
-  functionAnalysis: ParagraphFunctionAnalysis | null;
-
-  /** Layer 1: Deterministic specificity score (0-100) */
-  specificityScore: number;
-
-  /** Layer 1: Scene vs summary classification */
-  sceneOrSummary: 'scene' | 'summary' | 'mixed';
-
-  /** Layer 2: Structural role (from StructuralCartography) */
-  structuralRole: {
-    role: string;
-    narrativeFunction: string;
-    strengthContribution: string;
-    weaknessFlag: string | null;
-  } | null;
-
-  /** Layer 3: Deep 5-angle analysis */
-  deepAnalysis: ParagraphDeepAnalysis | null;
-
-  /** Layer 3: RunningUnderstanding snapshot AFTER this paragraph */
-  runningUnderstandingSnapshot: RunningUnderstanding | null;
-
-  /** Layer 5: Annotations targeting this paragraph */
-  annotations: EssayAnnotation[];
-
-  /** Sentence-level understanding */
-  sentences: SentenceUnderstanding[];
-
-  /** Layer 6: Conversation insights at paragraph level */
-  conversationInsights: ConversationInsight[];
-
-  /** Student's stated intent for this paragraph (from coaching) */
-  studentIntent: string | null;
-}
-
-/** Level 1 (root): Complete essay understanding */
-export interface EssayUnderstanding {
-  /** Unique understanding ID */
-  id: string;
-  /** Essay ID (FK to essays table) */
-  essayId: string;
-  /** User ID */
-  userId: string;
-  /** Version number (increments on each full re-analysis) */
-  version: number;
-  /** Essay type */
-  essayType: WorkshopEssayType;
-  /** Hash of the full essay text this understanding is based on */
-  textHash: string;
-  /** Timestamps */
-  createdAt: string;
-  updatedAt: string;
-
-  /** Layer 1: Extracted features (full deterministic analysis) */
-  features: ExtractedFeatures | null;
-
-  /** Layer 1: Narrative analysis results */
-  narrativeAnalysis: NarrativeAnalysisResult | null;
-
-  /** Layer 2: Structural cartography */
-  structuralCartography: StructuralCartography | null;
-
-  /** Layer 3: Final RunningUnderstanding (after last paragraph) */
-  finalUnderstanding: RunningUnderstanding | null;
-
-  /** Layer 4: Essay DNA */
-  essayDNA: EssayDNA | null;
-
-  /** Layer 4: Paragraph Score Matrix */
-  paragraphScoreMatrix: ParagraphScoreMatrix | null;
-
-  /** Layer 5: All annotations (also cross-referenced on paragraphs) */
-  annotations: EssayAnnotation[];
-
-  /** Paragraph-level understanding (ordered by index) */
-  paragraphs: ParagraphUnderstanding[];
-
-  /** Layer 6: Conversation insights at essay level */
-  conversationInsights: ConversationInsight[];
-
-  /** Voice profile snapshot used during analysis */
-  voiceProfileSnapshot: StudentVoiceProfile | null;
-
-  /** Analysis pass history */
-  analysisPasses: AnalysisPass[];
-
-  /** Cumulative cost tracking */
-  totalCostUSD: number;
-}
-
 // ============================================================================
 // ANALYSIS PASS METADATA
 // ============================================================================
@@ -615,14 +447,6 @@ export interface DiffResult {
   addedParagraphs: number[];
   /** Paragraphs removed */
   removedParagraphs: number[];
-}
-
-/** Whether a RunningUnderstanding change is "meaningful" */
-export interface MeaningfulDiffResult {
-  /** True if thesis, arc, connections, or emotional journey changed */
-  isMeaningful: boolean;
-  /** What specifically changed */
-  changedAspects: string[];
 }
 
 // ============================================================================
@@ -738,61 +562,3 @@ export const DEFAULT_ANALYSIS_CONFIG: AnalysisConfig = {
   },
 };
 
-// ============================================================================
-// SERVICE INTERFACES (for dependency injection / testing)
-// ============================================================================
-
-/** CRUD operations for EssayUnderstanding */
-export interface IEssayUnderstandingService {
-  /** Create initial understanding with Layer 1 data */
-  buildInitial(input: AnalysisInput): Promise<EssayUnderstanding>;
-  /** Load existing understanding from DB */
-  load(essayId: string, userId: string): Promise<EssayUnderstanding | null>;
-  /** Save understanding to DB */
-  save(understanding: EssayUnderstanding): Promise<void>;
-  /** Add a conversation insight at the correct hierarchy level */
-  addConversationInsight(
-    understanding: EssayUnderstanding,
-    level: 'essay' | 'paragraph' | 'sentence',
-    index: number | null,
-    sentenceIndex: number | null,
-    insight: ConversationInsight,
-  ): EssayUnderstanding;
-  /** Mark paragraphs as stale based on diff */
-  applyStaleness(understanding: EssayUnderstanding, diff: DiffResult): EssayUnderstanding;
-}
-
-/** Diff engine interface */
-export interface IDiffEngine {
-  /** Compare old and new essay text */
-  diffText(oldText: string, newText: string, oldParagraphs: ParagraphUnderstanding[]): DiffResult;
-  /** Check if RunningUnderstanding changed meaningfully */
-  meaningfulDiff(oldRU: RunningUnderstanding, newRU: RunningUnderstanding): MeaningfulDiffResult;
-  /** Compute text hash */
-  hashText(text: string): string;
-}
-
-/** Context builder interface */
-export interface IContextBuilder {
-  /** Route a conversation focus to the right context slices */
-  route(focus: ConversationFocus): ContextRoute;
-  /** Assemble context for an LLM prompt from selected slices */
-  assemble(understanding: EssayUnderstanding, slices: ContextSlice[]): AssembledContext;
-  /** Build context for Layer 3 paragraph walk */
-  buildParagraphWalkContext(
-    understanding: EssayUnderstanding,
-    paragraphIndex: number,
-    runningUnderstanding: RunningUnderstanding | null,
-    structuralMap: StructuralCartography,
-  ): string;
-  /** Build context for Layer 4 crystallization */
-  buildCrystallizationContext(
-    understanding: EssayUnderstanding,
-    finalRunningUnderstanding: RunningUnderstanding,
-    allParagraphAnalyses: ParagraphDeepAnalysis[],
-  ): string;
-  /** Build context for Layer 5 annotation */
-  buildAnnotationContext(
-    understanding: EssayUnderstanding,
-  ): string;
-}

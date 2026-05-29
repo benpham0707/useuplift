@@ -85,6 +85,40 @@ function isValidEndpoint(
 }
 
 /**
+ * Soft-recovery (2026-05-03): coerce an endpoint with an out-of-range
+ * sentence index to paragraph-level instead of rejecting it entirely.
+ * The L2.5 scout (Haiku) hallucinates ~35% of sentence indices on
+ * paragraphs with 5+ sentences. The connection itself is still useful
+ * at paragraph granularity — recover instead of discarding.
+ *
+ * Returns:
+ *   - Valid endpoint as-is when both paragraph + sentence are in bounds.
+ *   - Coerced endpoint (sentence undefined) when paragraph is valid but
+ *     sentence is out-of-range.
+ *   - null when even the paragraph index is invalid (genuinely
+ *     non-recoverable; discard the connection).
+ */
+function coerceEndpoint(
+  profile: EssayProfile,
+  endpoint: ConnectionEndpoint,
+): ConnectionEndpoint | null {
+  if (endpoint.paragraph < 0 || endpoint.paragraph >= profile.paragraphs.length) {
+    return null;
+  }
+  if (endpoint.sentence === undefined) {
+    return endpoint;
+  }
+  const para = profile.paragraphs[endpoint.paragraph];
+  if (endpoint.sentence < 0 || endpoint.sentence >= para.sentences.length) {
+    // Soft-recovery: drop the bad sentence index, keep paragraph-level
+    // anchor + label.
+    const { sentence: _drop, ...rest } = endpoint;
+    return rest as ConnectionEndpoint;
+  }
+  return endpoint;
+}
+
+/**
  * Strength ordering for upgrade comparisons (higher = stronger).
  * Used by isDuplicate to upgrade scout leads when walk rediscovers them.
  */
@@ -193,15 +227,23 @@ export class ConnectionMutator {
       relatedFindings?: string[];
     },
   ): { connectionId: string; mutations: MutationType[] } {
-    // Validate endpoints
-    const endpointErrors = this.validateEndpoints(profile, connection.from, connection.to);
-    if (endpointErrors.length > 0) {
-      console.error(
-        `[ConnectionMutator] addConnection endpoint validation failed:`,
-        endpointErrors,
-      );
+    // Soft-recovery (2026-05-03): when the LLM hallucinates non-existent
+    // endpoints (e.g. `[P8, S4]` when P8 has only 2 sentences), try to
+    // coerce out-of-range sentence indices to paragraph-level FIRST. If
+    // even the paragraph index is invalid, drop the connection silently
+    // (addConnections emits a single batch-level summary).
+    //
+    // This recovers ~35% of L2.5 scout output that was previously
+    // discarded entirely due to Haiku's sentence-index hallucination on
+    // dense paragraphs. The connection itself stays useful at paragraph
+    // granularity.
+    const fromCoerced = coerceEndpoint(profile, connection.from);
+    const toCoerced = coerceEndpoint(profile, connection.to);
+    if (fromCoerced === null || toCoerced === null) {
       return { connectionId: '', mutations: [] };
     }
+    if (fromCoerced !== connection.from) connection.from = fromCoerced;
+    if (toCoerced !== connection.to) connection.to = toCoerced;
 
     // Check for duplicate (same from + to endpoints among active connections)
     const { connection: existingConn, isReverse } = isDuplicate(
@@ -326,15 +368,33 @@ export class ConnectionMutator {
   ): { mutations: MutationType[]; connectionIds: string[] } {
     const allMutations: MutationType[] = [];
     const connectionIds: string[] = [];
+    let rejected = 0;
+    let firstRejectSample: { from: ConnectionEndpoint; to: ConnectionEndpoint } | null = null;
 
     for (const conn of connections) {
       const result = this.addConnection(profile, conn);
       connectionIds.push(result.connectionId);
+      if (result.connectionId === '') {
+        rejected += 1;
+        if (!firstRejectSample) {
+          firstRejectSample = { from: conn.from, to: conn.to };
+        }
+      }
       for (const m of result.mutations) {
         if (!allMutations.includes(m)) {
           allMutations.push(m);
         }
       }
+    }
+
+    if (rejected > 0 && firstRejectSample) {
+      console.warn(
+        `[ConnectionMutator] addConnections: ${rejected}/${connections.length} ` +
+        `connection(s) rejected due to invalid endpoints (LLM hallucinated sentence indices). ` +
+        `First sample: from=${formatEndpoint(firstRejectSample.from)} ` +
+        `to=${formatEndpoint(firstRejectSample.to)}. ` +
+        `Batch of ${connections.length - rejected} valid connection(s) added.`,
+      );
     }
 
     return { mutations: allMutations, connectionIds };
@@ -495,37 +555,52 @@ export class ConnectionMutator {
   ): MutationType[] {
     const mutations: MutationType[] = [];
 
-    // Repeated elements → pairwise connections between occurrences
+    // Bucket A (2026-05-27): repeatedElements → ONE canonical pair-edge per
+    // element, NOT the C(N,2) pairwise explosion. The pairwise multiplicity
+    // was pure data noise — no downstream consumer walks N-choose-2 pairs
+    // and treats each pair differently. The `description` already lists all
+    // participants in prose ("P1S1 uses 'mage's staff'; P2S0 references
+    // 'enchanted broom'; P3S1 uses 'wizard'..."), so the information is
+    // preserved. The dump's §7 collapses from ~810 lines to ~150 lines, and
+    // L3/L4/L5 prompts no longer pay the duplicate-description token cost
+    // 4× downstream.
+    //
+    // Convention: first occurrence → last occurrence, with the full
+    // participant list rendered in the `description`/`significance` fields.
+    // Sentences in middle occurrences still appear in the description prose
+    // and remain queryable via the connection lookup graph.
     for (const elem of scout.repeatedElements) {
-      for (let i = 0; i < elem.occurrences.length; i++) {
-        for (let j = i + 1; j < elem.occurrences.length; j++) {
-          const fromOcc = elem.occurrences[i];
-          const toOcc = elem.occurrences[j];
-          const result = this.addConnection(profile, {
-            from: {
-              paragraph: fromOcc.paragraphIndex,
-              sentence: fromOcc.sentenceIndex,
-              label: `"${elem.element}" occurrence ${i + 1}`,
-            },
-            to: {
-              paragraph: toOcc.paragraphIndex,
-              sentence: toOcc.sentenceIndex,
-              label: `"${elem.element}" occurrence ${j + 1}`,
-            },
-            description: `Repeated element "${elem.element}": ${elem.potentialSignificance}`,
-            reverseIllumination: null,
-            significance: elem.potentialSignificance,
-            strengthCategory: 'tentative',
-            directionality: 'forward',
-            discoveredBy: 'scout',
-            routingTags: ['thematic'],
-            relatedFindings: [],
-          });
-          if (result.connectionId && result.mutations.length > 0) {
-            for (const m of result.mutations) {
-              if (!mutations.includes(m)) mutations.push(m);
-            }
-          }
+      if (elem.occurrences.length < 2) continue; // validator should guarantee, defense
+      const firstOcc = elem.occurrences[0];
+      const lastOcc = elem.occurrences[elem.occurrences.length - 1];
+      const participantsList = elem.occurrences
+        .map((o, idx) => `occurrence ${idx + 1} at P${o.paragraphIndex}S${o.sentenceIndex}`)
+        .join(', ');
+      const result = this.addConnection(profile, {
+        from: {
+          paragraph: firstOcc.paragraphIndex,
+          sentence: firstOcc.sentenceIndex,
+          label: `"${elem.element}" first occurrence`,
+        },
+        to: {
+          paragraph: lastOcc.paragraphIndex,
+          sentence: lastOcc.sentenceIndex,
+          label: `"${elem.element}" last occurrence`,
+        },
+        description:
+          `Repeated element "${elem.element}" across ${elem.occurrences.length} sentences (${participantsList}): ` +
+          `${elem.potentialSignificance}`,
+        reverseIllumination: null,
+        significance: elem.potentialSignificance,
+        strengthCategory: 'tentative',
+        directionality: 'forward',
+        discoveredBy: 'scout',
+        routingTags: ['thematic'],
+        relatedFindings: [],
+      });
+      if (result.connectionId && result.mutations.length > 0) {
+        for (const m of result.mutations) {
+          if (!mutations.includes(m)) mutations.push(m);
         }
       }
     }

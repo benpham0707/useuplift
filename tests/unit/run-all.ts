@@ -48,11 +48,27 @@ async function runSuite(file: string): Promise<SuiteResult> {
 }
 
 async function main(): Promise<void> {
-  const files = (await fs.readdir(__dirname))
+  // Two test styles live in tests/unit/: legacy plain-tsx scripts (top-level
+  // assertions) and vitest-style suites (import from 'vitest'). This runner
+  // owns ONLY the tsx scripts — vitest suites run separately via
+  // `npm run test:vitest` (see vitest.config.ts, which enumerates them).
+  // Running a vitest suite under raw tsx crashes (vitest worker state is never
+  // initialised), so filter them out here by detecting the vitest import.
+  const allFiles = (await fs.readdir(__dirname))
     .filter((f) => f.endsWith('.test.ts'))
     .filter((f) => f !== 'run-all.ts')
-    .sort()
-    .map((f) => path.join(__dirname, f));
+    .sort();
+  const files: string[] = [];
+  let skippedVitest = 0;
+  for (const f of allFiles) {
+    const abs = path.join(__dirname, f);
+    const usesVitest = /from\s+['"]vitest['"]/.test(await fs.readFile(abs, 'utf8'));
+    if (usesVitest) { skippedVitest++; continue; }
+    files.push(abs);
+  }
+  if (skippedVitest > 0) {
+    console.log(`(skipping ${skippedVitest} vitest-style suite(s) — run via 'npm run test:vitest')`);
+  }
 
   if (files.length === 0) {
     console.log('no unit test files found in tests/unit/');

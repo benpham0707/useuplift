@@ -31,6 +31,7 @@ import type {
   Finding,
   DeltaSynthesisRequest,
   HolisticSectionType,
+  CarryForwardDecision,
 } from '../profileTypes';
 
 // Coordinator + Router
@@ -58,6 +59,13 @@ import type { ConversationTurn, CoachingResult } from '../coaching/coachingServi
 import type { CoachingSessionMemory, LearningStyleObservations, CognitiveAssessment, CoachingQualitySignals, CoachingMode } from '../profileTypes';
 import { detectCoachingMode } from '../coaching/modeDetection';
 import { holisticSynthesisService } from './holisticSynthesis';
+
+// [D-1.12 closure 2026-04-29] Iteration telemetry for halt-on-error
+// surfacing. Failures in focused-mode / comprehensive-mode catches now
+// emit structured iteration events so the audit trail captures the
+// rejection (parity with F-2's AO First Read closure pattern).
+import { emitIterationEvent } from '../telemetry/iterationTelemetry';
+import { getCurrentIteration } from '../profileManager/essayProfileManager';
 
 // Re-export ConversationTurn so callers can use it without importing from coachingService
 export type { ConversationTurn };
@@ -88,6 +96,39 @@ export interface EditProcessResult {
   totalCost: number;
   /** Per-layer cost breakdown */
   costBreakdown: LayerCost[];
+
+  /**
+   * [D-1.12 C3+C4 closure 2026-04-29] Why a return shape with
+   * `mode === 'deferred'` or `reanalysisTriggered: false` was produced.
+   *
+   * Pre-fix the orchestrator returned `mode: 'deferred'` for THREE
+   * semantically-distinct conditions: (i) version-tracker policy chose
+   * to defer, (ii) the focused analyzer threw and we silently absorbed,
+   * (iii) the comprehensive triggerReanalysis threw and we silently
+   * absorbed. Same return shape, three different realities. Consumer
+   * could not route differently on each.
+   *
+   * `deferReason` is the discriminator. When the consumer sees
+   * `deferReason === 'policy_defer'`, it's a clean policy decision and
+   * the caller can retry / surface as "we'll get to this." When it's
+   * `'focused_failed'` or `'comprehensive_failed'`, an inner sub-layer
+   * crashed and the caller should surface the `error` field's diagnostic
+   * to the user / logs / a 5xx response.
+   *
+   * `error` is populated alongside the failure variants. Consumers
+   * MUST check `deferReason` before reading `error`; the field is
+   * undefined on the policy-defer path and on the success paths.
+   *
+   * Backwards compatibility: every pre-existing consumer of
+   * `EditProcessResult.mode` continues to work unchanged. The new
+   * fields are additive.
+   */
+  deferReason?: 'policy_defer' | 'focused_failed' | 'comprehensive_failed';
+  error?: {
+    layer: 'focusedAnalyzer' | 'triggerReanalysis';
+    message: string;
+    code?: string;
+  };
 }
 
 /**
@@ -203,6 +244,20 @@ export class ReanalysisOrchestrator {
   /** Most recent EditUnderstanding from processEdit().
    *  Consumed once by the next processCoachingTurn() call, then cleared. */
   private lastEditUnderstanding: EditUnderstanding | null = null;
+
+  /**
+   * D-1.11 DP-1: most recent mode-selection decision from
+   * processEditAndMaybeReanalyze. Captured at the moment
+   * FocusedAnalyzer.selectAnalysisMode runs (this orchestrator's
+   * iteration counter is still at the prior iter at that point).
+   * Threaded through pipelineInput.modeSelectionDecision when
+   * triggerReanalysis runs analyzeEssay; analyzeEssay fills in the
+   * iteration AFTER incrementIteration and appends the decision.
+   *
+   * Cleared after each triggerReanalysis call to prevent stale
+   * decisions from bleeding into subsequent iterations.
+   */
+  private lastModeSelectionDecision: Omit<CarryForwardDecision, 'iteration'> | null = null;
 
   // ── Construction ──────────────────────────────────────────────────────────
 
@@ -603,7 +658,20 @@ export class ReanalysisOrchestrator {
    * 5. Close version record
    * 6. Return result
    */
-  async triggerReanalysis(): Promise<ReanalysisResult> {
+  async triggerReanalysis(
+    /**
+     * [F-1 wire-up 2026-04-29] When the comprehensive re-analysis is the
+     * escalation tail of a focused-mode run, the focused result's
+     * escalationLevel (1|2|3|4) is threaded into PipelineInput so
+     * commitIterationRecord populates IterationRecord.escalationLevel
+     * with the level that actually triggered the comprehensive re-run
+     * — not the silent 0 the consumer was reading before. Optional
+     * because direct comprehensive re-analyses (no focused predecessor)
+     * legitimately have no escalation level and `?? 0` keeps the
+     * field at 0 in that case (per its declared 0|1|2|3|4 type).
+     */
+    focusedEscalationLevel?: 0 | 1 | 2 | 3 | 4,
+  ): Promise<ReanalysisResult> {
     console.log('[ReanalysisOrchestrator] Triggering comprehensive re-analysis');
 
     // Generate brief from accumulated changes
@@ -646,18 +714,90 @@ export class ReanalysisOrchestrator {
       );
     }
 
+    // D-1.8: thread the prior-iteration baseline text and the LLM-judged
+    // overall edit significance from upstream `editUnderstandingService` so
+    // the analysisOrchestrator's priorAnnotations composer (Phase 6) can
+    // build EditSignals against the actual edit, not a stale ledger snapshot.
+    // The baselineText is the "before" essay text from the active version
+    // window — exactly the OLD-half of the diff that prior taughtMoves
+    // recorded their location.paragraphIndex against. lastEditUnderstanding
+    // is populated by `runEditProcessing` (line 920) when an edit triggered
+    // this re-analysis; null on student_request triggers (no edit). When
+    // both are absent, the composer's mechanical-significance fallback
+    // (D-1.8 §4) and ledger-snapshot lookup (D-1.10's deliverable) take over.
+    const activeVersion = this.versionTracker.getActiveVersion();
+    const priorEssayText = activeVersion.baselineText.length > 0 ? activeVersion.baselineText : undefined;
+    const editSignificance = this.lastEditUnderstanding?.significance;
+
+    // ── D-1.10: thread iteration-ledger continuity + triggeredBy + edit metadata ──
+    // Closes Dead Wire #3 (analyzeEssay always called createNew with a
+    // fresh empty ledger, silently discarding prior history). Capture the
+    // existing iterationLedger from this.coordinator's profile NOW —
+    // before analyzeEssay runs, because line 717's fromCheckpoint rebuild
+    // will overwrite this.coordinator with the post-pipeline profile that
+    // ALREADY has the new iteration record appended. The seed flows
+    // through PipelineInput → createNew → createInitialProfile, replacing
+    // the default empty ledger with a deep-clone of the prior state so the
+    // new iteration appends rather than starts fresh.
+    //
+    // triggeredBy: 'edit' when an edit fired upstream (lastEditUnderstanding
+    // is populated by runEditProcessing line 920 when edit-triggered);
+    // 'student_request' when re-analysis was triggered via this orchestrator
+    // without an edit (e.g., manual rerun from the chat interface).
+    //
+    // editChangeTypes: surfaced from the same upstream edit understanding;
+    // used by analysisOrchestrator.commitIterationRecord to populate
+    // IterationRecord.editScope.changeTypes when triggeredBy === 'edit'.
+    //
+    // [Item 13 drive-by fix 2026-04-30] Pre-existing duplicate `const currentProfile`
+    // declaration in the same function scope (the first declaration is at line 691
+    // for the essayType derivation). tsc tolerates this in the project's lib mode
+    // but esbuild (used by vitest) rejects it as a hard transform error, blocking
+    // any test that imports this file. Renamed the second to `profileForLedger` —
+    // it's a separate semantic (the profile snapshot taken NOW, before analyzeEssay
+    // overwrites this.coordinator). The two reads return the same Readonly snapshot
+    // via the coordinator's pure getProfile, so behavior is identical.
+    const profileForLedger = this.coordinator.getProfile();
+    const priorIterationLedger = profileForLedger.iterationLedger;
+    const triggeredBy: 'edit' | 'student_request' = this.lastEditUnderstanding ? 'edit' : 'student_request';
+    const editChangeTypes = this.lastEditUnderstanding?.changeTypes;
+
     const pipelineInput: PipelineInput = {
       // FIX 4.7: use stored essayId instead of synthetic one
       essayId: this.essayId,
       essayText: currentText,
       essayType,
       priorFindings: priorFindings.length > 0 ? priorFindings : undefined,
+      priorEssayText,
+      editSignificance,
+      priorIterationLedger,
+      triggeredBy,
+      editChangeTypes,
+      // D-1.11 DP-1: thread mode-selection decision so analyzeEssay can
+      // append it to recentDecisions[] AFTER incrementIteration runs.
+      // `lastModeSelectionDecision` is set by processEditAndMaybeReanalyze
+      // when an edit triggered the re-analysis. On 'student_request'
+      // triggers (no edit, no mode selection), it stays null and
+      // analyzeEssay's DP-1 append site no-ops via the `if (input.modeSelectionDecision)` guard.
+      modeSelectionDecision: this.lastModeSelectionDecision ?? undefined,
+      // [F-1 wire-up 2026-04-29] Thread focused-mode escalation level so
+      // IterationRecord.escalationLevel reflects the level that actually
+      // triggered comprehensive escalation, not a silent 0. See parameter
+      // doc above; consumer at analysisOrchestrator.ts (search for
+      // `escalationLevel: input.focusedEscalationLevel ?? 0`) — line
+      // numbers drift across commits, so a textual anchor is more durable.
+      focusedEscalationLevel,
     };
 
     // Run comprehensive pipeline with the reanalysis brief
     let pipelineResult: PipelineResult;
     try {
       pipelineResult = await analyzeEssay(pipelineInput, brief);
+      // D-1.11 DP-1: clear consumed mode-selection decision so it doesn't
+      // bleed into a subsequent triggerReanalysis (each call gets a fresh
+      // decision from processEditAndMaybeReanalyze, OR null on
+      // student_request triggers).
+      this.lastModeSelectionDecision = null;
       console.log(
         `[ReanalysisOrchestrator] Re-analysis complete: ` +
         `layers=${pipelineResult.layersCompleted.join(',')}, ` +
@@ -669,6 +809,23 @@ export class ReanalysisOrchestrator {
       throw error;
     }
 
+    // [D-1.12 C5 closure — warm-edit consumer 2026-05-06] analyzeEssay returns a
+    // PARTIAL PipelineResult (rather than throwing) when an inner layer hits its
+    // F-2 closure path (`buildPartialResult`). The cold-start consumer at
+    // essayCoachingRoutes.ts:413 already null-guards on `completedAllLayers`;
+    // this warm-edit consumer was missed in C5's first pass and silently adopts
+    // the partial profile — the catch above never fires, the coordinator is
+    // rebuilt against a profile missing L3+ output, and the pre-edit profile
+    // is overwritten. Throw so runComprehensiveMode's catch populates
+    // deferReason='comprehensive_failed' + buildEditProcessResponse maps to 503.
+    if (!pipelineResult.completedAllLayers) {
+      const failedLayerNames = pipelineResult.layersFailed.map((l) => l.layer).join(', ');
+      throw new Error(
+        `[ReanalysisOrchestrator] analyzeEssay returned partial result — failed layers=[${failedLayerNames}]; ` +
+        `refusing to overwrite the pre-edit profile with a degraded post-edit profile`,
+      );
+    }
+
     // FIX P0.4: Update this.coordinator with the fresh profile from the pipeline.
     // analyzeEssay() creates a NEW internal coordinator and returns the analyzed profile.
     // Prior findings were already seeded into the pipeline via input.priorFindings,
@@ -677,6 +834,16 @@ export class ReanalysisOrchestrator {
     // post-hoc migration needed.
     //
     // FIX P0.5: Preserve the existing checkpoint store across coordinator rebuilds.
+    //
+    // [D-1.12 C1 closure 2026-04-29] Pre-fix this catch logged "(CRITICAL)"
+    // and then RETURNED THE RESULT ANYWAY, leaving `this.coordinator`
+    // pointing at the pre-reanalysis state while the caller received the
+    // post-reanalysis result. Invariant violation: returned data and
+    // orchestrator state diverge silently. Now we throw — the caller's
+    // catch (in runComprehensiveMode) populates EditProcessResult.error
+    // and deferReason='comprehensive_failed' so the HTTP boundary can
+    // surface a 5xx instead of routing into a divergent-state coaching
+    // session.
     try {
       const freshProfile = pipelineResult.profile as EssayProfile;
       this.coordinator = EssayProfileCoordinator.fromCheckpoint(
@@ -687,28 +854,29 @@ export class ReanalysisOrchestrator {
       console.log('[ReanalysisOrchestrator] Coordinator updated with fresh post-reanalysis profile (checkpoint store preserved)');
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error(
-        `[ReanalysisOrchestrator] Failed to update coordinator after reanalysis (CRITICAL): ${msg}`,
+      throw new Error(
+        `[ReanalysisOrchestrator] coordinator_rebuild failed — orchestrator state would diverge from returned result; halting: ${msg}`,
       );
-      // This is a serious issue — the coordinator is now stale. But we still return
-      // the result so the caller can see the reanalysis output.
     }
 
-    // Close the version record
+    // Close the version record.
+    //
+    // [D-1.12 C2 closure 2026-04-29] Pre-fix this catch synthesized a
+    // fake VersionRecord with `version: 0`, empty arrays, current
+    // timestamp. Banned shape per CLAUDE.md "no degraded fallbacks":
+    // hardcoded substitute that downstream consumers cannot distinguish
+    // from a real version=0. The version record is part of the audit
+    // trail (cross-iteration continuity, change diffing); faking it
+    // corrupts the very thing D-1.10 was built to preserve. Now we
+    // throw — same caller-side surfacing as C1.
     let versionRecord: VersionRecord;
     try {
       versionRecord = this.versionTracker.closeVersion(currentText);
     } catch (err) {
-      console.error('[ReanalysisOrchestrator] Failed to close version (non-fatal):', err);
-      // Synthesize a minimal version record so we can still return a result
-      versionRecord = {
-        version: 0,
-        snapshotText: currentText,
-        analyzedAt: new Date().toISOString(),
-        changes: [],
-        insightsSinceLastVersion: [],
-        lightTouchAdjustments: [],
-      };
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `[ReanalysisOrchestrator] versionTracker.closeVersion failed — cannot synthesize a placeholder VersionRecord without corrupting audit trail; halting: ${msg}`,
+      );
     }
 
     return {
@@ -1001,6 +1169,28 @@ export class ReanalysisOrchestrator {
       selectedMode = 'focused';
     }
 
+    // ── D-1.11 DP-1: capture the mode-selection carry-forward decision ──
+    // We store the decision metadata on the orchestrator instance so
+    // triggerReanalysis can attach it to pipelineInput.modeSelectionDecision
+    // when comprehensive mode runs analyzeEssay. Focused-mode reanalyses
+    // don't go through analyzeEssay so the decision can't be attached
+    // to a new IterationRecord — documented gap (focused-mode iteration
+    // commit is a separate deliverable). For focused mode we still set
+    // the field so future deferred-fix code has access; it just won't
+    // get persisted under the current architecture.
+    //
+    // decision type:
+    //   'comprehensive' → 'rederive' (full re-analysis = re-derive everything)
+    //   'focused'       → 'partial_refresh' (focused: re-derive some, carry rest)
+    this.lastModeSelectionDecision = {
+      itemKey: 'mode_selection',
+      decision: selectedMode === 'comprehensive' ? 'rederive' : 'partial_refresh',
+      rationale: `FocusedAnalyzer.selectAnalysisMode → ${selectedMode}`,
+      costSavedIfCarry: 0, // baseline-cost reference table is D-4.11+ scope
+      costSpentIfRederive: 0,
+      arbitrationMechanism: 'validity_test', // selectAnalysisMode is a deterministic rules engine
+    };
+
     // ── Step 5: Execute analysis ──────────────────────────────────────────────
     if (selectedMode === 'focused') {
       return await this.runFocusedMode(editOutput, costBreakdown, totalCost);
@@ -1037,6 +1227,55 @@ export class ReanalysisOrchestrator {
       // FIX 1.6: cost is LayerCost[] with separate totalCost
       totalCost += focusedResult.totalCost;
       costBreakdown.push(...focusedResult.cost);
+
+      // [D-1.16 Item 13 follow-up closure 2026-04-30 — per-failedStep
+      // telemetry pre-early-return wiring] Emit one iterationTelemetry
+      // event per entry in failedSteps[] BEFORE the if(!escalated)
+      // branch, so the audit trail captures partial failures regardless
+      // of whether focused mode succeeded with swallowed errors (PATH A,
+      // mode='focused') or escalated to comprehensive (PATH B,
+      // mode='escalated_to_comprehensive').
+      //
+      // Pre-fix this block sat AFTER the if(!escalated) early-return at
+      // the function tail, so PATH A (the most common partial-success
+      // case — focused mode resolves with mode='focused' but with
+      // non-empty failedSteps) silently lost its audit trail. Item 13's
+      // existing tests (`d1-16-failure-injection.ts`) explicitly
+      // documented the gap at line 1048-1058 and routed around it by
+      // testing only the escalation tail. This fix closes the audit-
+      // trail gap; D-4.11 escalation calibration depends on these
+      // events for over-escalation drift detection.
+      //
+      // focusedResult is guaranteed non-undefined here because it was
+      // assigned by the await at line 1203 — if that threw, control
+      // would be in the catch block, not here.
+      if (!focusedResult.escalationLevelTrustworthy) {
+        const iter = getCurrentIteration(this.coordinator.getProfile());
+        for (const step of focusedResult.failedSteps) {
+          emitIterationEvent(this.essayId, {
+            iteration: iter,
+            step: `focusedAnalyzer.${step}`,
+            status: 'failed',
+            error: {
+              message: `[FocusedAnalyzer] step ${step} caught and continued; escalationLevel may be misleading`,
+              code: `focused_${step}_swallowed`,
+              context: {
+                resultEscalationLevel: focusedResult.escalationLevel,
+                resultMode: focusedResult.mode,
+                allFailedSteps: focusedResult.failedSteps,
+                note: 'Telemetry emit is the audit trail; the result was returned with escalationLevelTrustworthy=false.',
+              },
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+        console.warn(
+          `[ReanalysisOrchestrator] focused-analysis result has ${focusedResult.failedSteps.length} ` +
+            `failed step(s): [${focusedResult.failedSteps.join(', ')}]; escalationLevel ` +
+            `(${focusedResult.escalationLevel}) is untrustworthy and will not feed IterationRecord.escalationLevel. ` +
+            `mode=${focusedResult.mode}.`,
+        );
+      }
 
       // FIX 1.6: escalation is checked via mode field, not boolean
       const escalated = focusedResult.mode === 'escalated_to_comprehensive';
@@ -1100,19 +1339,47 @@ export class ReanalysisOrchestrator {
 
       console.log('[ReanalysisOrchestrator] Focused analysis escalated to comprehensive');
     } catch (error) {
+      // [D-1.12 C3 closure 2026-04-29] Pre-fix this catch returned
+      // `{ mode: 'deferred', reanalysisTriggered: false }` indistinguishable
+      // from the legitimate "policy chose to defer" path below. Caller
+      // could not route differently between "policy decision" and "analyzer
+      // crashed." Now: emit structured telemetry + populate the new
+      // deferReason='focused_failed' + error fields on EditProcessResult so
+      // the HTTP boundary can surface a 5xx instead of routing into a
+      // garbage coaching session.
+      const msg = error instanceof Error ? error.message : String(error);
       console.error(
-        '[ReanalysisOrchestrator] focusedAnalyzer.runFocusedAnalysis failed (deferring):',
-        error instanceof Error ? error.message : String(error),
+        '[ReanalysisOrchestrator] focusedAnalyzer.runFocusedAnalysis failed:',
+        msg,
       );
-      // On focused analysis failure: defer — don't escalate automatically
+      const iter = getCurrentIteration(this.coordinator.getProfile());
+      emitIterationEvent(this.essayId, {
+        iteration: iter,
+        step: 'runFocusedMode',
+        status: 'failed',
+        error: {
+          message: msg,
+          code: 'focused_analyzer_threw',
+          context: { downstreamBehavior: 'EditProcessResult.deferReason=focused_failed; caller surfaces error.' },
+        },
+        timestamp: new Date().toISOString(),
+      });
       return {
         editOutput,
         mode: 'deferred',
         reanalysisTriggered: false,
         totalCost,
         costBreakdown,
+        deferReason: 'focused_failed',
+        error: { layer: 'focusedAnalyzer', message: msg, code: 'focused_analyzer_threw' },
       };
     }
+
+    // [D-1.16 Item 13 follow-up closure 2026-04-30] Per-failedStep emit
+    // was moved into the try block (search marker
+    // `[D-1.16 Item 13 follow-up closure 2026-04-30 — per-failedStep
+    // telemetry pre-early-return wiring]`). This region only handles
+    // the escalation fall-through to runComprehensiveMode.
 
     // Escalated: fall through to comprehensive
     return await this.runComprehensiveMode(editOutput, costBreakdown, totalCost, focusedResult);
@@ -1137,6 +1404,9 @@ export class ReanalysisOrchestrator {
         `[ReanalysisOrchestrator] Comprehensive re-analysis recommended but deferred ` +
         `(urgency=${trigger.urgency}): ${trigger.reason}`,
       );
+      // [D-1.12 C4 partial — policy-defer branch] Mark deferReason so
+      // consumers can distinguish this clean policy decision from the
+      // failure paths below. No `error` field; this is a healthy outcome.
       return {
         editOutput,
         mode: 'comprehensive',
@@ -1144,6 +1414,7 @@ export class ReanalysisOrchestrator {
         reanalysisTriggered: false,
         totalCost,
         costBreakdown,
+        deferReason: 'policy_defer',
       };
     }
 
@@ -1155,7 +1426,19 @@ export class ReanalysisOrchestrator {
     let reanalysisBrief: ReanalysisBrief | undefined;
 
     try {
-      const reanalysisResult = await this.triggerReanalysis();
+      // [F-1 wire-up 2026-04-29 + D-1.12 Commit B 2026-04-29] Pass focused-mode
+      // escalation level through so the resulting IterationRecord.escalationLevel
+      // reflects the actual escalation tier (1|2|3|4) — UNLESS the focused
+      // analyzer reported escalationLevelTrustworthy=false, in which case
+      // pass undefined so the consumer's `?? 0` defaults honestly instead
+      // of recording the (misleading) hardcoded fallback. Telemetry was
+      // already emitted above, so the failure is captured in the audit
+      // trail; this prevents a load-bearing audit field from carrying a lie.
+      const trustedEscalationLevel =
+        focusedResult && focusedResult.escalationLevelTrustworthy
+          ? focusedResult.escalationLevel
+          : undefined;
+      const reanalysisResult = await this.triggerReanalysis(trustedEscalationLevel);
       reanalysisBrief = reanalysisResult.brief;
       totalCost += reanalysisResult.totalCost;
 
@@ -1179,10 +1462,31 @@ export class ReanalysisOrchestrator {
         costBreakdown,
       };
     } catch (error) {
-      console.error(
-        '[ReanalysisOrchestrator] triggerReanalysis failed:',
-        error instanceof Error ? error.message : String(error),
-      );
+      // [D-1.12 C4 closure 2026-04-29] Pre-fix this catch returned
+      // `{ mode: 'comprehensive', reanalysisTriggered: false }` —
+      // shape-indistinguishable from the policy-defer branch above.
+      // Same caller-visibility gap as C3. Now: emit structured telemetry
+      // + populate deferReason='comprehensive_failed' + error so the
+      // boundary can route correctly. C1 (coordinator-rebuild) and C2
+      // (closeVersion) inside triggerReanalysis now throw cleanly into
+      // this catch instead of silently swallowing.
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('[ReanalysisOrchestrator] triggerReanalysis failed:', msg);
+      const iter = getCurrentIteration(this.coordinator.getProfile());
+      emitIterationEvent(this.essayId, {
+        iteration: iter,
+        step: 'runComprehensiveMode',
+        status: 'failed',
+        error: {
+          message: msg,
+          code: 'trigger_reanalysis_threw',
+          context: {
+            downstreamBehavior: 'EditProcessResult.deferReason=comprehensive_failed; caller surfaces error.',
+            wasEscalation: focusedResult !== undefined,
+          },
+        },
+        timestamp: new Date().toISOString(),
+      });
       return {
         editOutput,
         mode: 'comprehensive',
@@ -1190,6 +1494,8 @@ export class ReanalysisOrchestrator {
         reanalysisTriggered: false,
         totalCost,
         costBreakdown,
+        deferReason: 'comprehensive_failed',
+        error: { layer: 'triggerReanalysis', message: msg, code: 'trigger_reanalysis_threw' },
       };
     }
   }

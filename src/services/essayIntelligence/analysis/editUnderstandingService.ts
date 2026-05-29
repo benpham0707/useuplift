@@ -134,7 +134,13 @@ interface SonnetUnderstandingRaw {
  * Simple string hash for paragraph identity comparison.
  * Fast O(n) hash — not cryptographic, just for change detection.
  */
-function hashString(s: string): number {
+/**
+ * Stable string hash (FNV-style 31× rolling). Exported so
+ * `paragraphRemapBuilder` (D-1.7) can mirror the same hash → identity logic
+ * `computeEditDiff` uses internally; sharing the helper eliminates the drift
+ * hazard that the index-remap problem is uniquely sensitive to.
+ */
+export function hashString(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) {
     h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
@@ -166,16 +172,24 @@ function splitSentences(text: string): string[] {
 /**
  * Split essay text into paragraphs on double newlines.
  * Filters out empty strings resulting from extra whitespace.
+ *
+ * Exported so `paragraphRemapBuilder` (D-1.7) splits on the same boundary
+ * rule the diff was computed under.
  */
-function splitParagraphs(text: string): string[] {
+export function splitParagraphs(text: string): string[] {
   return text.split(/\n\s*\n/).map(p => p.trim()).filter(p => p.length > 0);
 }
 
 /**
  * Compute text overlap ratio between two strings (Jaccard on word sets).
  * Used for sentence alignment within changed paragraphs.
+ *
+ * Exported so `paragraphRemapBuilder` (D-1.7) uses the identical pairing
+ * threshold (0.30) the diff was computed under — the helpers MUST stay
+ * lockstep or the builder and the diff disagree on which paragraph is
+ * "the same one."
  */
-function overlapRatio(a: string, b: string): number {
+export function overlapRatio(a: string, b: string): number {
   const wordsA = new Set(a.toLowerCase().split(/\s+/));
   const wordsB = new Set(b.toLowerCase().split(/\s+/));
   let intersection = 0;
@@ -243,7 +257,14 @@ function computeWordDiff(
  * of truth rather than re-splitting with a potentially inconsistent regex).
  * The profile's sentences are the canonical boundaries established by L1.
  */
-function computeEditDiff(
+/**
+ * Exported for D-1.8: the analysisOrchestrator wires `priorAnnotations` by
+ * computing its own `EditDiff` between the prior-iteration snapshot and the
+ * current essay text, then feeding it into `buildParagraphRemap` and
+ * `buildPerParagraphEdits`. Pure mechanical function — no LLM, idempotent,
+ * cheap; safe to call from any orchestration site.
+ */
+export function computeEditDiff(
   oldText: string,
   newText: string,
   profile?: Readonly<EssayProfile>,
@@ -881,37 +902,6 @@ function computeStalenessEffects(
 }
 
 // ============================================================================
-// ANALYSIS MODE SELECTION
-// ============================================================================
-
-/**
- * Select analysis mode based on diff characteristics and significance.
- * This is a heuristic — the Sonnet scope recommendation takes precedence for
- * understanding, but mode determines whether re-analysis is comprehensive or focused.
- *
- * TODO(M1): This function's output is placed on EditUnderstandingOutput.analysisMode,
- * but NO downstream consumer reads that field. The reanalysisOrchestrator uses
- * FocusedAnalyzer.selectAnalysisMode() instead (a separate, more sophisticated
- * implementation that also considers the profile state). This function should be
- * wired into the focused analysis mode selection pipeline so the edit understanding
- * service's heuristic is not ignored. Until then, the field is informational only
- * (logged but not acted upon).
- */
-function selectAnalysisMode(
-  diff: EditDiff,
-  significance: EditUnderstanding['significance']
-): 'focused' | 'comprehensive' {
-  // Multiple paragraphs changed → comprehensive
-  if (diff.paragraphChanges.length > 2) return 'comprehensive';
-  // Structural changes (add/remove paragraphs) → comprehensive
-  if (diff.structural.paragraphsAdded.length > 0 || diff.structural.paragraphsRemoved.length > 0) return 'comprehensive';
-  // Transformative → comprehensive
-  if (significance === 'transformative') return 'comprehensive';
-  // Everything else → focused
-  return 'focused';
-}
-
-// ============================================================================
 // SPECIAL CASE HANDLERS
 // ============================================================================
 
@@ -1172,8 +1162,6 @@ export class EditUnderstandingService {
               diff,
               understanding: trivialUnderstanding,
               stalenessEffects: [],
-              // TODO(M1): analysisMode is currently dead — see selectAnalysisMode() TODO
-              analysisMode: 'focused',
             },
             cost: {
               layer: 'edit_understanding',
@@ -1410,14 +1398,11 @@ export class EditUnderstandingService {
       diff
     );
 
-    // Select analysis mode
-    const analysisMode = selectAnalysisMode(diff, finalSignificance);
-
     const totalMs = Date.now() - startTime;
     console.log(
       `[EditUnderstanding] Complete: significance=${finalSignificance}, ` +
       `changeTypes=[${allChangeTypes.join(',')}], ` +
-      `scope=${editUnderstanding.scopeRecommendation.scope}, mode=${analysisMode}`
+      `scope=${editUnderstanding.scopeRecommendation.scope}`
     );
     console.log(`[EditUnderstanding] Total: ${totalMs}ms, $${totalCost.toFixed(5)}, ${stalenessEffects.length} staleness effects`);
 
@@ -1426,8 +1411,6 @@ export class EditUnderstandingService {
         diff,
         understanding: editUnderstanding,
         stalenessEffects,
-        // TODO(M1): analysisMode is currently dead — see selectAnalysisMode() TODO
-        analysisMode,
       },
       cost: {
         layer: 'edit_understanding',

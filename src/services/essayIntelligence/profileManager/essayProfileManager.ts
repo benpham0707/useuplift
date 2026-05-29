@@ -79,7 +79,12 @@ import type {
   FindingCoachingValue,
   DeltaSynthesisOutput,
   HolisticSectionType,
+  CarryForwardDecision,
+  IterationLedger,
+  IterationRecord,
 } from '../profileTypes';
+
+import { emitIterationEvent } from '../telemetry/iterationTelemetry';
 
 import { FindingStore } from '../findings/findingStore';
 import { ImprovementCandidateStore } from '../improvements/improvementCandidateStore';
@@ -662,8 +667,25 @@ export function createInitialProfile(input: {
    * can look up college-specific guidance on every coaching turn.
    */
   collegeId?: string;
+  /**
+   * D-1.10: optional iterationLedger seed for re-analysis runs. When
+   * supplied, deep-cloned in place of the default empty ledger block so
+   * the new profile carries the prior iteration history forward. Validated
+   * via `validateAndNormalizeIterationLedger` BEFORE seeding — a corrupt seed
+   * throws fail-fast with the same diagnostic the load-time validator
+   * produces, preventing propagation through any layer.
+   *
+   * Producer: `EssayProfileCoordinator.createNew` forwards from
+   *   `PipelineInput.priorIterationLedger`, which `reanalysisOrchestrator`
+   *   captures from `this.coordinator.getProfile().iterationLedger` BEFORE
+   *   invoking `analyzeEssay`.
+   * Default (when absent): the empty ledger block at line ~927 with
+   *   `currentIteration: 0`. Direct `analyzeEssay` callers (cold first-pass)
+   *   leave it undefined.
+   */
+  priorIterationLedger?: IterationLedger;
 }): EssayProfile {
-  const { paragraphTexts, sentenceTexts, metadata, collegeId } = input;
+  const { paragraphTexts, sentenceTexts, metadata, collegeId, priorIterationLedger } = input;
 
   const now = new Date().toISOString();
 
@@ -895,6 +917,9 @@ export function createInitialProfile(input: {
     // Persistent question queue — empty (Gap 2)
     questionQueue: [],
 
+    // D-2.2 round 1.8: concept library starts empty for new profiles
+    conceptLibrary: [],
+
     // Conversation insights — empty
     conversationInsights: [],
     patternInsights: [],
@@ -915,9 +940,405 @@ export function createInitialProfile(input: {
       lastMutatedAt: now,
       legacyProfile: false,
     },
+
+    // ── Integrated pipeline build — Phase 0 D-0.5 root defaults ──────────
+    // Required fields per D-0.5 contract; defaults are empty arrays plus
+    // a fresh IterationLedger with currentIteration=0 (the orchestrator
+    // increments to 1 on first-pass entry).
+    //
+    // D-1.10: when `priorIterationLedger` is supplied (re-analysis path),
+    // the seed REPLACES the default empty block. We validate first via
+    // `validateAndNormalizeIterationLedger` so a corrupt seed throws here rather
+    // than propagating through layers. Deep-clone via JSON round-trip so
+    // the caller's mutation of their local copy doesn't bleed into this
+    // profile (cheap because IterationLedger is plain-JSON and we
+    // intentionally do NOT include Maps or class instances in this type).
+    iterationLedger: priorIterationLedger
+      ? (() => {
+          validateAndNormalizeIterationLedger(
+            priorIterationLedger,
+            '<createInitialProfile.priorIterationLedger>',
+          );
+          return JSON.parse(JSON.stringify(priorIterationLedger)) as IterationLedger;
+        })()
+      : {
+          currentIteration: 0,
+          iterations: [],
+          taughtMoves: [],
+          recentDecisions: [],
+        },
+    groundTruthFacts: [],
+    storyFragments: [],
+    intentSignals: [],
+    conversatorSessionLog: [],
   };
 
   return profile;
+}
+
+// ============================================================================
+// ITERATION LEDGER ACCESSOR / MUTATOR (Phase 1 D-1.1)
+// ============================================================================
+// Spec: docs/pipeline-evolution/04-pipeline-architecture/L5/L5_ITERATION_LOOP_DESIGN.md
+//   §7.2 (currentIteration is incremented at the start of every iteration
+//   by the orchestrator).
+// Contract (D-1.1): provide explicit get / increment helpers + a
+// load-time validator that fails fast on corruption. The orchestrator
+// (D-1.8 / D-1.9) calls incrementIteration() at iteration entry.
+//
+// Top-level exports rather than methods on the coordinator class so the
+// orchestrator can call them on a raw profile without coordinator
+// instantiation (the orchestrator owns its own profile reference).
+//
+// Resolves the small contract divergence between D-0.5 ("currentIteration
+// = 0 at create") and D-1.1's prose ("On profile create, currentIteration
+// = 1") — D-0.5's create-time default of 0 is correct; the first
+// incrementIteration() call at orchestrator entry takes it to 1.
+
+/**
+ * Read the current iteration counter.
+ *
+ * Producer: incrementIteration() (mutator below) at orchestrator
+ *   iteration entry.
+ * Consumers: focusedAnalyzer mode-selection (`if iteration > 1, prefer
+ *   focused`), L5 prompt iteration context, priorAnnotationsBuilder.
+ *
+ * Throws if iterationLedger is missing — by Phase 1, every profile
+ * goes through createInitialProfile() (currentIteration=0) or
+ * fromCheckpoint() (hydrates if missing), so a missing ledger here
+ * indicates a profile constructed via a non-canonical path (raw
+ * literal cast, old test fixture, etc.). Fail-fast surfaces the bug.
+ */
+export function getCurrentIteration(profile: EssayProfile): number {
+  if (!profile.iterationLedger) {
+    throw new Error(
+      '[essayProfileManager.getCurrentIteration] EssayProfile.iterationLedger is missing. ' +
+        'Profile must go through createInitialProfile() or EssayProfileCoordinator.fromCheckpoint() ' +
+        'before reading the iteration counter.',
+    );
+  }
+  return profile.iterationLedger.currentIteration;
+}
+
+/**
+ * Resolve the snapshot text from the iteration BEFORE `currentIteration` —
+ * i.e., the OLD-half of the diff that priorAnnotationsBuilder (D-1.6) and
+ * paragraphRemapBuilder (D-1.7) consume to remap prior taughtMoves into the
+ * current paragraph layout.
+ *
+ * Per profileTypes.ts §IterationLedger: `iterations[N-1]` is the audit
+ * record for iteration N. So the snapshot for iteration `currentIteration - 1`
+ * lives at index `currentIteration - 2`.
+ *
+ * Returns `undefined` (NOT a throw) for the structurally-absent cases:
+ *   - `currentIteration <= 1` (no prior iteration exists by definition).
+ *   - `iterations[]` doesn't yet have a record at the expected slot
+ *     (cold ledger, mid-build before D-1.10 lands).
+ *   - The record exists but its `snapshotText` field is undefined
+ *     (record committed before D-1.10 wired the write path).
+ *
+ * Throws fail-fast on a CORRUPT ledger: the slot exists but its
+ * `record.iteration` doesn't match `currentIteration - 1` (e.g.,
+ * `iterations[3]` holds `iteration: 2` instead of `iteration: 4`).
+ * That indicates structural ledger corruption — not a soft case to log
+ * around; the orchestrator's Phase 6 catch routes it to buildPartialResult.
+ *
+ * Producer: D-1.10 (orchestrator iteration-end commit).
+ * Consumer: D-1.8 (analysisOrchestrator priorAnnotations wire-up).
+ */
+export function getPriorIterationSnapshotText(
+  profile: EssayProfile,
+  currentIteration: number,
+): string | undefined {
+  if (currentIteration <= 1) return undefined;
+  if (!profile.iterationLedger) return undefined;
+
+  const iterations = profile.iterationLedger.iterations;
+  if (!Array.isArray(iterations)) return undefined;
+
+  const slotIdx = currentIteration - 2; // iter N → slot N-2 (since iterations[N-1] is iter N's record)
+  if (slotIdx < 0 || slotIdx >= iterations.length) return undefined;
+
+  const record = iterations[slotIdx];
+  if (!record) return undefined;
+
+  // Belt-and-suspenders: a slot that exists but holds the wrong iteration
+  // number is structural corruption, not a soft case. Halt the orchestrator.
+  if (record.iteration !== currentIteration - 1) {
+    throw new Error(
+      `[essayProfileManager.getPriorIterationSnapshotText] corrupt iterationLedger: ` +
+        `iterations[${slotIdx}].iteration=${record.iteration} but expected ${currentIteration - 1} ` +
+        `(currentIteration=${currentIteration}). Slot/iteration mismatch indicates non-monotonic ` +
+        `or out-of-order audit-record commits.`,
+    );
+  }
+
+  return record.snapshotText; // may itself be undefined (pre-D-1.10 records)
+}
+
+/**
+ * Increment the iteration counter at iteration start. Must be called by
+ * the orchestrator at every iteration entry — analysisOrchestrator
+ * (first_pass on a fresh analysis) or reanalysisOrchestrator (edit /
+ * student_request on a re-analysis).
+ *
+ * Per L5_ITERATION_LOOP_DESIGN §7.2: "incremented at the start of every
+ * iteration." The IterationRecord audit commit happens at iteration end
+ * via D-1.10; this call only updates the live counter.
+ *
+ * Producer: orchestrator entry (D-1.8 / D-1.9).
+ * Consumer: every downstream layer that reads getCurrentIteration().
+ *
+ * Throws if iterationLedger is missing or if triggeredBy is empty —
+ * fail-fast per D-1.1 contract. The triggeredBy enum is structurally
+ * enforced by TypeScript at compile time; the runtime check guards
+ * against any dynamic-string-passing path.
+ */
+export function incrementIteration(
+  profile: EssayProfile,
+  triggeredBy: IterationRecord['triggeredBy'],
+): void {
+  if (!profile.iterationLedger) {
+    throw new Error(
+      '[essayProfileManager.incrementIteration] EssayProfile.iterationLedger is missing. ' +
+        'Hydrate via fromCheckpoint() or construct via createInitialProfile() before incrementing.',
+    );
+  }
+  if (
+    triggeredBy !== 'first_pass' &&
+    triggeredBy !== 'edit' &&
+    triggeredBy !== 'student_request'
+  ) {
+    throw new Error(
+      `[essayProfileManager.incrementIteration] triggeredBy is required and must be one of ` +
+        `'first_pass' | 'edit' | 'student_request'; got: ${JSON.stringify(triggeredBy)}.`,
+    );
+  }
+  profile.iterationLedger.currentIteration += 1;
+  // Note: the IterationRecord with full audit fields (carryForwardSummary,
+  // costBreakdown, comprehensiveBaselineCost, carryForwardSavings,
+  // escalationLevel, rationale, finishedAt) is committed at iteration
+  // END via D-1.10. The orchestrator captures `startedAt` locally and
+  // bundles it into the record at commit time. The increment here is the
+  // lifecycle marker; the record is the audit artifact. triggeredBy is
+  // captured so the orchestrator can read it back when commiting.
+  //
+  // We do NOT push a placeholder IterationRecord here because the
+  // append-only invariant (D-1.14) requires that every entry in
+  // iterations[] is the final committed audit — placeholders would
+  // violate the invariant if a crash interrupts before commit.
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// D-1.11 — CarryForwardDecision mutators
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Allowed values for `CarryForwardDecision.decision`. Kept as a runtime
+ * Set so the validator can enum-check incoming values (TypeScript only
+ * catches static call-site mistakes; runtime guard catches deserialized
+ * or upstream-bug-inserted bad values).
+ */
+const VALID_CARRY_FORWARD_DECISION_VALUES = new Set<CarryForwardDecision['decision']>([
+  'carry',
+  'rederive',
+  'partial_refresh',
+]);
+
+const VALID_CARRY_FORWARD_ARBITRATION_MECHANISMS = new Set<
+  CarryForwardDecision['arbitrationMechanism']
+>(['validity_test', 'llm_judgment', 'comprehensive_rule']);
+
+/**
+ * Maximum length for `decision.itemKey`. Generous bound that catches
+ * the obvious bug (someone pasted in a stack trace) without restricting
+ * legitimate compound keys like `'L5.P3.annotations'` or
+ * `'M-1-0-A-uuid-12345...'`.
+ */
+const ITEM_KEY_MAX_LENGTH = 200;
+
+/**
+ * Append a CarryForwardDecision to `profile.iterationLedger.recentDecisions[]`.
+ *
+ * Spec: `L5_IMPLEMENTATION_PLAN.md` §D-1.11 — closes the dead wire where
+ * `recentDecisions` was initialized but never written. Decision points
+ * across the orchestrator (mode selection, per-paragraph carry/rederive,
+ * finding maturity refresh, L3.75 section invalidation, focused-mode
+ * holistic-carry) call this helper to record their arbitration choices.
+ *
+ * Validation surface (per D-1.11 Plan agent §9):
+ *   - profile.iterationLedger must exist (mirrors D-1.1's invariant).
+ *   - decision.iteration MUST equal profile.iterationLedger.currentIteration.
+ *     Mismatch indicates either a stale closure capturing an older
+ *     iteration, a logic bug computing the wrong iteration, OR an
+ *     out-of-order commit. All three are programmer errors worth
+ *     surfacing loudly.
+ *   - decision.itemKey: non-empty, ≤ 200 chars.
+ *   - decision.decision and decision.arbitrationMechanism: enum-checked
+ *     against the runtime sets above.
+ *
+ * Failure surface: throws on any validation failure. The CALLER (the
+ * decision-point append-site) is responsible for wrapping this in a
+ * try/catch that logs structured telemetry and continues — an
+ * audit-trail bug must not abort analysis. This is the ONE charter-
+ * sanctioned swallow site (per the no-fallback charter §8); the
+ * helper itself throws so the bug is visible in tests + logs.
+ */
+export function appendCarryForwardDecision(
+  profile: EssayProfile,
+  decision: CarryForwardDecision,
+): void {
+  if (!profile.iterationLedger) {
+    throw new Error(
+      '[essayProfileManager.appendCarryForwardDecision] EssayProfile.iterationLedger is missing. ' +
+        'Hydrate via fromCheckpoint() or construct via createInitialProfile() before recording decisions.',
+    );
+  }
+  if (!decision || typeof decision !== 'object') {
+    throw new Error(
+      '[essayProfileManager.appendCarryForwardDecision] decision is missing or not an object.',
+    );
+  }
+  // Iteration mismatch — the catch case the Plan agent §9 calls out as
+  // most diagnostic. Stale closures capturing a prior iteration are the
+  // failure mode this guards against; the diagnostic message names
+  // both the claimed and the actual iteration so callers can audit.
+  if (decision.iteration !== profile.iterationLedger.currentIteration) {
+    throw new Error(
+      `[essayProfileManager.appendCarryForwardDecision] iteration mismatch: ` +
+        `decision claims iteration ${decision.iteration} but profile.iterationLedger.currentIteration is ` +
+        `${profile.iterationLedger.currentIteration}. This indicates a stale closure, an out-of-order commit, ` +
+        `or a logic bug computing the wrong iteration at the decision point.`,
+    );
+  }
+  if (typeof decision.itemKey !== 'string' || decision.itemKey.length === 0) {
+    throw new Error(
+      `[essayProfileManager.appendCarryForwardDecision] decision.itemKey must be a non-empty string; ` +
+        `got ${JSON.stringify(decision.itemKey)}.`,
+    );
+  }
+  if (decision.itemKey.length > ITEM_KEY_MAX_LENGTH) {
+    throw new Error(
+      `[essayProfileManager.appendCarryForwardDecision] decision.itemKey exceeds ${ITEM_KEY_MAX_LENGTH} chars ` +
+        `(got ${decision.itemKey.length}). This usually indicates an accidental paste of a stack trace or ` +
+        `serialized object into itemKey instead of a compact identifier.`,
+    );
+  }
+  if (!VALID_CARRY_FORWARD_DECISION_VALUES.has(decision.decision)) {
+    throw new Error(
+      `[essayProfileManager.appendCarryForwardDecision] decision.decision must be one of ` +
+        `'carry' | 'rederive' | 'partial_refresh'; got ${JSON.stringify(decision.decision)}.`,
+    );
+  }
+  if (!VALID_CARRY_FORWARD_ARBITRATION_MECHANISMS.has(decision.arbitrationMechanism)) {
+    throw new Error(
+      `[essayProfileManager.appendCarryForwardDecision] decision.arbitrationMechanism must be one of ` +
+        `'validity_test' | 'llm_judgment' | 'comprehensive_rule'; got ${JSON.stringify(decision.arbitrationMechanism)}.`,
+    );
+  }
+  if (typeof decision.rationale !== 'string') {
+    throw new Error(
+      `[essayProfileManager.appendCarryForwardDecision] decision.rationale must be a string; ` +
+        `got ${typeof decision.rationale}.`,
+    );
+  }
+  if (typeof decision.costSavedIfCarry !== 'number' || !Number.isFinite(decision.costSavedIfCarry)) {
+    throw new Error(
+      `[essayProfileManager.appendCarryForwardDecision] decision.costSavedIfCarry must be a finite number.`,
+    );
+  }
+  if (typeof decision.costSpentIfRederive !== 'number' || !Number.isFinite(decision.costSpentIfRederive)) {
+    throw new Error(
+      `[essayProfileManager.appendCarryForwardDecision] decision.costSpentIfRederive must be a finite number.`,
+    );
+  }
+  profile.iterationLedger.recentDecisions.push(decision);
+}
+
+/**
+ * Prune `profile.iterationLedger.recentDecisions[]` to retain only
+ * entries whose `decision.iteration >= currentIteration - keepLastN + 1`.
+ *
+ * Spec: `L5_IMPLEMENTATION_PLAN.md` §D-1.11 + §IterationLedger.recentDecisions
+ * JSDoc — "Pruned to last 5 iterations on commit."
+ *
+ * Pruning semantics (per D-1.11 Plan agent §6 — pinned ambiguity):
+ *   "Last 5 iterations" means an ITERATION-NUMBER WINDOW, not a record
+ *   count. When committing iteration N with keepLastN=5, retain
+ *   decisions where `iteration >= N - 4`. So at iter=7, decisions from
+ *   iters 3..7 stay; decisions from iters 1..2 are dropped.
+ *
+ * Why an iteration-number window:
+ *   1. Iteration 7 with zero decisions in iters 5–7 still correctly
+ *      retains iter 3+4 decisions.
+ *   2. After D-1.10's `priorIterationLedger` hydration, decisions from
+ *      iter N-5 are dropped on the very next commit — which is correct,
+ *      that iteration has aged out chronologically.
+ *
+ * Caller invariant: must run AFTER the iteration-end checkpoint
+ * succeeds (per D-1.11 Plan §6) so a checkpoint-failed retry replays
+ * the unpruned data.
+ */
+export function pruneRecentDecisions(profile: EssayProfile, keepLastN: number): void {
+  if (!profile.iterationLedger) {
+    throw new Error(
+      '[essayProfileManager.pruneRecentDecisions] EssayProfile.iterationLedger is missing.',
+    );
+  }
+  if (!Number.isInteger(keepLastN) || keepLastN < 0) {
+    throw new Error(
+      `[essayProfileManager.pruneRecentDecisions] keepLastN must be a non-negative integer; got ${keepLastN}.`,
+    );
+  }
+  const minIteration = profile.iterationLedger.currentIteration - keepLastN + 1;
+  // Edge: keepLastN === 0 → retain nothing. minIteration > currentIteration → filter drops everything.
+  profile.iterationLedger.recentDecisions = profile.iterationLedger.recentDecisions.filter(
+    (d) => d.iteration >= minIteration,
+  );
+}
+
+/**
+ * Validate AND NORMALIZE an iterationLedger structurally. Throws
+ * fail-fast with a diagnostic naming which field is corrupt; otherwise
+ * mutates the ledger in place to coerce JSONB-serialized `null` arrays
+ * into empty arrays.
+ *
+ * [round-1 audit T3.4 closure] Renamed from `assertIterationLedgerOnLoad`
+ * which implied read-only validation. The function actually mutates
+ * input (null → []), so the new name is honest about both behaviors.
+ *
+ * Exported so D-1.1 unit tests can exercise it directly without
+ * scaffolding a coordinator instance. Used internally by fromCheckpoint()
+ * after the existence-check + hydration block, and by createInitialProfile
+ * (D-1.10) at the priorIterationLedger seed point.
+ *
+ * Defensive: legacy stores sometimes serialize empty arrays as null;
+ * coerces those before validating (mutates the ledger in-place).
+ *
+ * Per D-1.1 contract: "Load failure on a corrupt iterationLedger →
+ * fail-fast with diagnostic naming the corrupt field."
+ */
+export function validateAndNormalizeIterationLedger(ledger: IterationLedger, essayId: string): void {
+  if (typeof ledger.currentIteration !== 'number' || ledger.currentIteration < 0) {
+    throw new Error(
+      `[essayProfileManager] corrupt iterationLedger.currentIteration on load (essayId=${essayId}): ` +
+        `expected non-negative number, got ${typeof ledger.currentIteration} ${JSON.stringify(ledger.currentIteration)}.`,
+    );
+  }
+  // Legacy null-as-empty coercion. JSONB serializers occasionally write
+  // null for an empty array; we accept this as "empty" rather than
+  // throwing. After coercion, the field MUST be an array.
+  for (const arrayField of ['iterations', 'taughtMoves', 'recentDecisions'] as const) {
+    if ((ledger as Record<string, unknown>)[arrayField] === null) {
+      (ledger as unknown as Record<string, unknown[]>)[arrayField] = [];
+    }
+    if (!Array.isArray(ledger[arrayField])) {
+      throw new Error(
+        `[essayProfileManager] corrupt iterationLedger.${arrayField} on load (essayId=${essayId}): ` +
+          `expected array, got ${typeof ledger[arrayField]} ${JSON.stringify(ledger[arrayField])}.`,
+      );
+    }
+  }
 }
 
 // ============================================================================
@@ -1117,6 +1538,13 @@ export class EssayProfileCoordinator {
     /** Target college (supplement/PIQ only). Normalized lowercase. */
     collegeId?: string;
     checkpointStore: CheckpointStore;
+    /**
+     * D-1.10: optional iteration-ledger seed for re-analysis runs.
+     * Forwarded to `createInitialProfile`. See its JSDoc for the full
+     * contract; in short: seeded ledger is validated then deep-cloned in
+     * place of the default empty block, carrying iter history forward.
+     */
+    priorIterationLedger?: IterationLedger;
     mutators?: Partial<{
       sentence: ISentenceMutator;
       paragraph: IParagraphMutator;
@@ -1134,6 +1562,7 @@ export class EssayProfileCoordinator {
       sentenceTexts: input.sentenceTexts,
       metadata: input.metadata,
       collegeId: input.collegeId,
+      priorIterationLedger: input.priorIterationLedger,
     });
     return new EssayProfileCoordinator(
       profile,
@@ -1178,6 +1607,15 @@ export class EssayProfileCoordinator {
       insight: IInsightMutator;
     }>,
   ): EssayProfileCoordinator {
+    // ── D-2.2 round 1.8: Legacy profile gets empty conceptLibrary ────────
+    // Mirrors the improvementCandidateSnapshot migration pattern — defaults
+    // the field for profiles persisted before D-2.2 shipped. The library is
+    // append-only; an empty default is safe (no instances to consult, no
+    // caps to enforce, walks emit fresh as if no concepts had been taught).
+    if (!profile.conceptLibrary) {
+      profile.conceptLibrary = [];
+    }
+
     // ── Phase 1.5: Legacy profile migration hook ──────────────────────────
     if (!profile.improvementCandidateSnapshot) {
       try {
@@ -1226,6 +1664,106 @@ export class EssayProfileCoordinator {
           throw err;
         }
       }
+    }
+
+    // ── Phase 0 D-0.8 + Phase 1 D-1.1: IterationLedger / Conversator-state hydration ─────
+    // Defensive backfill at load time. The bulk of historical rows are
+    // backfilled by migration 20260426000002, but this guards against
+    // edge cases:
+    //   - profile_cache rows that have not yet had the migration applied
+    //     in this environment (e.g., a developer pulling main without
+    //     running supabase db push).
+    //   - rows where the migration ran but a concurrent writer interleaved
+    //     and left a partial JSONB.
+    //   - in-memory profiles passed to fromCheckpoint() without going
+    //     through the JSONB store at all (test fixtures, etc.).
+    // Only populates fields that are missing — never overwrites existing
+    // ledger or ground-truth state.
+    //
+    // D-1.1 refinement: every legacy-hydration occurrence now emits a
+    // structured warning (console.warn + telemetry event with
+    // status='succeeded' + context flag). Substitution is VISIBLE, not
+    // silent — the no-fallback charter requires that the system surface
+    // when it had to substitute defaults so audit can detect drift.
+    if (!profile.iterationLedger) {
+      // [round-1 audit §4.B / T1.4 closure] Legacy hydration is a
+      // structural-absence DEGRADATION, not a successful step. Emit
+      // status:'failed' with code:'legacy_hydration' so audit grep
+      // surfaces it as drift (no-fallback charter §8). Hydration
+      // behavior unchanged — the warn + default-fill still happens.
+      console.warn(
+        `[EssayProfileCoordinator.fromCheckpoint] iterationLedger missing on loaded profile (essayId=${essayId}); hydrating with defaults. ` +
+          `This indicates the JSONB row pre-dates D-0.5/D-0.8 or a migration was incomplete.`,
+      );
+      emitIterationEvent(essayId, {
+        iteration: 0,
+        step: 'profile.fromCheckpoint.legacyHydration',
+        status: 'failed',
+        error: {
+          message: 'iterationLedger missing on loaded profile; hydrated with defaults',
+          code: 'legacy_hydration',
+          context: { essayId },
+        },
+        timestamp: new Date().toISOString(),
+      });
+      profile.iterationLedger = {
+        currentIteration: 0,
+        iterations: [],
+        taughtMoves: [],
+        recentDecisions: [],
+      };
+    } else {
+      // Validate structure of existing iterationLedger; corrupt fields
+      // throw fail-fast (per D-1.1 contract: "Load failure on a corrupt
+      // iterationLedger → fail-fast with diagnostic naming the corrupt
+      // field"). Defensively coerce arrays-as-null to empty arrays
+      // because some legacy stores serialize null for "empty" arrays.
+      validateAndNormalizeIterationLedger(profile.iterationLedger, essayId);
+    }
+    // [round-1 audit §4.A / T1.4 closure] Each of the four legacy-backfill
+    // branches converts a silent default-fill into a structured
+    // 'legacy_backfill.<field>' event so audit can surface profiles that
+    // hydrated without these fields (charter §8). Behavior unchanged —
+    // the assignment still happens; the emit is the only addition.
+    if (!profile.groundTruthFacts) {
+      emitIterationEvent(essayId, {
+        iteration: 0,
+        step: 'profile.fromCheckpoint.legacyBackfill.groundTruthFacts',
+        status: 'failed',
+        error: { message: 'groundTruthFacts missing on loaded profile; hydrated with []', code: 'legacy_backfill', context: { essayId } },
+        timestamp: new Date().toISOString(),
+      });
+      profile.groundTruthFacts = [];
+    }
+    if (!profile.storyFragments) {
+      emitIterationEvent(essayId, {
+        iteration: 0,
+        step: 'profile.fromCheckpoint.legacyBackfill.storyFragments',
+        status: 'failed',
+        error: { message: 'storyFragments missing on loaded profile; hydrated with []', code: 'legacy_backfill', context: { essayId } },
+        timestamp: new Date().toISOString(),
+      });
+      profile.storyFragments = [];
+    }
+    if (!profile.intentSignals) {
+      emitIterationEvent(essayId, {
+        iteration: 0,
+        step: 'profile.fromCheckpoint.legacyBackfill.intentSignals',
+        status: 'failed',
+        error: { message: 'intentSignals missing on loaded profile; hydrated with []', code: 'legacy_backfill', context: { essayId } },
+        timestamp: new Date().toISOString(),
+      });
+      profile.intentSignals = [];
+    }
+    if (!profile.conversatorSessionLog) {
+      emitIterationEvent(essayId, {
+        iteration: 0,
+        step: 'profile.fromCheckpoint.legacyBackfill.conversatorSessionLog',
+        status: 'failed',
+        error: { message: 'conversatorSessionLog missing on loaded profile; hydrated with []', code: 'legacy_backfill', context: { essayId } },
+        timestamp: new Date().toISOString(),
+      });
+      profile.conversatorSessionLog = [];
     }
 
     // Round 7 P0 (D4-L3): Recover essayType from the persisted North Star
@@ -1348,24 +1886,29 @@ export class EssayProfileCoordinator {
       discoveredBy: 'scout';
     }> = [];
 
-    // Repeated elements: create connections between each pair of occurrences
+    // Bucket A (2026-05-27): repeatedElements → ONE canonical pair-edge per
+    // element, NOT the C(N,2) pairwise explosion. See connectionMutator.ts
+    // addScoutLeads() for the full rationale. Keeps `from`/`to` at first/
+    // last occurrence; the description lists all participants in prose.
     for (const elem of scout.repeatedElements) {
-      for (let i = 0; i < elem.occurrences.length; i++) {
-        for (let j = i + 1; j < elem.occurrences.length; j++) {
-          const from = elem.occurrences[i];
-          const to = elem.occurrences[j];
-          flattenedLeads.push({
-            from: { paragraph: from.paragraphIndex, sentence: from.sentenceIndex, label: `P${from.paragraphIndex}S${from.sentenceIndex}` } as ConnectionEndpoint,
-            to: { paragraph: to.paragraphIndex, sentence: to.sentenceIndex, label: `P${to.paragraphIndex}S${to.sentenceIndex}` } as ConnectionEndpoint,
-            description: `Repeated element "${elem.element}": ${elem.potentialSignificance}`,
-            reverseIllumination: null,
-            significance: elem.potentialSignificance,
-            strengthCategory: 'tentative' as const,
-            directionality: 'forward' as const,
-            discoveredBy: 'scout' as const,
-          });
-        }
-      }
+      if (elem.occurrences.length < 2) continue;
+      const from = elem.occurrences[0];
+      const to = elem.occurrences[elem.occurrences.length - 1];
+      const participantsList = elem.occurrences
+        .map((o) => `P${o.paragraphIndex}S${o.sentenceIndex}`)
+        .join(', ');
+      flattenedLeads.push({
+        from: { paragraph: from.paragraphIndex, sentence: from.sentenceIndex, label: `P${from.paragraphIndex}S${from.sentenceIndex}` } as ConnectionEndpoint,
+        to: { paragraph: to.paragraphIndex, sentence: to.sentenceIndex, label: `P${to.paragraphIndex}S${to.sentenceIndex}` } as ConnectionEndpoint,
+        description:
+          `Repeated element "${elem.element}" across ${elem.occurrences.length} sentences (${participantsList}): ` +
+          `${elem.potentialSignificance}`,
+        reverseIllumination: null,
+        significance: elem.potentialSignificance,
+        strengthCategory: 'tentative' as const,
+        directionality: 'forward' as const,
+        discoveredBy: 'scout' as const,
+      });
     }
 
     // Tonal shifts: create connection from the shift point to the START of the next paragraph.
@@ -1445,6 +1988,23 @@ export class EssayProfileCoordinator {
       output.paragraphUnderstanding,
     );
     allMutations.push(...pMutations);
+
+    // 2b. Option 5 rebuild — propagate per-paragraph gap candidates onto
+    // the paragraph's understanding. Phase B (essayLevelEmissionService)
+    // reads from `para.understanding.gapCandidates` to assemble its
+    // candidate pool. The legacy sequentialDeepWalk did this in its own
+    // `applyToProfile`, but the coordinator path (which the orchestrator
+    // uses for both the legacy and essay-level walks) had no equivalent
+    // step — gap candidates produced by the walk never reached Phase B,
+    // and Phase B silently emitted zero. Diagnosed during Step 7 Crochet
+    // calibration (2026-05-04). Append-only by paragraph; later writes
+    // overwrite per the supersession model used elsewhere in walk output.
+    if (output.gapCandidates && output.gapCandidates.length > 0) {
+      const para = this.profile.paragraphs[pIdx];
+      if (para && para.understanding) {
+        para.understanding.gapCandidates = output.gapCandidates;
+      }
+    }
 
     // 3. SentenceMutator: apply back-propagations
     for (const backProp of output.priorSentenceUpdates) {
@@ -1680,6 +2240,11 @@ export class EssayProfileCoordinator {
       }
     }
 
+    // Option 5 rebuild: per-layer specifics-need emission write-back removed.
+    // Phase B (essayLevelEmissionService.applyEssayLevelEmissionsToProfile)
+    // is the single library-update path; runs after L4 + delta synthesis
+    // and before Phase 5.6 aggregator.
+
     this.afterMutation(allMutations, {});
 
     // Checkpoint after L3.75 (first comprehensive holistic understanding)
@@ -1771,6 +2336,11 @@ export class EssayProfileCoordinator {
       },
     );
     allMutations.push(...pMutations);
+
+    // Option 5 rebuild: per-layer L3.5 specifics-need emission write-back
+    // removed. Phase B (essayLevelEmissionService) reads L3.5's existing
+    // weakness/growthEdge/improvementCandidate artifacts directly when
+    // deciding emissions at essay level.
 
     // HolisticMutator: update craft assessment if there are new strength signatures
     if (result.holisticAnalysisEvolution) {
@@ -1869,6 +2439,11 @@ export class EssayProfileCoordinator {
     this.checkCircuitBreaker('L4_north_star');
 
     const mutations = this.northStarMutator.applyNorthStar(this.profile, northStar);
+
+    // Option 5 rebuild: per-layer L4 specifics-need emission write-back
+    // removed. Phase B (essayLevelEmissionService) reads L4's northStar
+    // (through-line, structural roles, distinctiveness, intent bridge)
+    // directly when deciding emissions at essay level.
 
     this.afterMutation(mutations, {});
 
@@ -2471,6 +3046,16 @@ export class EssayProfileCoordinator {
    */
   getProfile(): Readonly<EssayProfile> {
     return this.profile;
+  }
+
+  /**
+   * [D-1.12 Commit C 2026-04-29] Read-only essayId accessor.
+   * Added so orchestrator paths that need to emit telemetry (which
+   * requires essayId for buffer keying) can read it without widening
+   * helper signatures. Used by safeCheckpoint's failure-emit path.
+   */
+  getEssayId(): string {
+    return this.essayId;
   }
 
   /**

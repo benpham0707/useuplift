@@ -13,6 +13,11 @@ import { jsonrepair } from 'jsonrepair';
 import dotenv from 'dotenv';
 import path from 'path';
 
+// Build cost ledger (Phase 0 D-0.10) — Node-only, gated by isBrowser
+// below. Type-only import keeps `fs` out of browser bundles; the runtime
+// module is loaded via dynamic import in `getBuildCostLedger()`.
+import type * as BuildCostLedger from '../../services/essayIntelligence/telemetry/buildCostLedger';
+
 // Single-key policy: only use ANTHROPIC_API_KEY (paid/subscription credits).
 // CLAUDE_CODE_KEY is no longer considered.
 // Check if we're in browser (Vite) or Node.js environment
@@ -26,6 +31,18 @@ const isBrowser = typeof window !== 'undefined'
   && navigator.userAgent.length > 0
   && !navigator.userAgent.startsWith('Node.js')
   && (navigator.userAgent.includes('Mozilla') || navigator.userAgent.includes('Chrome') || navigator.userAgent.includes('Safari') || navigator.userAgent.includes('AppleWebKit'));
+
+// Build cost ledger lazy-loader. Only loaded in Node (server / test
+// harness / scripts); never bundled into the browser. The build cost
+// cap discipline (D-0.10) applies to build-session API calls, not to
+// browser-side runtime user calls (which have separate accounting).
+let buildCostLedgerCache: typeof BuildCostLedger | null = null;
+async function getBuildCostLedger(): Promise<typeof BuildCostLedger | null> {
+  if (isBrowser) return null;
+  if (buildCostLedgerCache) return buildCostLedgerCache;
+  buildCostLedgerCache = await import('../../services/essayIntelligence/telemetry/buildCostLedger');
+  return buildCostLedgerCache;
+}
 
 // Ensure dotenv is loaded — idempotent, safe to call multiple times.
 // This eliminates import-order bugs where services are loaded before
@@ -314,11 +331,19 @@ export function withSystemPromptVersion(
 // ============================================================================
 
 /**
- * Attempt to repair truncated JSON (common when Claude hits maxTokens).
- * Strategy: find the last complete array element and close the array.
- * Works for both arrays-of-objects `[{...}, {...}]` and standalone objects.
+ * Attempt to repair truncated JSON (common when Claude hits maxTokens, and
+ * occasionally when the model emits a mid-stream syntax glitch).
+ *
+ * Three strategies, tried in order:
+ *   (a) Root array: find the last complete element, close with `]`.
+ *   (b) Root object: find the last complete top-level PROPERTY (ending at a
+ *       `,` at depth 1), truncate there, close outstanding nesting, close
+ *       with `}`. This is what recovers L3.75 Phase B + L3 walk outputs that
+ *       hit max_tokens or sample a bad character mid-generation — previously
+ *       these hit `arrayDepth: -1, element end positions: 0` and threw.
+ *   (c) Give up.
  */
-function repairTruncatedJSON(text: string): unknown {
+export function repairTruncatedJSON(text: string): unknown {
   let s = text.trim();
 
   // Strip markdown code block wrapper if present (common in Claude responses)
@@ -340,13 +365,17 @@ function repairTruncatedJSON(text: string): unknown {
     s = s.substring(firstBrace);
   }
 
-  // Track positions of complete top-level array elements
-  // Walk through the string tracking nesting depth
+  // Single pass: track nesting depth, record (a) complete top-level array
+  // elements, and (b) complete top-level object properties. Each recorded
+  // position carries a `closer` flag — '' if the JSON is already closed at
+  // that position, otherwise ']' or '}' to append.
+  type RepairPosition = { end: number; closer: '' | ']' | '}' };
   let inString = false;
   let escape = false;
   let depth = 0;
-  let arrayDepth = -1;
-  const elementEndPositions: number[] = [];
+  let arrayDepth = -1; // position of root `[` if root is an array, else -1
+  let objectDepth = -1; // position of root `{` if root is an object, else -1
+  const positions: RepairPosition[] = [];
 
   for (let i = 0; i < s.length; i++) {
     const ch = s[i];
@@ -360,45 +389,51 @@ function repairTruncatedJSON(text: string): unknown {
       depth++;
     } else if (ch === ']') {
       depth--;
+      // Root array closed cleanly — full JSON intact
+      if (depth === 0 && arrayDepth !== -1) {
+        positions.push({ end: i, closer: '' });
+      }
     } else if (ch === '{') {
+      if (depth === 0) objectDepth = i;
       depth++;
     } else if (ch === '}') {
       depth--;
-      // If we just closed a top-level array element (depth back to 1 = inside outer array)
+      // Closed a top-level array element (needs array closer)
       if (depth === 1 && arrayDepth !== -1) {
-        elementEndPositions.push(i);
+        positions.push({ end: i, closer: ']' });
       }
-      // If we just closed the only top-level object (not in an array)
-      if (depth === 0 && arrayDepth === -1) {
-        elementEndPositions.push(i);
+      // Closed a complete object-valued top-level property (needs object closer)
+      if (depth === 1 && objectDepth !== -1) {
+        positions.push({ end: i, closer: '}' });
       }
+      // Root object closed cleanly — full JSON intact
+      if (depth === 0 && objectDepth !== -1) {
+        positions.push({ end: i, closer: '' });
+      }
+    } else if (ch === ',' && depth === 1 && objectDepth !== -1) {
+      // Comma at depth 1 of root object = end of a top-level property.
+      // Record the char BEFORE the comma so the slice ends at the value.
+      positions.push({ end: i - 1, closer: '}' });
     }
   }
 
-  console.warn(`[JSONRepair] Text length: ${s.length}, element end positions: ${elementEndPositions.length}, arrayDepth: ${arrayDepth}`);
+  const rootKind = arrayDepth !== -1 ? 'array' : objectDepth !== -1 ? 'object' : 'none';
+  console.warn(`[JSONRepair] Text length: ${s.length}, root: ${rootKind}, repair positions: ${positions.length}`);
 
-  // Try the full string first (shouldn't work if we're here, but just in case)
-  // Then try truncating to the last complete element
-  for (let attempt = elementEndPositions.length - 1; attempt >= 0; attempt--) {
-    const endPos = elementEndPositions[attempt];
-    let candidate = s.substring(0, endPos + 1);
-
-    // Close the outer array if needed
-    if (arrayDepth !== -1) {
-      candidate += ']';
-    }
-
-    // Clean trailing commas before closing bracket
+  // Walk positions newest → oldest. Strip orphan trailing commas then append
+  // the position's closer (empty for already-closed JSON).
+  for (let attempt = positions.length - 1; attempt >= 0; attempt--) {
+    const { end, closer } = positions[attempt];
+    let candidate = s.substring(0, end + 1);
+    candidate = candidate.replace(/,(\s*)$/, '$1');
     candidate = candidate.replace(/,(\s*[\]}])/g, '$1');
-
+    candidate += closer;
     try {
       return JSON.parse(candidate);
     } catch (e) {
-      if (attempt === elementEndPositions.length - 1) {
-        console.warn(`[JSONRepair] Last element attempt failed:`, (e as Error).message.substring(0, 100));
-        console.warn(`[JSONRepair] Candidate ends with: ...${candidate.slice(-80)}`);
+      if (attempt === positions.length - 1) {
+        console.warn(`[JSONRepair] ${rootKind}: last-position attempt failed, walking back — ${(e as Error).message.substring(0, 80)}`);
       }
-      // Try next earlier element
     }
   }
 
@@ -442,10 +477,39 @@ function createTimeoutPromise(timeoutMs: number): { promise: Promise<never>; can
  * Extended input format for Claude calls with userPrompt/systemPrompt.
  * This is a simpler alternative to the messages array format.
  */
+/**
+ * Block of user-prompt text with optional cache breakpoint.
+ * When `cacheBreakpoint: true`, the Anthropic API caches the prefix
+ * up to and including this block. Use this for stable shared context
+ * (essay text, accumulated profile, layer outputs) that's reused
+ * across multiple calls within the 5-minute prompt-cache TTL.
+ *
+ * Anthropic supports up to 4 cache breakpoints per request. Place them
+ * at the END of stable prefixes — the cache is keyed on the prefix
+ * up to the breakpoint, so any change in earlier blocks invalidates
+ * the cache.
+ */
+export interface UserPromptBlock {
+  text: string;
+  cacheBreakpoint?: boolean;
+}
+
 interface ClaudeSimpleInput {
   model?: string;
   systemPrompt?: string;
-  userPrompt: string;
+  /**
+   * Single string user prompt (current default). Mutually exclusive with
+   * `userPromptBlocks`. When both are provided, `userPromptBlocks` wins.
+   */
+  userPrompt?: string;
+  /**
+   * Multi-block user prompt with optional per-block cache breakpoints.
+   * Use when the prompt has a stable shared prefix that should be
+   * cached across calls. The wrapper assembles these into a single
+   * user message with proper cache_control on requested blocks.
+   * Mutually exclusive with `userPrompt`.
+   */
+  userPromptBlocks?: UserPromptBlock[];
   maxTokens?: number;
   temperature?: number;
   timeoutMs?: number;
@@ -468,7 +532,10 @@ export async function callClaude<T = any>(
   // Determine which interface is being used
   const isObject = typeof promptOrInput !== 'string';
   const hasMessages = isObject && 'messages' in (promptOrInput as ClaudeMessageInput);
-  const hasUserPrompt = isObject && 'userPrompt' in (promptOrInput as ClaudeSimpleInput);
+  const hasUserPrompt =
+    isObject &&
+    ('userPrompt' in (promptOrInput as ClaudeSimpleInput) ||
+      'userPromptBlocks' in (promptOrInput as ClaudeSimpleInput));
 
   let model: string;
   let temperature: number;
@@ -505,12 +572,37 @@ export async function callClaude<T = any>(
     useJsonMode = input.useJsonMode ?? false;
     cacheSystemPrompt = input.cacheSystemPrompt ?? false;
 
-    messages = [
-      {
-        role: 'user' as const,
-        content: [{ type: 'text' as const, text: input.userPrompt }],
-      },
-    ];
+    // Build user message content. When userPromptBlocks is provided,
+    // assemble a multi-block content array with cache_control on
+    // breakpoint blocks. Otherwise fall through to a single text block
+    // from the legacy `userPrompt` string field.
+    const blocks = input.userPromptBlocks;
+    if (blocks && blocks.length > 0) {
+      const contentBlocks = blocks.map((b) => {
+        const block: Anthropic.Messages.TextBlockParam = {
+          type: 'text' as const,
+          text: b.text,
+        };
+        if (b.cacheBreakpoint) {
+          block.cache_control = { type: 'ephemeral' as const };
+        }
+        return block;
+      });
+      messages = [
+        {
+          role: 'user' as const,
+          content: contentBlocks,
+        },
+      ];
+    } else {
+      const promptText = input.userPrompt ?? '';
+      messages = [
+        {
+          role: 'user' as const,
+          content: [{ type: 'text' as const, text: promptText }],
+        },
+      ];
+    }
   } else {
     // String-based interface: callClaude(userPrompt, options)
     const opts = options ?? {};
@@ -529,6 +621,14 @@ export async function callClaude<T = any>(
       },
     ];
   }
+
+  // Build cost cap enforcement (Phase 0 D-0.10). Throws
+  // BuildCostCapExceededError when cumulative >= $9. The orchestrator
+  // / test harness catches and halts cleanly. Browser-side calls
+  // (runtime user flows) skip this — the build cap is for Node build
+  // sessions only.
+  const buildCostLedger = await getBuildCostLedger();
+  buildCostLedger?.checkCapBeforeCall();
 
   try {
     // Build system parameter — use cache_control when caching requested.
@@ -638,15 +738,42 @@ export async function callClaude<T = any>(
         throw new Error(`Unexpected content type: ${response.content[0].type}`);
       }
 
+      const usageOut = {
+        input_tokens: response.usage.input_tokens,
+        output_tokens: response.usage.output_tokens,
+        cache_creation_input_tokens: response.usage.cache_creation_input_tokens,
+        cache_read_input_tokens: response.usage.cache_read_input_tokens,
+      };
+
+      // Record to the build cost ledger (Phase 0 D-0.10). Sync
+      // append + cumulative update + telemetry emission. Browser
+      // calls skip this — the build cap is for Node build sessions.
+      // Failure to record HALTS the caller per no-fallback discipline:
+      // a missed cost record on a successful call would make the cap
+      // unreliable.
+      if (buildCostLedger) {
+        // Phase 1 A1 (2026-05-12): emit cost-component split alongside
+        // the rolled-up total so the ledger can be analyzed by cost basis
+        // in Phase 6 verification (which cost columns moved under each Cut).
+        const breakdown = calculateCostBreakdown(usageOut, model);
+        buildCostLedger.recordCost({
+          model,
+          inputTokens: usageOut.input_tokens,
+          outputTokens: usageOut.output_tokens,
+          cacheReadTokens: usageOut.cache_read_input_tokens ?? undefined,
+          cacheWriteTokens: usageOut.cache_creation_input_tokens ?? undefined,
+          costUsd: breakdown.total,
+          freshInputUsd: breakdown.freshInput,
+          cacheReadUsd: breakdown.cacheRead,
+          cacheCreateUsd: breakdown.cacheCreate,
+          outputUsd: breakdown.output,
+        });
+      }
+
       // Return structured response
       return {
         content,
-        usage: {
-          input_tokens: response.usage.input_tokens,
-          output_tokens: response.usage.output_tokens,
-          cache_creation_input_tokens: response.usage.cache_creation_input_tokens,
-          cache_read_input_tokens: response.usage.cache_read_input_tokens,
-        },
+        usage: usageOut,
         stopReason: response.stop_reason || 'unknown',
       };
     } catch (error) {
@@ -866,4 +993,50 @@ export function calculateCost(usage: ClaudeResponse['usage'], model?: string): n
   }
 
   return Math.round(cost * 10000) / 10000; // Round to 4 decimal places
+}
+
+/**
+ * Phase 1 A1 cost-component breakdown (2026-05-12, telemetry foundation).
+ *
+ * Returns the same total as `calculateCost` plus per-component dollars
+ * attributed to: fresh (uncached) input, cached input reads, cache creation
+ * writes, and output tokens. The split is the diagnostic foundation for
+ * Phase 6 verification analysis — a Cut that eliminates a Haiku output
+ * call should show as a drop in `output` with correlated `freshInput`
+ * reduction; a Cut that improves cache hit rates shows as a shift from
+ * `freshInput` to `cacheRead`.
+ *
+ * Numerically: `freshInput + cacheRead + cacheCreate + output ≈ total`
+ * (subject to 4-decimal rounding on `total`).
+ */
+export function calculateCostBreakdown(
+  usage: ClaudeResponse['usage'],
+  model?: string,
+): {
+  freshInput: number;
+  cacheRead: number;
+  cacheCreate: number;
+  output: number;
+  total: number;
+} {
+  const pricing = (model && MODEL_PRICING[model]) || DEFAULT_PRICING;
+
+  const round = (n: number) => Math.round(n * 10000) / 10000;
+
+  const freshInput = round((usage.input_tokens / 1_000_000) * pricing.input);
+  const output = round((usage.output_tokens / 1_000_000) * pricing.output);
+  const cacheCreate = usage.cache_creation_input_tokens
+    ? round((usage.cache_creation_input_tokens / 1_000_000) * pricing.cacheWrite)
+    : 0;
+  const cacheRead = usage.cache_read_input_tokens
+    ? round((usage.cache_read_input_tokens / 1_000_000) * pricing.cacheRead)
+    : 0;
+
+  return {
+    freshInput,
+    cacheRead,
+    cacheCreate,
+    output,
+    total: round(freshInput + cacheRead + cacheCreate + output),
+  };
 }

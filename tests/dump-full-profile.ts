@@ -23,14 +23,40 @@ dotenv.config({ path: path.resolve(__dirname, '..', '.env.local') });
 import { analysisOrchestrator } from '../src/services/essayIntelligence/analysis/analysisOrchestrator';
 import type { PipelineResult } from '../src/services/essayIntelligence/analysis/analysisOrchestrator';
 import type { EssayProfile } from '../src/services/essayIntelligence/profileTypes';
+import { lintDump, summarizeLint } from '../src/services/essayIntelligence/profileManager/dumpLint';
+import {
+  renderAnalysisForStudent,
+  renderStudentDocumentMarkdown,
+} from '../src/services/essayIntelligence/presentation';
 
 // ============================================================================
 // CONFIG
 // ============================================================================
 
-const ESSAY_PATH = path.join(__dirname, 'fixtures', 'piano-essay.txt');
+// Essay can be overridden via CLI arg: `npx tsx ... --essay <path-or-corpus-filename>`.
+// If the value contains a path separator, it's treated as a path; otherwise it's
+// looked up in tests/calibration/top-tier-reference/essays/. Defaults to the
+// fixture piano-essay.
+const ESSAY_PATH = (() => {
+  const idx = process.argv.indexOf('--essay');
+  if (idx < 0 || !process.argv[idx + 1]) {
+    return path.join(__dirname, 'fixtures', 'piano-essay.txt');
+  }
+  const arg = process.argv[idx + 1];
+  if (arg.includes('/')) return path.resolve(arg);
+  return path.join(__dirname, 'calibration', 'top-tier-reference', 'essays', arg);
+})();
+const ESSAY_LABEL = path.basename(ESSAY_PATH).replace(/\.txt$/, '');
 const OUTPUT_DIR = path.join(__dirname, 'output');
-const OUTPUT_FILE = path.join(OUTPUT_DIR, 'full-profile-dump.md');
+const OUTPUT_FILE = path.join(OUTPUT_DIR, `full-profile-${ESSAY_LABEL}.md`);
+const OUTPUT_JSON = path.join(OUTPUT_DIR, `full-profile-${ESSAY_LABEL}.json`);
+// Phase 2 — student-facing snapshot. Produced from EssayProfile by
+// renderAnalysisForStudent; markdown projection lives alongside as readable
+// sibling. Lands in `tests/output/` so Phase 4 parity gate can diff
+// across regens. See:
+// docs/pipeline-evolution/04-pipeline-architecture/L3-75/FIELD_DISPOSITION_TABLE.md
+const OUTPUT_STUDENT_JSON = path.join(OUTPUT_DIR, `full-profile-${ESSAY_LABEL}-student.json`);
+const OUTPUT_STUDENT_MD = path.join(OUTPUT_DIR, `full-profile-${ESSAY_LABEL}-student.md`);
 
 // ============================================================================
 // HELPERS
@@ -67,12 +93,30 @@ function safe(val: unknown): string {
   return String(val);
 }
 
-/** Render observation entries as a markdown list */
+/**
+ * Render observation entries as a markdown list.
+ *
+ * Bucket B (2026-05-27): returns empty string for empty arrays so callers
+ * can guard whole header+body blocks via `if (out)` or by length-checking
+ * the input. Per-entry: skip `Confidence` when it's the default 0.5
+ * sentinel and skip `Evidence` when empty — both signal "no real signal"
+ * and shipped as visible lines on every populated entry, polluting §8.
+ */
 function renderObservations(obs: Array<{ observation: string; confidence: number; evidence: string }> | undefined): string {
-  if (!obs || obs.length === 0) return '  (none)\n';
-  return obs.map(o =>
-    `  - **${o.observation}**\n    - Confidence: ${o.confidence}\n    - Evidence: "${o.evidence}"`
-  ).join('\n') + '\n';
+  if (!obs || obs.length === 0) return '';
+  return obs.map(o => {
+    const parts: string[] = [`  - **${o.observation}**`];
+    // Skip default-0.5 confidence — it's the "no real confidence assigned"
+    // sentinel and renders as noise on every otherwise-meaningful entry.
+    if (o.confidence !== 0.5) {
+      parts.push(`    - Confidence: ${o.confidence}`);
+    }
+    // Skip empty evidence — same noise pattern.
+    if (o.evidence && o.evidence.length > 0) {
+      parts.push(`    - Evidence: "${o.evidence}"`);
+    }
+    return parts.join('\n');
+  }).join('\n') + '\n';
 }
 
 // ============================================================================
@@ -98,8 +142,8 @@ function renderPipelineOverview(result: PipelineResult, essayText: string, pipel
     lines.push(`- **Coaching lens**: ${ip.coachingLens}`);
     lines.push(`- **Readiness assessment**: ${ip.readinessAssessment}`);
     lines.push(`- **Near boundary**: ${ip.nearBoundary ?? 'N/A'}`);
-    lines.push(`- **Focus areas**: ${ip.focusAreas.join('; ') || '(none)'}`);
-    lines.push(`- **Deferred areas**: ${ip.deferredAreas.join('; ') || '(none)'}`);
+    if (ip.focusAreas.length > 0) lines.push(`- **Focus areas**: ${ip.focusAreas.join('; ')}`);
+    if (ip.deferredAreas.length > 0) lines.push(`- **Deferred areas**: ${ip.deferredAreas.join('; ')}`);
     lines.push(`- **Legacy readiness**: essay=${ip.legacyReadiness.essayLevel}, paragraph=${ip.legacyReadiness.paragraphLevel}, sentence=${ip.legacyReadiness.sentenceLevel}, word=${ip.legacyReadiness.wordLevel}`);
     if (ip.dimensionPhases.length > 0) {
       lines.push(`\n**Dimension Phases:**`);
@@ -115,14 +159,22 @@ function renderPipelineOverview(result: PipelineResult, essayText: string, pipel
     }
   }
 
-  lines.push('\n### Layer Cost Breakdown\n');
-  lines.push('| Layer | Cost | Input Tokens | Output Tokens | Cache Read | Time |');
-  lines.push('|-------|------|-------------|---------------|------------|------|');
-  for (const lc of result.costSummary.layers) {
-    const tu = lc.tokenUsage;
-    lines.push(`| ${lc.layer} | ${cost(lc.cost)} | ${tu.inputTokens} | ${tu.outputTokens} | ${tu.cacheReadTokens} | ${lc.timingMs}ms |`);
+  // Phase 1 R5 (2026-05-12): §1 Layer Cost Breakdown table gated behind
+  // DUMP_DEBUG_COST=1. The header line above already reports total cost +
+  // time; the detailed per-layer breakdown is diagnostic and consumes ~12
+  // lines of dump without editorial value for the student-facing audit.
+  // Cost ledger CSV (BUILD_COST_LEDGER.md) is the authoritative
+  // per-call cost-history surface.
+  if (process.env.DUMP_DEBUG_COST === '1') {
+    lines.push('\n### Layer Cost Breakdown\n');
+    lines.push('| Layer | Cost | Input Tokens | Output Tokens | Cache Read | Time |');
+    lines.push('|-------|------|-------------|---------------|------------|------|');
+    for (const lc of result.costSummary.layers) {
+      const tu = lc.tokenUsage;
+      lines.push(`| ${lc.layer} | ${cost(lc.cost)} | ${tu.inputTokens} | ${tu.outputTokens} | ${tu.cacheReadTokens} | ${lc.timingMs}ms |`);
+    }
+    lines.push(`| **TOTAL** | **${cost(result.costSummary.totalCost)}** | **${result.costSummary.totalTokenUsage.inputTokens}** | **${result.costSummary.totalTokenUsage.outputTokens}** | **${result.costSummary.totalTokenUsage.cacheReadTokens}** | **${result.costSummary.totalTimingMs}ms** |`);
   }
-  lines.push(`| **TOTAL** | **${cost(result.costSummary.totalCost)}** | **${result.costSummary.totalTokenUsage.inputTokens}** | **${result.costSummary.totalTokenUsage.outputTokens}** | **${result.costSummary.totalTokenUsage.cacheReadTokens}** | **${result.costSummary.totalTimingMs}ms** |`);
 
   return lines.join('\n') + '\n';
 }
@@ -168,7 +220,7 @@ function renderNorthStar(profile: EssayProfile): string {
     lines.push(`- **Central element**: ${tlm.centralElement}`);
     lines.push(`- **Element type**: ${tlm.elementType}`);
     lines.push(`- **Transformation**: ${tlm.transformation}`);
-    lines.push(`- **Connection refs**: ${tlm.connectionRefs.join(', ') || '(none)'}`);
+    if (tlm.connectionRefs.length > 0) lines.push(`- **Connection refs**: ${tlm.connectionRefs.join(', ')}`);
     lines.push('\n**Journey:**\n');
     for (const j of tlm.journey) {
       const loc = j.location.sentence !== undefined
@@ -216,7 +268,7 @@ function renderNorthStar(profile: EssayProfile): string {
   lines.push('\n### Distinctiveness Signature\n');
   const ds = ns.distinctivenessSignature;
   lines.push(`**Articulation**: ${ds.articulation}\n`);
-  lines.push(`**Entanglement refs**: ${ds.entanglementRefs.join(', ') || '(none)'}`);
+  if (ds.entanglementRefs.length > 0) lines.push(`**Entanglement refs**: ${ds.entanglementRefs.join(', ')}`);
   lines.push('\n**Non-interchangeable factors:**\n');
   for (const f of ds.nonInterchangeableFactors) {
     lines.push(`- ${f}`);
@@ -228,7 +280,7 @@ function renderNorthStar(profile: EssayProfile): string {
     const ib = ns.intentBridge;
     lines.push(`- **Student intent**: ${safe(ib.studentIntent)}`);
     lines.push(`- **System reading**: ${ib.systemReading}`);
-    lines.push(`- **Source insight IDs**: ${ib.sourceInsightIds.join(', ') || '(none)'}`);
+    if (ib.sourceInsightIds.length > 0) lines.push(`- **Source insight IDs**: ${ib.sourceInsightIds.join(', ')}`);
     if (ib.alignments.length > 0) {
       lines.push('\n**Alignments:**\n');
       for (const a of ib.alignments) {
@@ -352,7 +404,7 @@ function renderHolisticUnderstanding(profile: EssayProfile): string {
   if (vi) {
     lines.push(`- **Signature**: ${vi.signature}`);
     lines.push(`- **Register**: ${vi.register}`);
-    lines.push(`- **Distinctive patterns**: ${vi.distinctivePatterns.join('; ') || '(none)'}`);
+    if (vi.distinctivePatterns.length > 0) lines.push(`- **Distinctive patterns**: ${vi.distinctivePatterns.join('; ')}`);
     lines.push(`- **Evolution**: ${vi.evolution}`);
     if (vi.authenticVsPerformed.length > 0) {
       lines.push('\n**Authentic vs Performed:**\n');
@@ -411,7 +463,7 @@ function renderHolisticUnderstanding(profile: EssayProfile): string {
     // Tonal Disposition
     lines.push('\n**Tonal Disposition:**\n');
     lines.push(`- Baseline: ${vm.tonalDisposition.baseline}`);
-    lines.push(`- Dominant qualities: ${vm.tonalDisposition.dominantQualities?.join(', ') || '(none)'}`);
+    if ((vm.tonalDisposition.dominantQualities?.length ?? 0) > 0) lines.push(`- Dominant qualities: ${vm.tonalDisposition.dominantQualities!.join(', ')}`);
     for (const obs of vm.tonalDisposition.observations) {
       lines.push(`- P${obs.location.paragraph+1}: ${obs.observation}`);
     }
@@ -460,7 +512,7 @@ function renderHolisticUnderstanding(profile: EssayProfile): string {
   if (et) {
     lines.push(`- **Arc trajectory**: ${et.arcTrajectory}`);
     lines.push(`- **Authenticity assessment**: ${et.authenticityAssessment}`);
-    lines.push(`- **Undertones**: ${et.undertones.join('; ') || '(none)'}`);
+    if (et.undertones.length > 0) lines.push(`- **Undertones**: ${et.undertones.join('; ')}`);
 
     if (et.peakMoments.length > 0) {
       lines.push('\n**Peak Moments:**\n');
@@ -527,7 +579,7 @@ function renderHolisticUnderstanding(profile: EssayProfile): string {
     lines.push(`- **Thesis confidence**: ${ta.thesisConfidence}`);
     lines.push(`- **Thesis evolution**: ${ta.thesisEvolution}`);
     lines.push(`- **Subtext**: ${ta.subtext}`);
-    lines.push(`- **Contradictions**: ${ta.contradictions.join('; ') || '(none)'}`);
+    if (ta.contradictions.length > 0) lines.push(`- **Contradictions**: ${ta.contradictions.join('; ')}`);
 
     if (ta.threads.length > 0) {
       lines.push('\n**Thematic Threads:**\n');
@@ -588,11 +640,11 @@ function renderHolisticUnderstanding(profile: EssayProfile): string {
     if (cr.essayOnlyPortrait) {
       lines.push(`**Essay-Only Portrait:**\n\n> ${cr.essayOnlyPortrait}\n`);
     }
-    lines.push(`- **Values revealed**: ${cr.valuesRevealed.join('; ') || '(none)'}`);
+    if (cr.valuesRevealed.length > 0) lines.push(`- **Values revealed**: ${cr.valuesRevealed.join('; ')}`);
     lines.push(`- **Growth arc**: ${cr.growthArc}`);
     lines.push(`- **Intellectual fingerprint**: ${cr.intellectualFingerprint}`);
-    lines.push(`- **Blind spots**: ${cr.blindSpots.join('; ') || '(none)'}`);
-    lines.push(`- **Revealed qualities**: ${cr.revealedQualities.join('; ') || '(none)'}`);
+    if (cr.blindSpots.length > 0) lines.push(`- **Blind spots**: ${cr.blindSpots.join('; ')}`);
+    if (cr.revealedQualities.length > 0) lines.push(`- **Revealed qualities**: ${cr.revealedQualities.join('; ')}`);
   } else {
     lines.push('(not available)');
   }
@@ -604,6 +656,45 @@ function renderHolisticUnderstanding(profile: EssayProfile): string {
     lines.push(`- **Image system**: ${ca.imageSystem}`);
     lines.push(`- **Sentence patterns**: ${ca.sentencePatterns}`);
     lines.push(`- **Word patterns**: ${ca.wordPatterns}`);
+
+    // Quality Gap 1: render the Signature Move callout BEFORE strengthSignatures.
+    // Populated case shows the one-sentence claim + an evidence table with
+    // 1-indexed paragraph display. Null case renders a teaching block that
+    // explains what null means so a reader doesn't infer the system "missed it".
+    lines.push('\n### Signature Move\n');
+    if (ca.signatureMove) {
+      const sm = ca.signatureMove;
+      lines.push(`> ${sm.oneSentenceName}\n`);
+      lines.push(`**Why it is theirs**: ${sm.whyItIsTheirs}\n`);
+      lines.push(`**Reader effect**: ${sm.readerEffect}\n`);
+      lines.push('| # | Kind | Where | Detail |');
+      lines.push('|---|---|---|---|');
+      for (let i = 0; i < sm.instances.length; i++) {
+        const inst = sm.instances[i];
+        let where: string;
+        let detail: string;
+        if (inst.kind === 'sentence_quote') {
+          const sentence = inst.location.sentence;
+          where = sentence != null
+            ? `P${inst.location.paragraph + 1}S${sentence + 1}`
+            : `P${inst.location.paragraph + 1}`;
+          detail = `"${inst.quotedText}" — ${inst.whatThisInstanceShows}`;
+        } else if (inst.kind === 'paragraph_compression') {
+          where = `P${inst.paragraph + 1}`;
+          detail = inst.whatThisInstanceShows;
+        } else {
+          where = `P${inst.paragraphs.map((p) => p + 1).join(',')}`;
+          detail = inst.whatThisInstanceShows;
+        }
+        // Escape pipe characters in detail to avoid breaking markdown table rendering
+        const escaped = detail.replace(/\|/g, '\\|').replace(/\n/g, ' ');
+        lines.push(`| ${i + 1} | ${inst.kind} | ${where} | ${escaped} |`);
+      }
+      lines.push('');
+    } else {
+      lines.push('*No single defining move identified for this essay.*\n');
+      lines.push('Your essay\'s craft is distributed across multiple strengths rather than concentrated in one identity-defining technique. Both shapes can succeed — some essays earn admission through one unforgettable move, others through sustained competence across many craft elements. See your **Strength Signatures** below for the full picture of your craft.\n');
+    }
 
     if (ca.strengthSignatures.length > 0) {
       lines.push('\n**Strength Signatures:**\n');
@@ -674,7 +765,7 @@ function renderConnectionsAndEntanglements(profile: EssayProfile): string {
   const conns = profile.connections;
   if (conns) {
     lines.push(`- **Graph summary**: ${conns.graphSummary}`);
-    lines.push(`- **Structural islands**: ${conns.structuralIslands.length > 0 ? conns.structuralIslands.map(i => `P${i+1}`).join(', ') : '(none)'}`);
+    if (conns.structuralIslands.length > 0) lines.push(`- **Structural islands**: ${conns.structuralIslands.map(i => `P${i+1}`).join(', ')}`);
     lines.push(`- **Total connections**: ${conns.all.length}`);
 
     if (conns.imageRecurrences?.length > 0) {
@@ -698,8 +789,24 @@ function renderConnectionsAndEntanglements(profile: EssayProfile): string {
       }
     }
 
-    lines.push('\n**All Connections (Detailed):**\n');
-    for (const c of conns.all) {
+    // Phase 1 R6/R7 (2026-05-12): tightened from "≥ supporting" to
+    // "foundational | significant only" + cap ≤10. Foundational + significant
+    // connections are the load-bearing structural ties — what the editorial
+    // surface actually surfaces to the student. Supporting + tentative
+    // connections are walker working memory; both remain in
+    // profile.connections.all for downstream layers + the JSON sidecar.
+    const RENDERED_STRENGTH_FILTER = new Set(['foundational', 'significant']);
+    const RENDERED_CONNECTION_CAP = 10;
+    const renderedConns = conns.all
+      .filter((c) => RENDERED_STRENGTH_FILTER.has(c.strengthCategory))
+      .slice(0, RENDERED_CONNECTION_CAP);
+    const suppressedCount = conns.all.length - renderedConns.length;
+    lines.push(
+      `\n**All Connections (Detailed):** ${renderedConns.length} of ${conns.all.length} ` +
+        `(suppressed ${suppressedCount} connections at strengthCategory < significant or beyond cap=${RENDERED_CONNECTION_CAP}; ` +
+        `set DUMP_DEBUG_CONNECTIONS=1 — TODO — for the full list)\n`,
+    );
+    for (const c of renderedConns) {
       const fromStr = c.from.sentence !== undefined
         ? `P${c.from.paragraph+1}S${c.from.sentence+1}`
         : `P${c.from.paragraph+1}`;
@@ -710,14 +817,25 @@ function renderConnectionsAndEntanglements(profile: EssayProfile): string {
       lines.push(`- **From label**: ${c.from.label}`);
       lines.push(`- **To label**: ${c.to.label}`);
       lines.push(`- **Description**: ${c.description}`);
-      lines.push(`- **Reverse illumination**: ${safe(c.reverseIllumination)}`);
-      lines.push(`- **Routing tags**: ${c.routingTags.join(', ')}`);
-      lines.push(`- **Significance**: ${c.significance}`);
+      if (c.reverseIllumination) {
+        lines.push(`- **Reverse illumination**: ${c.reverseIllumination}`);
+      }
+      if (c.routingTags.length > 0) {
+        lines.push(`- **Routing tags**: ${c.routingTags.join(', ')}`);
+      }
+      // R4-related: when significance equals description verbatim, suppress
+      // the duplicate. The LLM emits identical strings into both fields
+      // for ~30% of connections (audit §3.5).
+      if (c.significance && c.significance.trim() !== c.description.trim()) {
+        lines.push(`- **Significance**: ${c.significance}`);
+      }
       lines.push(`- **Strength**: ${c.strengthCategory}`);
       lines.push(`- **Directionality**: ${c.directionality}`);
       lines.push(`- **Discovered by**: ${c.discoveredBy}`);
       lines.push(`- **Status**: ${c.status}`);
-      lines.push(`- **Related findings**: ${c.relatedFindings.join(', ') || '(none)'}`);
+      if (c.relatedFindings.length > 0) {
+        lines.push(`- **Related findings**: ${c.relatedFindings.join(', ')}`);
+      }
       if (c.invalidation) {
         lines.push(`- **Invalidation**: ${c.invalidation.reason} (trigger: ${c.invalidation.trigger})`);
       }
@@ -756,7 +874,7 @@ function renderParagraphProfiles(profile: EssayProfile): string {
     const wordCount = para.text.split(/\s+/).length;
     lines.push(`### Paragraph ${para.index + 1} (${wordCount} words, ${para.sentences.length} sentences)\n`);
     lines.push(`**Text**: ${para.text.slice(0, 200)}${para.text.length > 200 ? '...' : ''}\n`);
-    lines.push(`**Tags**: ${para.tags.join(', ') || '(none)'}`);
+    if (para.tags.length > 0) lines.push(`**Tags**: ${para.tags.join(', ')}`);
 
     if (para.walkSkipped) {
       lines.push(`\n**WALK SKIPPED**: Failed at ${para.walkSkipped.failedAt} — ${para.walkSkipped.errorSummary}`);
@@ -791,7 +909,16 @@ function renderParagraphProfiles(profile: EssayProfile): string {
       if (pa.strengthSignatures.length > 0) {
         lines.push('- Strength signatures:');
         for (const ss of pa.strengthSignatures) {
-          lines.push(`  - **${ss.quality}**: ${ss.evidence}`);
+          // Bucket C (2026-05-27): when evidence is verbatim the verdict
+          // (L3.5 occasionally pastes the verdict here instead of a short
+          // quoted fragment), drop the evidence — keep the quality label,
+          // which is still informative on its own. Defense-in-depth; the
+          // L3.5 prompt directive prevents the bug at source.
+          if (ss.evidence && ss.evidence.trim() !== pa.verdict.trim()) {
+            lines.push(`  - **${ss.quality}**: ${ss.evidence}`);
+          } else {
+            lines.push(`  - **${ss.quality}**`);
+          }
         }
       }
       if (pa.growthEdges.length > 0) {
@@ -810,19 +937,53 @@ function renderParagraphProfiles(profile: EssayProfile): string {
       if (sent.understanding) {
         const su = sent.understanding;
         lines.push('**Understanding:**\n');
-        lines.push('*Observed Functions:*\n');
-        lines.push(renderObservations(su.observedFunctions));
-        lines.push('*Inferred Intents:*\n');
-        lines.push(renderObservations(su.inferredIntents));
-        lines.push('*Narrative Contributions:*\n');
-        lines.push(renderObservations(su.narrativeContributions));
-        lines.push(`- Rhetorical functions: ${su.rhetoricalFunctions.join(', ') || '(none)'}`);
-        lines.push(`- Paragraph contribution: ${su.paragraphContribution}`);
-        lines.push(`- Primary function: ${safe(su.primaryFunction)}`);
-        lines.push(`- Significance: ${safe(su.significance)}`);
-        lines.push(`- Tags: ${su.tags.join(', ') || '(none)'}`);
-        lines.push(`- Connection refs: ${su.connectionRefs.join(', ') || '(none)'}`);
-        lines.push(`- Finding refs: ${su.findingRefs.join(', ') || '(none)'}`);
+        // Bucket B: skip Observed Functions section when empty (was emitting "(none)" per sentence).
+        if (su.observedFunctions && su.observedFunctions.length > 0) {
+          lines.push('*Observed Functions:*\n');
+          lines.push(renderObservations(su.observedFunctions));
+        }
+        // R3 fix: suppress always-empty schema stubs. The previous renderer
+        // emitted "*Inferred Intents:* (none)", "*Narrative Contributions:*
+        // (none)", "Rhetorical functions: (none)", "Tags: (none)",
+        // "Connection refs: (none)", "Finding refs: (none)" for every
+        // sentence regardless of population. Suppressing when empty drops
+        // ~6 lines per sentence × N sentences = ~150-200 lines per dump.
+        if (su.inferredIntents && su.inferredIntents.length > 0) {
+          lines.push('*Inferred Intents:*\n');
+          lines.push(renderObservations(su.inferredIntents));
+        }
+        if (su.narrativeContributions && su.narrativeContributions.length > 0) {
+          lines.push('*Narrative Contributions:*\n');
+          lines.push(renderObservations(su.narrativeContributions));
+        }
+        if (su.rhetoricalFunctions.length > 0) {
+          lines.push(`- Rhetorical functions: ${su.rhetoricalFunctions.join(', ')}`);
+        }
+        // Paragraph contribution and Primary function are duplicates in practice
+        // (see audit §1.5). Render Primary function only; skip Paragraph contribution
+        // when it equals Primary function. Keep Significance.
+        const primary = su.primaryFunction;
+        const paraContrib = su.paragraphContribution;
+        if (primary) {
+          lines.push(`- Primary function: ${primary}`);
+          if (paraContrib && paraContrib !== primary) {
+            lines.push(`- Paragraph contribution: ${paraContrib}`);
+          }
+        } else if (paraContrib) {
+          lines.push(`- Paragraph contribution: ${paraContrib}`);
+        }
+        if (su.significance) {
+          lines.push(`- Significance: ${su.significance}`);
+        }
+        if (su.tags.length > 0) {
+          lines.push(`- Tags: ${su.tags.join(', ')}`);
+        }
+        if (su.connectionRefs.length > 0) {
+          lines.push(`- Connection refs: ${su.connectionRefs.join(', ')}`);
+        }
+        if (su.findingRefs.length > 0) {
+          lines.push(`- Finding refs: ${su.findingRefs.join(', ')}`);
+        }
 
         if (su.craft) {
           // Scope 1 Phase 1: voiceAlignment dropped from SentenceCraft.
@@ -844,10 +1005,15 @@ function renderParagraphProfiles(profile: EssayProfile): string {
         lines.push(`- Reasoning: ${sa.effectivenessReasoning}`);
         lines.push(`- Is strength: ${sa.isStrength}, Is problem: ${sa.isProblem}`);
         lines.push(`- Priority for improvement: ${sa.priorityForImprovement}`);
-        lines.push('- Strengths:');
-        lines.push(renderObservations(sa.strengths));
-        lines.push('- Weaknesses:');
-        lines.push(renderObservations(sa.weaknesses));
+        // Bucket B: skip Strengths/Weaknesses sections when empty.
+        if (sa.strengths && sa.strengths.length > 0) {
+          lines.push('- Strengths:');
+          lines.push(renderObservations(sa.strengths));
+        }
+        if (sa.weaknesses && sa.weaknesses.length > 0) {
+          lines.push('- Weaknesses:');
+          lines.push(renderObservations(sa.weaknesses));
+        }
       }
       lines.push('');
     }
@@ -977,20 +1143,57 @@ function renderCoherenceReport(profile: EssayProfile): string {
   lines.push(`- **Is coherent**: ${cr.isCoherent}`);
   lines.push(`- **Contradictions found**: ${cr.contradictions.length}`);
 
-  if (cr.contradictions.length > 0) {
-    lines.push('\n**Contradictions:**\n');
+  // Bucket E (2026-05-27): resolution-first render. After Stage 2.B, every
+  // contradiction L4 surfaces should carry a CoherenceResolution. Lead with
+  // the OUTCOMES (state + reasoning + surface/suppress signals) rather than
+  // the raw contradiction wall (claimA/B/nature/routingCategory/canCoexist/
+  // likelyResolution/evidence/source) that duplicated §9 findings.
+  // Resolutions live on northStar OR scoreMatrix (both stamped identically
+  // by the crystallizer); read either.
+  const resolutions =
+    profile.northStar?.coherenceResolutions ??
+    profile.scoreMatrix?.coherenceResolutions ??
+    [];
+
+  if (resolutions.length > 0) {
+    lines.push(`- **Resolutions emitted**: ${resolutions.length}`);
+    lines.push('\n**Resolutions (terminal state per contradiction):**\n');
+    for (const r of resolutions) {
+      // contradictionId is free-text that typically names the contradicting
+      // sections — it serves as the A-vs-B summary.
+      lines.push(`### [${r.state.toUpperCase()}] ${r.contradictionId}`);
+      lines.push(`- **Reasoning**: ${r.reasoning}`);
+      if (r.surfaceSignals.length > 0) {
+        lines.push(`- **Surface**: ${r.surfaceSignals.join(', ')}`);
+      }
+      if (r.suppressedSignals.length > 0) {
+        lines.push(`- **Suppressed (do not surface)**: ${r.suppressedSignals.join(', ')}`);
+      }
+      lines.push('');
+    }
+    // Any contradiction count not covered by a resolution → flag the gap
+    // compactly so an unaddressed contradiction is visible, not hidden.
+    if (cr.contradictions.length > resolutions.length) {
+      lines.push(
+        `> ${cr.contradictions.length - resolutions.length} contradiction(s) lack a resolution — ` +
+          `L4 directive may have under-emitted. Compact list:\n`,
+      );
+      for (const c of cr.contradictions) {
+        lines.push(`- **${c.severity.toUpperCase()}** ${c.sectionA} vs ${c.sectionB}: ${c.suggestedResolution}`);
+      }
+      lines.push('');
+    }
+  } else if (cr.contradictions.length > 0) {
+    // Backward-compat fallback (pre-Stage-2.B profiles, or L4 didn't emit
+    // resolutions): compact contradiction render. Drop the verbose
+    // nature/routingCategory/canCoexist/likelyResolution/evidence/source
+    // fields — those duplicated findings or were diagnostic-for-own-sake.
+    lines.push('\n**Contradictions (no resolutions — compact view):**\n');
     for (const c of cr.contradictions) {
-      lines.push(`### ${c.severity.toUpperCase()}: ${c.sectionA} vs ${c.sectionB}\n`);
+      lines.push(`### ${c.severity.toUpperCase()}: ${c.sectionA} vs ${c.sectionB}`);
       lines.push(`- **Claim A**: ${c.claimA}`);
       lines.push(`- **Claim B**: ${c.claimB}`);
-      lines.push(`- **Nature**: ${safe(c.nature)}`);
-      lines.push(`- **Routing category**: ${safe(c.routingCategory)}`);
-      lines.push(`- **Can coexist**: ${c.canCoexist ?? 'N/A'}`);
       lines.push(`- **Suggested resolution**: ${c.suggestedResolution}`);
-      lines.push(`- **Likely resolution**: ${safe(c.likelyResolution)}`);
-      if (c.evidenceA) lines.push(`- **Evidence A**: "${c.evidenceA}"`);
-      if (c.evidenceB) lines.push(`- **Evidence B**: "${c.evidenceB}"`);
-      lines.push(`- **Source**: ${safe(c.source)}`);
       lines.push('');
     }
   }
@@ -1002,14 +1205,6 @@ function renderCoherenceReport(profile: EssayProfile): string {
       lines.push(`  - A: ${pc.evidenceA.section} — "${pc.evidenceA.claim}"`);
       lines.push(`  - B: ${pc.evidenceB.section} — "${pc.evidenceB.claim}"`);
     }
-  }
-
-  if (cr.northStarAssessment) {
-    const nsa = cr.northStarAssessment;
-    lines.push('\n**North Star Assessment:**\n');
-    lines.push(`- Passes irreplaceability test: ${nsa.passesIrreplaceabilityTest}`);
-    lines.push(`- Reasoning: ${nsa.reasoning}`);
-    lines.push(`- Missing insight: ${safe(nsa.missingInsight)}`);
   }
 
   return lines.join('\n') + '\n';
@@ -1182,7 +1377,7 @@ async function main(): Promise<void> {
   const pipelineStart = Date.now();
 
   const pipelineResult = await analysisOrchestrator.analyzeEssay({
-    essayId: 'full-profile-dump-piano',
+    essayId: `full-profile-dump-${ESSAY_LABEL}`,
     essayText,
     essayType: 'common_app',
     includeAnnotations: false,
@@ -1214,7 +1409,7 @@ async function main(): Promise<void> {
   const totalCostStr = cost(pipelineResult.costSummary.totalCost);
 
   sections.push(`# Uplift Conversator V2 — Complete Analysis Profile`);
-  sections.push(`## Essay: piano-essay.txt (${wordCount} words)`);
+  sections.push(`## Essay: ${path.basename(ESSAY_PATH)} (${wordCount} words)`);
   sections.push(`## Analysis date: ${analysisDate}`);
   sections.push(`## Cost: ${totalCostStr} | Time: ${formatTime(pipelineTimeMs)}`);
   sections.push('');
@@ -1244,17 +1439,66 @@ async function main(): Promise<void> {
   sections.push(renderCoherenceReport(profile));
   sections.push('---\n');
   sections.push(renderQuestionQueue(profile));
-  sections.push('---\n');
-  sections.push(renderProfileIndex(profile));
-  sections.push('---\n');
-  sections.push(renderMetadata(profile));
+
+  // Phase 1 R8/R9 (2026-05-12): §13 Profile Index + §14 Profile Metadata
+  // suppressed from the markdown dump. Both are system-bookkeeping surfaces
+  // with no editorial value (paragraph digests duplicated elsewhere, section
+  // token counts + maturity histograms + staleness snapshots are diagnostic).
+  // Full content remains accessible in the JSON sidecar (OUTPUT_JSON) written
+  // below. Toggle DUMP_DEBUG_INDEX=1 to re-render in markdown for debugging.
+  if (process.env.DUMP_DEBUG_INDEX === '1') {
+    sections.push('---\n');
+    sections.push(renderProfileIndex(profile));
+    sections.push('---\n');
+    sections.push(renderMetadata(profile));
+  }
 
   // Write output
   ensureOutputDir();
   const output = sections.join('\n');
   fs.writeFileSync(OUTPUT_FILE, output, 'utf-8');
+
+  // R6 fix: persist the profile JSON next to the markdown so future
+  // audits / re-renders / lint checks don't require an API re-run.
+  // Serialized via JSON.stringify with 2-space indent for diffability.
+  fs.writeFileSync(OUTPUT_JSON, JSON.stringify(profile, null, 2), 'utf-8');
+  console.log(`[Profile Dump] Profile JSON persisted to: ${OUTPUT_JSON}`);
   console.log(`\n[Profile Dump] Output written to: ${OUTPUT_FILE}`);
   console.log(`[Profile Dump] Output size: ${(output.length / 1024).toFixed(1)} KB`);
+
+  // ─── Phase 2 — student-facing render snapshot ─────────────────────────
+  // renderAnalysisForStudent is the composition-layer prototype (per
+  // UNIFIED_PLAN_HOLD_2026_05_10.md §Phase 2). Wiring it here produces a
+  // snapshot every dump regen so Phase 4 parity gate can diff structured
+  // student output across runs without re-spending the analysis cost.
+  // The renderer reads only EssayProfile (no LLM); failure here surfaces
+  // as a non-fatal log so the analytical dump still lands.
+  try {
+    const studentDoc = renderAnalysisForStudent(profile, { mode: 'initial' });
+    fs.writeFileSync(OUTPUT_STUDENT_JSON, JSON.stringify(studentDoc, null, 2), 'utf-8');
+    fs.writeFileSync(OUTPUT_STUDENT_MD, renderStudentDocumentMarkdown(studentDoc), 'utf-8');
+    console.log(`[Profile Dump] Student render JSON: ${OUTPUT_STUDENT_JSON}`);
+    console.log(`[Profile Dump] Student render MD:   ${OUTPUT_STUDENT_MD}`);
+  } catch (err) {
+    console.warn(
+      `[Profile Dump] Student render skipped (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  // ─── Phase 0a.4: dumpLint production check (WARN-ONLY) ───────────────
+  // Mechanically scans the just-produced markdown for the recurring render
+  // regressions surfaced by every full-profile audit (R1 zero-indexed
+  // prose, R2 tentative connections leaking, R3 empty schema stubs, R4
+  // repeated verdict prose). Surfaces a punch-list inline so Phase 6
+  // verification regens self-validate without a separate audit pass.
+  // Warn-only for first round per Phase 0a.4 default — does not exit
+  // non-zero on findings, so render regressions don't block dump
+  // production. Promote to hard-fail once R1-R4 ratchets reach zero.
+  const lintResult = lintDump(output);
+  console.log(`\n[Profile Dump] Dump-lint findings: ${lintResult.findings.length}`);
+  if (lintResult.findings.length > 0) {
+    console.log(summarizeLint(lintResult));
+  }
 }
 
 main().catch((err) => {

@@ -7,6 +7,23 @@
  * - UC Berkeley Class of 2029
  * - Model UN exceptional example
  * - Chemistry Society exceptional example
+ *
+ * ⚠️ FRAGILITY FLAG (D-1.15.1 H-4 audit closure 2026-04-30) ⚠️
+ * D-1.15 integration scenarios pin specific essays from this file by `id`
+ * and treat their `description_original` byte-content as load-bearing —
+ * iter-1 snapshotText assertions compare byte-equal to the essay text,
+ * AND scenario `iter1MoveAnchors` reference paragraph indices keyed off
+ * the current paragraph count.
+ *
+ * If you edit `description_original` for any of these IDs:
+ *   - harvard-mites-2029  (S1, S4)
+ *   - ucla-cancer-awareness-2029  (S2, S5)
+ *   - ucb-cell-tower-2029  (S3)
+ * then `tests/integration/d1-15-harness.test.ts` AND
+ * `tests/integration/phase1-iteration-ledger.ts` will break — likely with
+ * cryptic snapshotText-mismatch or paragraphIndex-out-of-range errors. To
+ * intentionally edit these essays: update `tests/fixtures/d1-15/scenarios.ts`
+ * scenario fixtures + iter1MoveAnchors in the SAME commit.
  */
 
 import { ExperienceEntry } from '../../src/core/types/experience';

@@ -69,6 +69,159 @@ import { buildCorpusTelemetryRecord, persistCorpusTelemetry } from './corpusTele
 const SONNET = 'claude-sonnet-4-5-20250929';
 
 /**
+ * Stage 2.F (Model sentences + Cut-list) feature flags. Default off; flip on
+ * for the Phase 6 regen via env. Independent so each can A/B independently.
+ *
+ * - `ENABLE_REWRITE_VARIANTS=true` opts priority 1-2 ACTION annotations into
+ *   emitting `rewriteVariants` (2-3 candidate revisions per high-priority
+ *   annotation). The legacy single `rewriteExample` stays populated either
+ *   way (back-compat).
+ * - `ENABLE_CUT_LIST=true` opts the per-paragraph L5 prompt into emitting
+ *   `cutCandidates[]` (essay-level cut candidates with confidence). Only
+ *   ≥0.9-confidence candidates surface to the student; lower confidence
+ *   stays in the result for ledger/carry-forward.
+ */
+function isRewriteVariantsEnabled(): boolean {
+  return process.env.ENABLE_REWRITE_VARIANTS === 'true';
+}
+function isCutListEnabled(): boolean {
+  return process.env.ENABLE_CUT_LIST === 'true';
+}
+/**
+ * Stage 2.D (Item 8): per-annotation revisionMode toggle. When on, the LLM
+ * picks 'rewrite' vs 'ask' per priority-1-2 ACTION annotation:
+ *   - 'rewrite' → existing path (rewriteVariants populated, askPayload null)
+ *   - 'ask'     → student writes the revision (rewriteVariants null,
+ *                  askPayload populated with questions + principle + exemplars)
+ *
+ * When flag is off, all eligible annotations default to 'rewrite' — the
+ * existing student-visible behavior is preserved byte-for-byte.
+ *
+ * Pedagogical motivation: always providing the answer trains learned
+ * helplessness. 'Ask' mode lets the student build the skill instead of
+ * copying. Mutual exclusion is load-bearing — the *system* not solving the
+ * problem is what produces the learning effect.
+ */
+function isRevisionModeAskEnabled(): boolean {
+  return process.env.ENABLE_REVISION_MODE_ASK === 'true';
+}
+
+/**
+ * Stage 2.F: parse the LLM's `rewriteVariants` raw output into a typed array,
+ * dropping invalid entries and de-duplicating by angle. Returns null when the
+ * annotation is ineligible for variants (non-ACTION mode, priority 3+, flag
+ * off, or LLM emitted nothing). Returning null vs an empty array distinguishes
+ * "no variants this annotation" from "variants attempted but all dropped" —
+ * downstream readers check `=== null` for the legacy single-rewrite path.
+ */
+function parseRewriteVariants(
+  raw: unknown,
+  teachingMode: L5TeachingMode,
+  priority: number,
+): RewriteVariant[] | null {
+  if (!isRewriteVariantsEnabled()) return null;
+  if (teachingMode !== 'action') return null;
+  if (priority > 2) return null;
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+
+  const validAngles = ['tighten', 'specify', 'sharpen_voice', 'restructure'] as const;
+  const byAngle = new Map<RewriteVariant['angle'], RewriteVariant>();
+
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const r = item as Record<string, unknown>;
+
+    const rawAngle = typeof r.angle === 'string' ? r.angle : '';
+    if (!validAngles.includes(rawAngle as RewriteVariant['angle'])) continue;
+    const angle = rawAngle as RewriteVariant['angle'];
+
+    const text = typeof r.text === 'string' ? r.text.trim() : '';
+    if (text.length === 0) continue;
+
+    const rationale = typeof r.rationale === 'string' ? r.rationale.trim() : '';
+    const netWordDelta = typeof r.netWordDelta === 'number' ? Math.round(r.netWordDelta) : 0;
+
+    // First-write-wins on angle deduplication.
+    if (!byAngle.has(angle)) {
+      byAngle.set(angle, { angle, text, rationale, netWordDelta });
+    }
+  }
+
+  if (byAngle.size === 0) return null;
+  return Array.from(byAngle.values());
+}
+
+/**
+ * Stage 2.D (Item 8): resolve a per-annotation revisionMode from the raw
+ * LLM output. Returns null when the annotation is ineligible (non-ACTION,
+ * priority 3+) regardless of flag state. When the flag is OFF, eligible
+ * annotations default to 'rewrite' so student-visible behavior matches
+ * pre-feature shipping. When ON, the LLM's choice is honored; an invalid
+ * value coerces to 'rewrite' (safer default).
+ */
+function resolveRevisionMode(
+  raw: unknown,
+  teachingMode: L5TeachingMode,
+  priority: number,
+): 'rewrite' | 'ask' | null {
+  if (teachingMode !== 'action') return null;
+  if (priority > 2) return null;
+  if (!isRevisionModeAskEnabled()) return 'rewrite';
+  if (raw === 'ask') return 'ask';
+  return 'rewrite';
+}
+
+/**
+ * Stage 2.D (Item 8): parse the LLM's `askPayload` raw output into a typed
+ * shape, dropping invalid entries. Returns null when revisionMode is not
+ * 'ask' (mutual exclusion with rewriteVariants), or when the payload is
+ * missing required fields. Empty arrays for questions/exemplars OR empty
+ * principle string → drop entire payload (no usable signal).
+ */
+function parseAskPayload(
+  raw: unknown,
+  revisionMode: 'rewrite' | 'ask' | null,
+): AskPayload | null {
+  if (revisionMode !== 'ask') return null;
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+
+  const questionsRaw = Array.isArray(r.questions) ? r.questions : [];
+  const questions = questionsRaw
+    .filter((q): q is string => typeof q === 'string' && q.trim().length > 0)
+    .map((q) => q.trim());
+  if (questions.length === 0) return null;
+
+  const principle = typeof r.principle === 'string' ? r.principle.trim() : '';
+  if (principle.length === 0) return null;
+
+  const exemplarsRaw = Array.isArray(r.exemplars) ? r.exemplars : [];
+  const exemplars = exemplarsRaw
+    .filter((e): e is string => typeof e === 'string' && e.trim().length > 0)
+    .map((e) => e.trim());
+  // Exemplars optional — empty array is acceptable; principle + questions
+  // alone is a valid Socratic payload.
+
+  return { questions, principle, exemplars };
+}
+
+/**
+ * Stage 2.F: surfacing threshold for the cut-list. Only candidates with
+ * confidence ≥ this value render to the student; lower-confidence entries
+ * stay in the result for iteration-ledger telemetry.
+ */
+const CUT_LIST_SURFACE_THRESHOLD = 0.9;
+
+/**
+ * Stage 2.F: maximum surfaced cut candidates per essay per plan §0.5 D6
+ * decision. When the LLM emits more than this many ≥0.9-confidence cuts,
+ * we truncate to the top-N by confidence and log a warning — that scale of
+ * cutting belongs in a structural-review directive (Executive Brief), not
+ * inline cuts.
+ */
+const CUT_LIST_MAX_SURFACED = 5;
+
+/**
  * Phase-specific annotation GUIDANCE.
  * Soft guidance for the LLM prompt — NOT hard caps.
  * The LLM decides how many annotations each paragraph needs.
@@ -274,6 +427,129 @@ export interface L5Annotation {
    * Populated during post-processing. Diagnostic signal, not a filter.
    */
   groundingQuality?: 'grounded' | 'weakly_grounded' | 'ungrounded';
+
+  /**
+   * Top-N ranker — whether this annotation is selected for student-facing
+   * render. Set by `rankAndSurfaceAnnotations()` after dedup + cross-paragraph
+   * merge. Surfaced=false annotations stay in the result for the iteration
+   * ledger and carry-forward (Rule 2 — nothing discarded). The render layer
+   * filters by this flag.
+   *
+   * Defaults to `true` so callers that pre-date the ranker still see the full
+   * set without behavior change.
+   *
+   * Design: `docs/pipeline-evolution/04-pipeline-architecture/L5/L5_TOPN_RANKER_DESIGN.md`.
+   */
+  surfaced: boolean;
+
+  /**
+   * Stage 2.F (Model sentences): 2-3 candidate revisions for priority 1-2
+   * ACTION-mode annotations, each playing a different editorial angle. The
+   * student picks one. `rewriteExample` is kept populated as
+   * `rewriteVariants[0].text` for back-compat.
+   *
+   * Null when:
+   *   - The annotation is not ACTION mode.
+   *   - The annotation's priority is 3-5 (variants reserved for top-priority).
+   *   - The ENABLE_REWRITE_VARIANTS flag is off (variants array is null,
+   *     legacy single-rewrite path holds).
+   *   - The LLM judged a single rewrite was sufficient.
+   *   - revisionMode is 'ask' (mutual exclusion with askPayload).
+   */
+  rewriteVariants: RewriteVariant[] | null;
+
+  /**
+   * Stage 2.D (Item 8): per-annotation editorial mode for priority-1-2
+   * ACTION annotations. Two values:
+   *
+   *   - 'rewrite' — system provides the revision (rewriteVariants
+   *                  populated, askPayload null). Existing behavior.
+   *   - 'ask'     — student writes the revision (rewriteVariants null,
+   *                  askPayload populated with questions + principle +
+   *                  exemplars). Pedagogical fix for learned helplessness.
+   *
+   * Mutually exclusive with rewriteVariants and askPayload — exactly one
+   * of those is non-null when revisionMode is non-null. Null for non-
+   * ACTION modes, priority 3-5 annotations, or when the flag is off.
+   *
+   * When ENABLE_REVISION_MODE_ASK is off, all eligible annotations default
+   * to 'rewrite' so the student-visible behavior matches pre-feature
+   * shipping.
+   */
+  revisionMode: 'rewrite' | 'ask' | null;
+
+  /**
+   * Stage 2.D (Item 8): the "ask" mode payload. Populated only when
+   * revisionMode === 'ask'. Null otherwise.
+   *
+   * Contains the materials the student uses to write their OWN revision:
+   *   - questions: 2-3 questions guiding the student's revision
+   *   - principle: ≤30-word craft principle the rewrite would honor
+   *   - exemplars: 1-2 exemplar phrases (from elsewhere in this essay or
+   *                from the corpus) showing the principle in action
+   */
+  askPayload: AskPayload | null;
+}
+
+/**
+ * Stage 2.D (Item 8): the 'ask' mode payload. Provided to the student when
+ * the L5 LLM judged this annotation needs Socratic-style coaching rather
+ * than a rewrite demo. Mutually exclusive with rewriteVariants per the
+ * Stage 2 design — exactly one of them is populated when revisionMode is
+ * non-null.
+ */
+export interface AskPayload {
+  /** 2-3 questions guiding the student's own revision. */
+  questions: string[];
+  /** ≤30-word craft principle the rewrite would honor. */
+  principle: string;
+  /** 1-2 exemplar phrases (essay-internal or corpus) showing the principle. */
+  exemplars: string[];
+}
+
+/**
+ * Stage 2.F: a single candidate revision angle for a priority 1-2 ACTION
+ * annotation. Each variant stands alone — the student picks one and ships
+ * it. `angle` discriminates which editorial lever the revision pulled.
+ */
+export interface RewriteVariant {
+  /** Which editorial lever this variant pulled. */
+  angle: 'tighten' | 'specify' | 'sharpen_voice' | 'restructure';
+  /** The candidate revision text. */
+  text: string;
+  /** One-sentence rationale (≤25 words) — why this angle for this sentence. */
+  rationale: string;
+  /** Computed: revised word count − original word count (negative = tightening). */
+  netWordDelta: number;
+}
+
+/**
+ * Stage 2.F (Decisive cut-list): a single essay-level deletion candidate
+ * with confidence and rationale. Aggregated across per-paragraph L5 calls
+ * into `L5AnnotationResult.cutCandidates`. Only entries with confidence ≥
+ * `CUT_LIST_SURFACE_THRESHOLD` (0.9) render to the student; lower-confidence
+ * entries persist in the result for iteration-ledger telemetry.
+ */
+export interface CutCandidate {
+  /** Stable, locally-unique id (UUID). */
+  id: string;
+  /** Exact text to delete — must be verbatim from the essay (validator enforces). */
+  textToDelete: string;
+  /** Location anchor — where in the essay the cut sits. */
+  location: {
+    paragraphIndex: number;
+    sentenceIndex: number;
+    /** Sentence-scope = delete the whole sentence; phrase-scope = sub-sentence span. */
+    scope: 'sentence' | 'phrase';
+  };
+  /** 0-1; only ≥`CUT_LIST_SURFACE_THRESHOLD` surface to the student. */
+  confidence: number;
+  /** Why cut — ≤25 words; what the cut accomplishes. */
+  rationale: string;
+  /** Which Finding justifies this cut; null when not associated with one. */
+  pairedFindingId: string | null;
+  /** Which annotation justifies this cut; null when not associated with one. */
+  pairedAnnotationId: string | null;
 }
 
 /**
@@ -297,9 +573,30 @@ export interface L5AnnotationResult {
   /** Cross-paragraph annotations that span multiple paragraphs */
   crossParagraphAnnotations: L5Annotation[];
   phase: ImprovementPhaseLevel;
+  /** Total annotations in the result, surfaced + unsurfaced. */
   annotationCount: number;
+  /**
+   * Annotations with `surfaced=true` — the student-facing subset.
+   * Lock target: 20 ≤ surfacedCount ≤ 30 per essay.
+   * Set by `rankAndSurfaceAnnotations()`. When the pool is < 20, all
+   * annotations are surfaced and a diagnostic is logged.
+   */
+  surfacedCount: number;
   /** Density diagnostics per paragraph — signal, not a problem to fix */
   densityDiagnostics: AnnotationDensityDiagnostic[];
+
+  /**
+   * Stage 2.F (Decisive cut-list): aggregated cut candidates across all
+   * per-paragraph L5 calls. Includes both surfaced (≥0.9 confidence) and
+   * sub-threshold entries — the render layer filters by confidence.
+   *
+   * Empty when the `ENABLE_CUT_LIST` flag is off. The aggregator caps
+   * surfaced count to `CUT_LIST_MAX_SURFACED` (5) and logs a warning if
+   * the LLM emitted more — that scale of cutting belongs in a
+   * structural-review directive, not inline cuts.
+   */
+  cutCandidates: CutCandidate[];
+
   cost: number;
   tokenUsage: {
     inputTokens: number;
@@ -342,10 +639,31 @@ interface RawAnnotation {
   confidence?: number;
   crossParagraphRefs?: number[];
   capacityBuildingNote?: string | null;
+  /** Stage 2.F: candidate revisions for priority 1-2 ACTION annotations. */
+  rewriteVariants?: unknown[];
+  /** Stage 2.D (Item 8): per-annotation 'rewrite' vs 'ask' toggle. */
+  revisionMode?: string;
+  /** Stage 2.D (Item 8): the 'ask' mode payload — questions + principle + exemplars. */
+  askPayload?: unknown;
+}
+
+interface RawCutCandidate {
+  textToDelete?: string;
+  location?: {
+    paragraphIndex?: number;
+    sentenceIndex?: number;
+    scope?: string;
+  };
+  confidence?: number;
+  rationale?: string;
+  pairedFindingId?: string | null;
+  pairedAnnotationId?: string | null;
 }
 
 interface RawParagraphAnnotationOutput {
   annotations: RawAnnotation[];
+  /** Stage 2.F: per-paragraph cut-list emissions. Aggregated essay-wide. */
+  cutCandidates?: RawCutCandidate[];
 }
 
 // ============================================================================
@@ -539,6 +857,34 @@ class DeepAnnotationService {
       additionalShared.push(`\n=== CONTRADICTION FLAGS ===\n${contradictionFlags.join('\n')}`);
     }
 
+    // Stage 2.B (Coherence-Resolution): inject L4's terminal-state resolutions
+    // so L5 can respect `suppressedSignals` and surface `framed` contradictions
+    // with their framing reasoning rather than raw. Both surfaces carry the
+    // same array (stamped by the crystallizer); read either.
+    const coherenceResolutions =
+      profile.northStar?.coherenceResolutions ??
+      profile.scoreMatrix?.coherenceResolutions ??
+      [];
+    if (coherenceResolutions.length > 0) {
+      const resolutionLines = coherenceResolutions.map((r) => {
+        const suppressed = r.suppressedSignals.length > 0
+          ? ` | SUPPRESS: ${r.suppressedSignals.join(', ')}`
+          : '';
+        const surface = r.surfaceSignals.length > 0
+          ? ` | surface: ${r.surfaceSignals.join(', ')}`
+          : '';
+        return `  • [${r.state.toUpperCase()}] ${r.contradictionId} — ${r.reasoning}${surface}${suppressed}`;
+      });
+      additionalShared.push(
+        `\n=== COHERENCE RESOLUTIONS (from L4) ===\n` +
+          `For every contradiction L4 surfaced, it assigned a terminal state. Respect them:\n` +
+          `- RESOLVED: do NOT surface the SUPPRESS signals listed below in any annotation.\n` +
+          `- FRAMED: if you surface either side, include the resolution's reasoning as framing — never raw.\n` +
+          `- ESCALATED: surface as an AWARENESS annotation naming the decision the student must make.\n\n` +
+          resolutionLines.join('\n'),
+      );
+    }
+
     // Wave-3a Phase 3C: corpus-anchored craft moves — injected once into the
     // shared-context block so each paragraph's annotation call inherits the
     // same growth-target vocabulary. Retrieval keyed on the full essay text
@@ -595,6 +941,8 @@ class DeepAnnotationService {
 
     // ── Accumulate results ──
     const paragraphAnnotations: ParagraphAnnotations[] = [];
+    // Stage 2.F: per-paragraph cut-list emissions aggregated essay-wide.
+    const rawCutCandidates: CutCandidate[] = [];
     let totalCost = 0;
     const totalTokenUsage = {
       inputTokens: 0,
@@ -613,6 +961,7 @@ class DeepAnnotationService {
       const result = paragraphResults[i];
       if (result.status === 'fulfilled') {
         paragraphAnnotations.push(result.value.paragraphAnnotations);
+        rawCutCandidates.push(...result.value.cutCandidates);
         totalCost += result.value.cost;
         totalTokenUsage.inputTokens += result.value.tokenUsage.inputTokens;
         totalTokenUsage.outputTokens += result.value.tokenUsage.outputTokens;
@@ -786,6 +1135,14 @@ class DeepAnnotationService {
       0,
     ) + allAnnotations.essayLevelAnnotations.length + crossParagraphAnnotations.length;
 
+    // ── Top-N ranker — surface 20-30 from the full pool. ──
+    // Mutates `surfaced` in place; nothing is deleted (Rule 2).
+    const { surfacedCount } = rankAndSurfaceAnnotations(
+      allAnnotations.paragraphAnnotations,
+      allAnnotations.essayLevelAnnotations,
+      crossParagraphAnnotations,
+    );
+
     // Port G2 — Focus Mode. When ENABLE_FOCUS_MODE is set, rank active
     // candidates by ROI and mark all but the top-N with `visible = false`.
     // Full emission stays in the store (Rule 2 — nothing discarded); only
@@ -832,13 +1189,41 @@ class DeepAnnotationService {
       void persistCorpusTelemetry(record);
     }
 
+    // ── Stage 2.F: aggregate + truncate cut-list ──
+    // Sort by confidence desc so the top-N-by-confidence truncation surfaces
+    // the highest-confidence cuts. Per plan §0.5 D6: warn + truncate to
+    // CUT_LIST_MAX_SURFACED when the surfaced count would exceed it. Lower-
+    // confidence entries stay in the result for iteration-ledger telemetry.
+    const sortedCuts = [...rawCutCandidates].sort((a, b) => b.confidence - a.confidence);
+    const surfacedCuts = sortedCuts.filter((c) => c.confidence >= CUT_LIST_SURFACE_THRESHOLD);
+    let finalCutCandidates = sortedCuts;
+    if (surfacedCuts.length > CUT_LIST_MAX_SURFACED) {
+      console.warn(
+        `[L5] cut-list emitted ${surfacedCuts.length} ≥${CUT_LIST_SURFACE_THRESHOLD}-confidence candidates ` +
+          `(exceeds CUT_LIST_MAX_SURFACED=${CUT_LIST_MAX_SURFACED}). Truncating to top ${CUT_LIST_MAX_SURFACED} by confidence — ` +
+          `this scale of cutting belongs in a structural-review directive (Executive Brief), not inline cuts.`,
+      );
+      const trimmedSurfaced = surfacedCuts.slice(0, CUT_LIST_MAX_SURFACED);
+      const subThreshold = sortedCuts.filter((c) => c.confidence < CUT_LIST_SURFACE_THRESHOLD);
+      finalCutCandidates = [...trimmedSurfaced, ...subThreshold];
+    }
+    if (isCutListEnabled()) {
+      console.log(
+        `[L5] cutCandidates: total=${finalCutCandidates.length} ` +
+          `surfaced=${Math.min(surfacedCuts.length, CUT_LIST_MAX_SURFACED)} ` +
+          `sub_threshold=${sortedCuts.length - surfacedCuts.length}`,
+      );
+    }
+
     return {
       paragraphAnnotations: allAnnotations.paragraphAnnotations,
       essayLevelAnnotations: allAnnotations.essayLevelAnnotations,
       crossParagraphAnnotations,
       phase: phase.level,
       annotationCount,
+      surfacedCount,
       densityDiagnostics,
+      cutCandidates: finalCutCandidates,
       cost: totalCost,
       tokenUsage: totalTokenUsage,
       timingMs: Date.now() - startTime,
@@ -906,6 +1291,90 @@ says the essay rewards attention to vocabulary domain shifts, annotations
 about voice register and word choice carry more weight than generic
 structural observations. The reading strategy tells you what makes THIS
 essay tick — let your annotations match.
+`
+      : '';
+
+    // Stage 2.F: Model sentence variants — only inject directive when the
+    // feature flag is on. Off-state keeps the prompt byte-identical to
+    // pre-feature so the cached system-prompt prefix stays warm for
+    // unrolled-out essays.
+    const rewriteVariantsDirective = isRewriteVariantsEnabled()
+      ? `MODEL SENTENCE VARIANTS (Stage 2.F):
+For ACTION-mode annotations with priority 1 or 2, emit a \`rewriteVariants\` array with 2 or 3 entries. Each variant plays a different editorial angle:
+- \`tighten\`: cut words without losing meaning; preserve voice + claim.
+- \`specify\`: replace abstract phrases with concrete sensory or factual detail FROM ELSEWHERE IN THE ESSAY (do not invent). Use the fabrication-guard self-audit on every variant.
+- \`sharpen_voice\`: rewrite to make the writer's distinctive voice more present; preserve content.
+- \`restructure\`: change the sentence's syntactic shape (subordination, fronting, parallelism) for emphasis; preserve content.
+
+You do not need to use all 4 angles — pick the 2-3 most useful for THIS sentence. Each variant must stand alone. Variants must use DISTINCT angles — three "tighten" variants are not three variants, they're one variant emitted three times.
+
+The legacy \`rewriteExample\` field stays populated as the FIRST variant's text (back-compat). For priority 3-5 annotations, emit \`rewriteVariants: null\` and use \`rewriteExample\` alone.
+
+Per-variant schema:
+  { "angle": "tighten"|"specify"|"sharpen_voice"|"restructure", "text": "...", "rationale": "≤25 words — why this angle for this sentence", "netWordDelta": <revised_words − original_words> }
+
+Variant length budget: ≤80 words each. Variant array cap: 2 priority-1-2 ACTION annotations per paragraph emit variants; further ACTION annotations in the same paragraph use the single \`rewriteExample\` path.
+
+`
+      : '';
+
+    // Stage 2.D (Item 8): 'rewrite' vs 'ask' per-annotation toggle. Only
+    // inject directive when flag is on. Off-state preserves byte-identical
+    // pre-feature behavior (eligible annotations default to 'rewrite').
+    const revisionModeDirective = isRevisionModeAskEnabled()
+      ? `REVISION MODE TOGGLE (Stage 2.D):
+For each ACTION-mode annotation with priority 1 or 2, you must additionally pick a \`revisionMode\`. The pedagogy is load-bearing — "always providing the answer" trains learned helplessness. Some annotations are better served by inviting the student to write the revision themselves.
+
+Two values, MUTUALLY EXCLUSIVE with the rewriteVariants path:
+
+- \`"revisionMode": "rewrite"\` — system demonstrates. Emit \`rewriteVariants\` per the MODEL SENTENCE VARIANTS contract above. Set \`askPayload: null\`.
+
+- \`"revisionMode": "ask"\` — student writes the revision. Set \`rewriteVariants: null\`. Emit an \`askPayload\` object with:
+    { "questions": ["2-3 questions that guide the student to discover the fix themselves"], "principle": "≤30-word craft principle the rewrite would honor", "exemplars": ["1-2 short phrases (essay-internal OR corpus) that show the principle in action — verbatim quotes"] }
+
+PICKING THE MODE — heuristic, not rule:
+- Use \`"ask"\` when the student likely has the skill but hasn't applied it here. A question can unlock the revision; a demo would short-circuit learning.
+- Use \`"ask"\` when the rewrite would be highly stylistic and the student's voice should drive it.
+- Use \`"rewrite"\` when the student lacks the craft vocabulary to find the fix on their own (e.g., they don't yet know what "fronting a subordinate clause for emphasis" looks like).
+- Use \`"rewrite"\` for time-sensitive fixes (final-polish phase) where demonstration is faster than discovery.
+
+Distribution sanity (post-emission self-check): if you emitted only "rewrite" across the whole essay, you may have under-used "ask". If you emitted only "ask", the student is probably not yet equipped to revise — bias toward "rewrite".
+
+`
+      : '';
+
+    // Stage 2.F: Decisive cut-list — only inject directive when the feature
+    // flag is on. Cut candidates are gathered per-paragraph and aggregated
+    // essay-wide in the result envelope.
+    const cutListDirective = isCutListEnabled()
+      ? `DECISIVE CUT-LIST (Stage 2.F — separate from annotations):
+Scan THIS paragraph's text for sentences or sub-sentence phrases that should be CUT decisively (not just revised). Emit each candidate to the \`cutCandidates\` field at the top level of your JSON response (sibling to \`annotations\`).
+
+Per-candidate schema:
+  {
+    "textToDelete": "EXACT verbatim text from the paragraph — the post-call validator rejects any candidate whose textToDelete is not found in the paragraph verbatim",
+    "location": { "paragraphIndex": <P index>, "sentenceIndex": <S index>, "scope": "sentence"|"phrase" },
+    "confidence": <0.0-1.0> — only emit if ≥0.7; only entries ≥${CUT_LIST_SURFACE_THRESHOLD} will surface to the student,
+    "rationale": "≤25 words — what the cut accomplishes",
+    "pairedFindingId": "<[F#] reference if associated with a finding>"|null,
+    "pairedAnnotationId": null  // post-set if associated with an annotation in this paragraph
+  }
+
+Cut-list entries must be GENUINE deletions — the essay reads BETTER with the text gone. If you're unsure, set confidence <${CUT_LIST_SURFACE_THRESHOLD} and let it sit below the surfacing threshold.
+
+Avoid cutting:
+- Sentences carrying load-bearing thesis claims.
+- Sentences introducing specific narrative pivots.
+- Voice signatures the writer has earned (idiomatic phrasings, distinctive sentence shapes).
+
+Bias toward cutting:
+- Telling-not-showing summaries that the next sentence already enacts.
+- Stage-direction throat-clears ("I want to talk about...", "It is important to note...").
+- Filler transitions that don't advance the arc.
+- Redundant claims (the second time the writer says the same thing).
+
+When this paragraph has nothing worth cutting at ≥0.7 confidence, emit \`cutCandidates: []\`. Conservative is fine — over-cutting is worse than under-cutting.
+
 `
       : '';
 
@@ -1038,7 +1507,15 @@ Every annotation's northStarConnection must reference THIS essay's specific arch
 CROSS-PARAGRAPH AWARENESS:
 If an annotation's teaching point involves another paragraph, populate crossParagraphRefs with the other paragraph indices. The annotation still anchors to one primary location, but the reader can see the connection.
 
-ANNOTATION STRUCTURE (JSON):
+COHERENCE RESOLUTIONS (Stage 2.B — when present in shared context):
+The shared context may include a "COHERENCE RESOLUTIONS" block listing terminal-state outcomes L4 assigned to every detected contradiction. Respect them:
+- RESOLVED entries: DO NOT emit any annotation that surfaces a signal listed in that resolution's SUPPRESS list. The losing side of a resolved contradiction is invisible to the student by design.
+- FRAMED entries: if your annotation would surface either side of a framed contradiction, include the resolution's reasoning as the annotation's framing — never present one side raw. The reader needs to see the both/and, not a flat assertion.
+- ESCALATED entries: surface as AWARENESS-mode annotations that name the decision the student must make. Do not pre-commit the choice for them.
+
+When in doubt about whether an annotation crosses a SUPPRESS signal, prefer not to surface it. Suppressed signals exist because L4 judged their evidence insufficient — re-surfacing them undoes the resolution.
+
+${rewriteVariantsDirective}${revisionModeDirective}${cutListDirective}ANNOTATION STRUCTURE (JSON):
 {
   "annotations": [
     {
@@ -1059,9 +1536,30 @@ ANNOTATION STRUCTURE (JSON):
       "antiPatternExample": "Exact 5-12 word quoted phrase that IS the problem. Null for strength/structural.",
       "confidence": 0.85,
       "crossParagraphRefs": [3, 4],
-      "capacityBuildingNote": "In future writing, watch for moments where you claim an emotion instead of letting the reader feel it through detail."
+      "capacityBuildingNote": "In future writing, watch for moments where you claim an emotion instead of letting the reader feel it through detail."${
+        isRewriteVariantsEnabled()
+          ? `,
+      "rewriteVariants": [
+        { "angle": "tighten", "text": "Three-sentence revised version.", "rationale": "≤25 words.", "netWordDelta": -8 },
+        { "angle": "specify", "text": "Three-sentence revised version with concrete detail from elsewhere in essay.", "rationale": "≤25 words.", "netWordDelta": 2 }
+      ]`
+          : ''
+      }${
+        isRevisionModeAskEnabled()
+          ? `,
+      "revisionMode": "rewrite" | "ask"  // mutually exclusive with the askPayload/rewriteVariants pairing
+      "askPayload": null | { "questions": ["Q1", "Q2"], "principle": "≤30-word craft principle", "exemplars": ["short verbatim phrase"] }`
+          : ''
+      }
     }
-  ]
+  ]${
+    isCutListEnabled()
+      ? `,
+  "cutCandidates": [
+    { "textToDelete": "verbatim sentence or phrase from THIS paragraph", "location": { "paragraphIndex": 2, "sentenceIndex": 4, "scope": "sentence" }, "confidence": 0.92, "rationale": "≤25 words", "pairedFindingId": "[F3]", "pairedAnnotationId": null }
+  ]`
+      : ''
+  }
 }
 
 Note: transferablePrinciple is populated POST-CALL by a deterministic technique matcher. Do NOT emit it in your output — it will be overwritten.
@@ -1071,7 +1569,7 @@ QUALITY BAR:
 - Every annotation must pass the teaching test.
 - At least 25% of annotations should be strength type.
 
-OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanation text.
+OUTPUT: JSON object with "annotations" array${isCutListEnabled() ? ' + "cutCandidates" array' : ''}. No markdown wrapping, no explanation text.
 
 ${buildFabricationGuardBlock()}`;
   }
@@ -1791,6 +2289,8 @@ ${buildFabricationGuardBlock()}`;
     paragraphRelevantContext?: string,
   ): Promise<{
     paragraphAnnotations: ParagraphAnnotations;
+    /** Stage 2.F: cut candidates the LLM emitted for THIS paragraph. */
+    cutCandidates: CutCandidate[];
     cost: number;
     tokenUsage: {
       inputTokens: number;
@@ -1803,6 +2303,7 @@ ${buildFabricationGuardBlock()}`;
     if (para.walkSkipped) {
       return {
         paragraphAnnotations: { paragraphIndex: para.index, annotations: [] },
+        cutCandidates: [],
         cost: 0,
         tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
       };
@@ -1828,20 +2329,25 @@ ${buildFabricationGuardBlock()}`;
       enrichment, // Scope 1 GAP-6/7/8
     );
 
-    // 3-block caching: system (cached) + shared digest (cached) + paragraph context (not cached)
-    // Block 2 is the COMPACT shared digest (~1800 tokens for L5) instead of the full profile dump.
-    // Paragraph-relevant holistic data is injected between the shared context and the paragraph prompt,
-    // filtered by the AnalysisContextBuilder to only include dimensions relevant to THIS paragraph.
+    // C5 (2026-05-04): 3-block caching now actually wired (system + shared
+    // digest + per-paragraph tail). The comment block here promised this
+    // since the layer was built but only system caching was hooked up —
+    // each L5 call paid full input cost on `sharedContext`. With the
+    // user-prompt cache breakpoint after sharedContext, paragraph 1 writes
+    // the cache (1.25× on ~1800 tokens) and paragraphs 2..N read it (0.1×).
+    // Estimated savings: ~$0.05-0.10 per essay × N annotations when L5 is on.
     const relevantSection = paragraphRelevantContext
       ? `${paragraphRelevantContext}\n\n`
       : '';
-    const userMessage = `${sharedContext}\n\n===\n\n${relevantSection}TARGET PARAGRAPH ANNOTATION REQUEST:\n\n${paragraphPrompt}`;
 
     const response: ClaudeResponse<RawParagraphAnnotationOutput> = await callClaudeWithRetry<RawParagraphAnnotationOutput>(
       {
         model: SONNET,
         systemPrompt,
-        userPrompt: userMessage,
+        userPromptBlocks: [
+          { text: `${sharedContext}\n\n===\n\n`, cacheBreakpoint: true },
+          { text: `${relevantSection}TARGET PARAGRAPH ANNOTATION REQUEST:\n\n${paragraphPrompt}` },
+        ],
         maxTokens: 2000,
         temperature: 0.3,
         useJsonMode: true,
@@ -1858,11 +2364,23 @@ ${buildFabricationGuardBlock()}`;
     const rawOutput = this.parseRawOutput(response.content, para.index);
     const validAnnotations = this.validateAnnotations(rawOutput, para, phase, profile.paragraphs.length);
 
+    // ── Stage 2.F: parse + validate cutCandidates (flag-gated) ──
+    // The parser tolerates missing field (flag-off paragraphs return []);
+    // validateCutCandidates additionally rejects anything not verbatim in the
+    // paragraph text. Result is per-paragraph; aggregation happens in
+    // generateAnnotations across paragraphs.
+    let cutCandidates: CutCandidate[] = [];
+    if (isCutListEnabled()) {
+      const rawCutsContainer = response.content as RawParagraphAnnotationOutput | undefined;
+      cutCandidates = this.validateCutCandidates(rawCutsContainer?.cutCandidates, para);
+    }
+
     return {
       paragraphAnnotations: {
         paragraphIndex: para.index,
         annotations: validAnnotations,
       },
+      cutCandidates,
       cost,
       tokenUsage: {
         inputTokens: response.usage.input_tokens,
@@ -2077,6 +2595,137 @@ ${buildFabricationGuardBlock()}`;
         capacityBuildingNote: (raw.capacityBuildingNote && typeof raw.capacityBuildingNote === 'string')
           ? raw.capacityBuildingNote.trim()
           : null,
+        // Top-N ranker default: every annotation is surfaced until the
+        // ranker decides otherwise. `rankAndSurfaceAnnotations()` flips
+        // beyond-Top-N entries to false after dedup + cross-paragraph merge.
+        surfaced: true,
+        // Stage 2.F: model sentence variants — populated only for priority 1-2
+        // ACTION annotations when the flag is on and the LLM emitted distinct
+        // angles. Validator drops any variant whose `angle` is unrecognized
+        // and de-duplicates by angle so the array carries at most one entry
+        // per angle.
+        //
+        // Stage 2.D (Item 8): rewriteVariants and askPayload are MUTUALLY
+        // EXCLUSIVE — when revisionMode='ask', rewriteVariants is null and
+        // askPayload is non-null. resolveRevisionMode + parseAskPayload below
+        // enforce the dichotomy; this line is overridden in the post-push
+        // mutual-exclusion pass to keep the data invariant.
+        rewriteVariants: parseRewriteVariants(raw.rewriteVariants, teachingMode, raw.priority ?? 3),
+        // Stage 2.D (Item 8): revisionMode + askPayload. resolveRevisionMode
+        // returns null for ineligible annotations regardless of flag; when
+        // the flag is off, eligible annotations default to 'rewrite' so
+        // pre-feature behavior is preserved.
+        revisionMode: resolveRevisionMode(raw.revisionMode, teachingMode, raw.priority ?? 3),
+        askPayload: null, // set below alongside mutual-exclusion enforcement
+      });
+
+      // Stage 2.D (Item 8): mutual-exclusion enforcement. When the LLM picked
+      // revisionMode='ask', parse askPayload AND clear rewriteVariants. When
+      // 'rewrite' (or null for ineligible), askPayload stays null. If the
+      // LLM emitted both populated by accident, the schema invariant wins
+      // and rewriteVariants is the canonical demo path.
+      const built = valid[valid.length - 1];
+      if (built.revisionMode === 'ask') {
+        const parsedAsk = parseAskPayload(raw.askPayload, built.revisionMode);
+        if (parsedAsk !== null) {
+          built.askPayload = parsedAsk;
+          built.rewriteVariants = null; // mutual exclusion
+        } else {
+          // LLM picked 'ask' but emitted no usable payload — fall back to
+          // 'rewrite' rather than ship a broken ask. Diagnostic only;
+          // rewriteVariants stays as parsed above (possibly null if the
+          // LLM didn't emit those either, in which case the annotation
+          // surfaces as a CONSEQUENCE-shaped ACTION which the ranker can
+          // de-prioritize).
+          console.warn(
+            `[L5 validateAnnotations] revisionMode='ask' with no usable askPayload at ` +
+              `P${built.location.paragraphIndex}S${built.location.sentenceIndex ?? '?'}; ` +
+              `falling back to 'rewrite'.`,
+          );
+          built.revisionMode = 'rewrite';
+          built.askPayload = null;
+        }
+      }
+    }
+
+    return valid;
+  }
+
+  /**
+   * Stage 2.F: validate per-paragraph cutCandidates raw emissions against the
+   * paragraph text. Drops any candidate whose `textToDelete` is not verbatim
+   * in the paragraph (anti-fabrication code-side guard — the prompt-side
+   * fabricationGuard self-audit covers numbers, not arbitrary phrasing).
+   * Returns the validated set with stable UUID ids.
+   */
+  private validateCutCandidates(
+    rawCandidates: RawCutCandidate[] | undefined,
+    para: Readonly<ParagraphProfile>,
+  ): CutCandidate[] {
+    if (!Array.isArray(rawCandidates) || rawCandidates.length === 0) return [];
+
+    const validScopes = ['sentence', 'phrase'] as const;
+    const valid: CutCandidate[] = [];
+
+    for (const raw of rawCandidates) {
+      const textToDelete =
+        typeof raw.textToDelete === 'string' ? raw.textToDelete.trim() : '';
+      if (textToDelete.length === 0) continue;
+
+      // Anti-fabrication: must be verbatim in the paragraph. Try exact, then
+      // case-insensitive (mirrors the spanText match in validateAnnotations).
+      let verified: string | null = null;
+      if (para.text.includes(textToDelete)) {
+        verified = textToDelete;
+      } else {
+        const lowerPara = para.text.toLowerCase();
+        const lowerCut = textToDelete.toLowerCase();
+        if (lowerPara.includes(lowerCut)) {
+          const idx = lowerPara.indexOf(lowerCut);
+          verified = para.text.substring(idx, idx + textToDelete.length);
+        }
+      }
+      if (verified === null) {
+        console.warn(
+          `[L5 validateCutCandidates] Dropped cut candidate — textToDelete not in P${para.index}: ` +
+            `"${textToDelete.slice(0, 80)}..."`,
+        );
+        continue;
+      }
+
+      const confidence =
+        typeof raw.confidence === 'number'
+          ? Math.max(0, Math.min(1, raw.confidence))
+          : 0;
+      if (confidence === 0) continue; // No confidence signal → drop.
+
+      const rationale = typeof raw.rationale === 'string' ? raw.rationale.trim() : '';
+      if (rationale.length === 0) continue; // No rationale → drop.
+
+      const rawScope = raw.location?.scope;
+      const scope: 'sentence' | 'phrase' = validScopes.includes(rawScope as typeof validScopes[number])
+        ? (rawScope as 'sentence' | 'phrase')
+        : 'phrase';
+
+      const paragraphIndex =
+        typeof raw.location?.paragraphIndex === 'number' ? raw.location.paragraphIndex : para.index;
+      const sentenceIndex =
+        typeof raw.location?.sentenceIndex === 'number' ? raw.location.sentenceIndex : 0;
+
+      valid.push({
+        id: crypto.randomUUID(),
+        textToDelete: verified,
+        location: { paragraphIndex, sentenceIndex, scope },
+        confidence,
+        rationale,
+        pairedFindingId:
+          typeof raw.pairedFindingId === 'string' && raw.pairedFindingId.trim().length > 0
+            ? raw.pairedFindingId.trim()
+            : null,
+        pairedAnnotationId:
+          typeof raw.pairedAnnotationId === 'string' && raw.pairedAnnotationId.trim().length > 0
+            ? raw.pairedAnnotationId.trim()
+            : null,
       });
     }
 
@@ -2329,6 +2978,127 @@ Output JSON: { "annotations": [...] }`;
   private getEssayText(profile: Readonly<EssayProfile>): string {
     return profile.paragraphs.map((p) => p.text).join('\n\n');
   }
+}
+
+// ============================================================================
+// TOP-N RANKER — surfaces a curated 20–30 from the full annotation pool
+// ============================================================================
+
+/**
+ * Lock targets per `CURRENT_STATE.md` L5 + `b32534b` (2026-05-12).
+ * Window for student-facing surfaced annotations.
+ */
+export const L5_SURFACED_TARGET = { min: 20, max: 30 } as const;
+
+/** Number of distinct teachingModes the diversity floor tries to cover. */
+const L5_TEACHING_MODE_DIVERSITY_FLOOR = 3;
+
+/**
+ * Rank the full annotation pool (paragraph + essay-level + cross-paragraph)
+ * and mark a curated 20–30 with `surfaced=true`. Everything else stays in the
+ * result with `surfaced=false` — Rule 2 (nothing discarded). Idempotent.
+ *
+ * Selection (deterministic, no LLM call):
+ *   1. Sort the combined pool by `priority` asc (LLM-judged, 1=highest), then
+ *      by `confidence` desc as a tiebreak.
+ *   2. Floor pass 1 — per-paragraph ACTION coverage. For each paragraph that
+ *      has any ACTION-mode annotation with `rewriteExample` in the pool, mark
+ *      its top-priority such annotation as required.
+ *   3. Floor pass 2 — teachingMode diversity. If the required set covers
+ *      fewer than 3 distinct teachingModes and the pool has more, add the
+ *      top-priority annotation of each missing mode, capping at 3 modes.
+ *   4. Fill pass. Greedy in sorted order, append until 30 are surfaced or the
+ *      pool is exhausted.
+ *   5. Floor target. If the surfaced set < 20, surface everything (the LLM
+ *      under-emitted; hiding good annotations is worse than over-surfacing).
+ *
+ * Design: `docs/pipeline-evolution/04-pipeline-architecture/L5/L5_TOPN_RANKER_DESIGN.md`.
+ */
+export function rankAndSurfaceAnnotations(
+  paragraphAnnotations: ParagraphAnnotations[],
+  essayLevelAnnotations: L5Annotation[],
+  crossParagraphAnnotations: L5Annotation[],
+): { surfacedCount: number; totalCount: number } {
+  const pool: L5Annotation[] = [
+    ...paragraphAnnotations.flatMap((pa) => pa.annotations),
+    ...essayLevelAnnotations,
+    ...crossParagraphAnnotations,
+  ];
+
+  // Reset: idempotent if the ranker is re-run after an upstream mutation.
+  for (const a of pool) a.surfaced = false;
+
+  if (pool.length === 0) {
+    return { surfacedCount: 0, totalCount: 0 };
+  }
+
+  // Stable sort: priority asc, confidence desc.
+  const sorted = pool
+    .map((a, i) => ({ a, i })) // preserve original order for ties beyond confidence
+    .sort((x, y) => {
+      const dp = x.a.priority - y.a.priority;
+      if (dp !== 0) return dp;
+      const dc = (y.a.confidence ?? 0) - (x.a.confidence ?? 0);
+      if (dc !== 0) return dc;
+      return x.i - y.i;
+    })
+    .map((w) => w.a);
+
+  // ── Floor pass 1: per-paragraph ACTION+rewrite coverage. ──
+  const required = new Set<L5Annotation>();
+  const seenParagraphAction = new Set<number>();
+  for (const a of sorted) {
+    if (a.teachingMode !== 'action') continue;
+    if (!a.rewriteExample) continue;
+    const p = a.location.paragraphIndex;
+    if (seenParagraphAction.has(p)) continue;
+    seenParagraphAction.add(p);
+    required.add(a);
+  }
+
+  // ── Floor pass 2: teachingMode diversity (≥3 of 4). ──
+  const modesPresent = new Set<L5TeachingMode>();
+  for (const a of required) modesPresent.add(a.teachingMode);
+
+  if (modesPresent.size < L5_TEACHING_MODE_DIVERSITY_FLOOR) {
+    for (const a of sorted) {
+      if (modesPresent.size >= L5_TEACHING_MODE_DIVERSITY_FLOOR) break;
+      if (modesPresent.has(a.teachingMode)) continue;
+      // Only promote if the mode actually exists in the pool.
+      required.add(a);
+      modesPresent.add(a.teachingMode);
+    }
+  }
+
+  // ── Fill pass: greedy by sort order up to max. ──
+  const surfaced = new Set<L5Annotation>(required);
+  for (const a of sorted) {
+    if (surfaced.size >= L5_SURFACED_TARGET.max) break;
+    surfaced.add(a);
+  }
+
+  // ── Floor target: if under min, surface everything. ──
+  if (surfaced.size < L5_SURFACED_TARGET.min) {
+    for (const a of sorted) surfaced.add(a);
+  }
+
+  for (const a of surfaced) a.surfaced = true;
+
+  const surfacedCount = surfaced.size;
+  const totalCount = pool.length;
+
+  // Diagnostic — only fire when out of band on essays large enough to expect
+  // a full pool. Phase 6 verification regen reads this signal.
+  if (surfacedCount < L5_SURFACED_TARGET.min || surfacedCount > L5_SURFACED_TARGET.max) {
+    console.log(
+      `[L5/ranker] surfaced=${surfacedCount} pool=${totalCount} — outside target band ` +
+        `[${L5_SURFACED_TARGET.min}, ${L5_SURFACED_TARGET.max}]; ` +
+        `modes=${Array.from(modesPresent).join(',') || '∅'}; ` +
+        `required(action+rewrite+diversity)=${required.size}.`,
+    );
+  }
+
+  return { surfacedCount, totalCount };
 }
 
 // ============================================================================

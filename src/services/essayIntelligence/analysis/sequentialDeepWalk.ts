@@ -45,6 +45,9 @@ import type {
   FindingCoachingValue,
   FindingEvidence,
   HolisticDimension,
+  SpecificsNeedEmission,
+  ConceptLibraryEntry,
+  EssayGapCandidate,
 } from '../profileTypes';
 
 import type { StructuralCartography } from '../types';
@@ -96,14 +99,22 @@ const WALK_TEMPERATURE = 0.3;
  * Freed budget goes to richer findings.
  */
 // Tightened from 4096/8192/3500 as part of observation economy optimization.
-// The OBSERVATION ECONOMY prompt guidance (30-50 total observations for 7 paragraphs)
-// means each paragraph produces 4-10 observations instead of 15-20. This naturally
-// reduces output volume, so we can safely lower the token budgets.
-const WALK_BASE_MAX_TOKENS = 2500;
+// Option 5 rebuild (2026-05-03): further tightened to 1800/4000/1500 since
+// Option 5 removed the SPECIFICS-NEED EMISSION output bloat (~150 lines of
+// schema description + emission shape was producing 500-800 output tokens
+// per paragraph). The remaining schema (paragraphUnderstanding,
+// sentenceUnderstandings, holisticEvolution, priorSentenceUpdates,
+// newConnections, newFindings, findingEvolutions, gapCandidates) lands at
+// 1500-2200 typical output for 1-4 sentence paragraphs. The CAP at 4000
+// preserves headroom for dense paragraphs (5+ sentences) so jsonrepair
+// doesn't trip on truncation. Finding budget reduced to 1500 since
+// observation economy + emission removal both reduced finding-output
+// pressure.
+const WALK_BASE_MAX_TOKENS = 1800;
 const WALK_MAX_TOKENS_CAP = 5000;
 const WALK_TIMEOUT_MS = 180_000;
 /** Finding budget: space for paragraph understanding + 1-3 findings + metadata */
-const WALK_FINDING_BUDGET = 2000;
+const WALK_FINDING_BUDGET = 1500;
 
 /**
  * Compute max tokens for a paragraph's walk call based on sentence count.
@@ -184,6 +195,12 @@ function buildSystemPrompt(): string {
 }
 
 const SYSTEM_PROMPT_TEMPLATE = `You are a Literature PhD who has read 10,000 college application essays and can articulate what a casual reader feels but cannot name. You read like an expert: you notice not just WHAT techniques appear, but what their presence REVEALS about the essay's architecture of meaning. Your task is to deeply UNDERSTAND one paragraph at a time, building compound understanding across the essay.
+
+=== BREVITY DISCIPLINE + JSON CLEANLINESS (read before producing output) ===
+
+Total output should land at ~1500-2500 tokens per paragraph. The schema has many fields; each gets a tight one- or two-sentence value, not a paragraph. Architecture-level depth (the THIRD level explained below) is achieved through PRECISION, not VOLUME — one well-chosen sentence beats three vague ones.
+
+JSON CLEANLINESS — produce well-formed JSON the first time. The schema below uses placeholder notation (e.g., "<one sentence about X>") for guidance — replace each placeholder with your actual content. Do NOT include the placeholder description text in your output. Verify before returning: every brace balanced, every string properly quoted, every array properly closed. The system runs jsonrepair as a safety net but malformed output is friction we want to avoid.
 
 === YOUR SOLE JOB: UNDERSTANDING (NOT EVALUATION) ===
 
@@ -302,20 +319,36 @@ Also discover connections the scout missed — structural parallels, image recur
 
 === FINDINGS (MANDATORY — EVERY PARAGRAPH PRODUCES FINDINGS) ===
 
-Every paragraph MUST produce at least one finding. Findings are the PRIMARY unit of understanding — referenceable, growable, evidence-grounded.
+**Findings are NOT observations.** OBSERVATION ECONOMY (above) governs sentence-level observations. Findings are different — they are paragraph-level CLAIMS the system can REFERENCE later. Findings produce themselves on every paragraph, including polished ones, because every paragraph's purpose IS a finding.
+
+Every paragraph MUST produce at least one finding. **No exceptions.** Polished essays produce findings about WHAT IS WORKING — that is descriptive, not evaluative, and not banned by FORBIDDEN VOCABULARY. The finding describes the paragraph's structural CONTRIBUTION, not whether the contribution is "strong."
 
 CALIBRATION BY PARAGRAPH SIGNIFICANCE:
 - TRANSITIONAL paragraph: 1 finding about its structural function (what it bridges, sets up).
 - CONTRIBUTING paragraph: 2-3 findings about what it contributes to the essay's architecture.
 - PIVOTAL paragraph: 3-5 findings about the architectural insights, tensions, or patterns it reveals.
 
-Every paragraph serves a purpose — that purpose IS a finding.
+WORKED EXAMPLE — what a finding LOOKS LIKE:
+
+For Crochet's P3 (the Vietnam War + grandmother + crochet origin paragraph):
+- Finding 1 (claim): "P3 compresses three generations of family history into a single paragraph through one architectural move: each sentence carries a load-bearing biographical specific (Vietnam War / 13-year imprisonment / matriarch + literature professor / yarn scarcity → practical objects / chrysanthemums-and-roses pivot)."
+  - dimensions: ["narrative", "character", "structure"]
+  - maturity: "confirmed"
+  - evidence: quoted text from each escalation point
+  - coachingValue: "critical"
+- Finding 2 (claim): "The paragraph closes by transitioning from grandmother's wartime-driven practical crochet to writer's leisure-driven flower crochet — the family-history compression is in service of the generational pivot the essay's central tension hinges on."
+  - dimensions: ["theme", "narrative"]
+  - maturity: "developing"
+
+Both findings describe WHAT IS happening structurally. Neither uses banned evaluative vocabulary. Both are REFERENCEABLE — downstream layers can cite "F1" and reason about the family-history compression as a structural unit. **This is the bar.** Polished paragraphs produce findings of this shape.
 
 MATURITY: assess honestly. A first sighting is 'hypothesis'. If confirmed by multiple evidence locations, 'developing' or 'confirmed'. If it reveals something deeper, 'deepened'.
 
 FINDING EVOLUTIONS: If existing findings should be updated based on what this paragraph reveals — confirmed, deepened, or superseded — produce finding evolutions.
 
-SUPERSESSION IS RARE: On a first analysis pass, prefer 'deepened' or 'confirmed' over 'superseded'. A finding should only be superseded when its claim is WRONG or CONTRADICTED — not when a later paragraph adds nuance. If P3 reveals that a P1 finding was incomplete, that's 'deepened', not 'superseded'. Supersession means the original claim is no longer true. If you supersede a finding, you MUST produce a replacement finding in newFindings that captures the corrected understanding.
+SUPERSESSION IS RARE: On a first analysis pass, prefer 'deepened' or 'confirmed' over 'superseded'. A finding should only be superseded when its claim is WRONG or CONTRADICTED — not when a later paragraph adds nuance. If you supersede a finding, you MUST produce a replacement finding in newFindings that captures the corrected understanding.
+
+**FINDINGS DISCIPLINE OVERRIDES OBSERVATION ECONOMY.** Even if a paragraph's purpose seems "obvious," the finding that names that purpose is required. The MANDATORY rule does not yield to "would a competent teacher already know this." Findings are the system's referenceable substrate; without them downstream coaching has nothing to point to.
 
 === INDEX CONVENTION ===
 
@@ -393,23 +426,15 @@ Return a JSON object matching this EXACT structure:
   ],
   "newFindings": [
     {
-      "claim": "A referenceable claim about the essay — specific, evidence-grounded, above sentence-level",
-      "scope": {
-        "type": "word | sentence | sentence_group | paragraph | cross_paragraph | essay_level",
-        "paragraph": 0,
-        "sentences": [0, 1],
-        "paragraphs": [0, 2],
-        "textEvidence": [{ "text": "quoted text from essay", "location": { "paragraph": 0, "sentence": 1 } }]
-      },
+      "claim": "<one-sentence claim about this paragraph that is referenceable later — above sentence-level, structurally meaningful>",
+      "scope": { "type": "paragraph | cross_paragraph | essay_level", "paragraph": 0, "paragraphs": [0, 2] },
       "maturity": "hypothesis | developing | confirmed | deepened",
-      "maturityReasoning": "Why this maturity level — what evidence supports it",
+      "maturityReasoning": "<one-sentence justification for this maturity>",
       "coachingValue": "critical | high | medium | contextual | diagnostic",
-      "dimensions": ["voice", "theme", "narrative", "emotion", "character", "craft", "admissions", "structure"],
-      "evidence": [{ "text": "quoted text or description of absence", "location": { "paragraph": 0, "sentence": 1 }, "type": "present | absent" }],
-      "deepeningPotential": "What further investigation could reveal, or null",
-      "raisesQuestions": ["Questions this finding raises for further investigation"],
-      "buildsOn": ["existing-finding-ID"],
-      "relatedTo": ["existing-finding-ID"]
+      "dimensions": ["voice | theme | narrative | emotion | character | craft | admissions | structure"],
+      "evidence": [{ "text": "<quoted text>", "location": { "paragraph": 0, "sentence": 1 } }],
+      "deepeningPotential": "<one sentence on what investigation could reveal, or null>",
+      "raisesQuestions": ["<question>"]
     }
   ],
   "findingEvolutions": [
@@ -418,6 +443,15 @@ Return a JSON object matching this EXACT structure:
       "newMaturity": "hypothesis | developing | confirmed | deepened | superseded",
       "reasoning": "Why this finding's maturity should change based on what this paragraph reveals",
       "supersedes": "other-finding-ID-if-superseding"
+    }
+  ],
+  "gapCandidates": [
+    {
+      "sourceLayer": "l3_walk",
+      "anchorParagraph": 0,
+      "anchorSentence": 1,
+      "triggeringArtifact": "Short — which finding/observation surfaced this gap (e.g., 'F12 deepeningPotential cites moment writer's mother reacted but text doesn't show it')",
+      "briefRecognition": "ONE sentence — what you noticed about the gap. Phase B (essay-level decision) fills in the full delivery shape (framingSeed, conceptTag, etc.) with full essay context."
     }
   ]
 }
@@ -492,9 +526,59 @@ Improvement candidate:
   "coachingValue": "high"
 }
 
+=== GAP CANDIDATE PROPOSAL (Option 5 — lightweight per-layer recognition) ===
+
+While reading this paragraph sentence-by-sentence, you sometimes notice a gap
+the writer alone can close — a moment they remember that isn't on the page, a
+person who appears only as a function, a stake whose consequence is unstated.
+When this happens AND the gap meets the conditions below, propose a brief
+gapCandidate. An essay-level decision pass (Phase B, single Sonnet call after
+all layers complete) reads ALL candidates from all layers + the full essay +
+the concept library, and promotes 0-3 to full delivery (framingSeed,
+conceptTag, expectedDiscovery, etc). You do NOT fill in the delivery shape
+here — just propose lightweight {sourceLayer, anchorParagraph, anchorSentence,
+triggeringArtifact, briefRecognition}. Recognition stays here; delivery
+happens at Phase B with full context.
+
+PROPOSE a gapCandidate ONLY when ALL of these are true (uncertainty counts as No):
+
+1. WORKING-MOVE SILENCE. The move on this anchor is reaching but not landing.
+   If the writer's craft is working as written (a reveal that lands, a metaphor
+   doing its work), say nothing. Worked example: "Sometimes, I even ran over
+   my friends' toes" lands as written via reveal-through-consequence + meek
+   framing + inferential geometry. Recognition fires; gapCandidate count =
+   ZERO. Silence.
+
+2. THE GAP IS REAL. Text-evidenced. The triggering finding/observation cites
+   specific text.
+
+3. WRITER-SIDE ONLY. Re-reading won't close the gap; later paragraphs won't
+   close it; only the writer can.
+
+4. ANGLE PRESENT. You can name a specific direction the question would
+   take (a moment to recover, a sensory anchor, a stakes-context, a person
+   to name) — not just "tell me more."
+
+5. ANSWER UPGRADES — DOESN'T ENABLE. The walk has already produced (or is
+   producing in this same output) text-grounded coaching for this gap (a
+   finding-with-claim, an improvementCandidate). Without that, you have
+   under-coached; re-coach harder before proposing. Constructive-proof rider:
+   if the only specific text-grounded coaching is "ask the writer for the
+   specific thing," your coaching has BECOME the question — that's enable,
+   not upgrade. Don't propose.
+
+Most paragraphs propose ZERO gap candidates. Silence is the default. Phase B
+applies the surface-vs-deep filter (discovery OR coaching-unlock different
+in shape) and the per-essay 3-cap; YOU don't need to enforce those — focus
+only on whether THIS paragraph genuinely surfaces a gap meeting conditions
+1-5 above.
+
+OUTPUT gapCandidates as a top-level array (sibling of paragraphUnderstanding).
+Empty array is valid and the default — silence is the audit signal.
+
 === CRITICAL REMINDERS ===
 
-1. UNDERSTANDING ONLY. Zero evaluative language. If you write "effectively", "strong", or any banned word, rewrite immediately.
+1. UNDERSTANDING ONLY. Zero evaluative language. If you write "effectively", "strong", or any banned word, rewrite immediately. // @descriptive-contract-ok: names banned words to instruct the model NOT to use them
 2. EVERY finding needs evidence — quote specific text from the essay. primaryFunction should cite the architectural insight, not just name a technique.
 3. Aim for ARCHITECTURAL depth — not just "what technique" but "what this technique reveals about how the essay makes meaning."
 4. For later paragraphs, focus on what is NEW. Don't rehash known understanding.
@@ -503,6 +587,10 @@ Improvement candidate:
 7. Tags must be semantic and useful for routing: "turning_point", "sensory_grounding", "thesis_crystallization", "voice_shift", "emotional_peak".
 8. Every sentence needs a "primaryFunction" (one-line architectural summary) and "significance" (pivotal/contributing/transitional).
 9. "craft" and "significantChoices" are OPTIONAL — include only for pivotal/contributing sentences where they add genuine insight. Omit for transitional sentences.
+
+=== FINAL CHECK BEFORE OUTPUT ===
+
+Re-scan your draft. Does newFindings have at least one entry? If not, STOP and produce one before returning. Every paragraph has a structural function — that function IS a finding. The MANDATORY rule does not yield. A response with newFindings = [] on a real paragraph is a contract violation; the system will reject it as if you returned nothing.
 
 Return ONLY the JSON object. No markdown, no explanation, no code blocks.`;
 
@@ -607,11 +695,15 @@ export class SequentialDeepWalkService {
       }
 
       try {
-        // 1. Assemble context via Profile Router
+        // 1. Assemble context via Profile Router. Intentionally NO tokenBudget
+        // override here — the router's RULE_BASE_BUDGETS (8000) is used. A
+        // previous hardcoded 3000 was unrealistic for the walk's always-priority
+        // set (typically 9-16K) and produced 150+ "exceed budget" warnings per
+        // run without changing behavior, since always-priority sections are
+        // never dropped regardless of budget.
         const assembledContext = this.router.assembleContext(profile, {
           rule: 'l3_understanding_walk',
           paragraphIndex: pIdx,
-          tokenBudget: 3000,
         });
 
         // 2. Build user prompt
@@ -631,6 +723,16 @@ export class SequentialDeepWalkService {
               options.reanalysisContext;
           }
         }
+        // Option 5 rebuild: cross-paragraph anti-repetition + cap awareness
+        // moves to Phase B (essay-level emission decision after all layers
+        // complete). The L3 walk now proposes lightweight gap candidates;
+        // Phase B sees ALL of them at once with full essay context. We
+        // keep walkContext threading for backward compat but pass empty
+        // priorEmissions — Phase B handles dedup. This drops per-paragraph
+        // user-prompt size meaningfully.
+        const priorEmissions: SpecificsNeedEmission[] = [];
+        const conceptLibrary: ConceptLibraryEntry[] = profile.conceptLibrary ?? [];
+
         const userPrompt = this.buildUserPrompt(
           markedEssay,
           paragraphs,
@@ -643,6 +745,7 @@ export class SequentialDeepWalkService {
           reanalysisContextForPara,
           options?.findingStore,
           walkCorpusArchetypeBlock,
+          { priorEmissions, conceptLibrary },
         );
 
         // 3. Call Sonnet — dynamically scale output tokens by sentence count
@@ -724,6 +827,17 @@ export class SequentialDeepWalkService {
       void persistCorpusTelemetry(record);
     }
 
+    // Option 5 rebuild: post-walk consolidation removed. Cap enforcement
+    // (per-essay 3, per-concept complexity caps) now happens at Phase B
+    // (essay-level emission decision call) which sees ALL per-layer gap
+    // candidates + concept library + full essay context in a single Sonnet
+    // pass. Concept tag fragmentation is structurally impossible there
+    // (one prompt picks all tags) and cap is enforced by the prompt's
+    // 3-emission ceiling. Gap-resolution detection (anchor-existence proxy
+    // for cross-pass cap relaxation) is simpler in a future deliverable
+    // since Phase B's library-append is the single update path; will be
+    // reintroduced if calibration runs surface staleness.
+
     return {
       walkOutputs,
       backPropagations: allBackPropagations,
@@ -734,6 +848,7 @@ export class SequentialDeepWalkService {
       timingMs: Date.now() - startTime,
     };
   }
+
 
   // ══════════════════════════════════════════════════════════════════════════
   // PARAGRAPH SPLITTING
@@ -861,6 +976,12 @@ export class SequentialDeepWalkService {
     reanalysisContext?: string,
     findingStore?: FindingStore,
     corpusArchetypeBlock?: string,
+    walkContext?: {
+      /** Emissions from earlier paragraphs in this walk run — drives §7.1 cross-paragraph anti-repetition. */
+      priorEmissions: SpecificsNeedEmission[];
+      /** Concepts already taught in this essay across walk passes — drives §8 cap awareness. */
+      conceptLibrary: ConceptLibraryEntry[];
+    },
   ): string {
     const sections: string[] = [];
 
@@ -909,6 +1030,50 @@ export class SequentialDeepWalkService {
       if (currentHolisticEvolution.arcMomentum) {
         sections.push(`Arc momentum: ${currentHolisticEvolution.arcMomentum}`);
       }
+    }
+
+    // ── D-2.2 round 1.8: PRIOR EMISSIONS IN THIS WALK ──
+    // Drives §7.1 cross-paragraph anti-repetition. The walk sees every
+    // emission produced by earlier paragraphs in THIS pass; it must not
+    // re-emit on the same line + same gap or recycle the same angle.
+    if (walkContext && walkContext.priorEmissions.length > 0) {
+      sections.push('\n=== PRIOR EMISSIONS IN THIS WALK (avoid repeating gaps + angles) ===');
+      walkContext.priorEmissions.forEach((emission, i) => {
+        sections.push(
+          `[${i + 1}] P${emission.anchorParagraph + 1}` +
+            (typeof emission.anchorSentence === 'number'
+              ? `S${emission.anchorSentence + 1}`
+              : '') +
+            ` — concept: "${emission.conceptTag}"`,
+        );
+        sections.push(`     framingSeed: ${emission.framingSeed}`);
+        sections.push(`     whyAsked: ${emission.whyAsked}`);
+      });
+    }
+
+    // ── D-2.2 round 1.8: CONCEPT LIBRARY (concepts already taught in this essay) ──
+    // Drives §8 cap awareness + reuse policy. The walk sees concepts taught
+    // across walk passes (this essay's analysis history) with unresolved-
+    // instance counts. Per-concept caps fire on unresolved instances:
+    // simple → 1 max, medium → 2 max, complex → 3 max. Reuse existing tags
+    // when the underlying mechanism matches; mint a new tag only for a
+    // genuinely distinct principle.
+    if (walkContext && walkContext.conceptLibrary.length > 0) {
+      sections.push('\n=== CONCEPT LIBRARY (concepts already taught in this essay) ===');
+      sections.push(
+        'Per-concept caps (unresolved instances): simple = 1, medium = 2, complex = 3.',
+      );
+      sections.push(
+        'Reuse an existing tag if the underlying principle matches; otherwise mint a new prose tag.',
+      );
+      walkContext.conceptLibrary.forEach((entry) => {
+        const unresolved = entry.instances.filter((i) => !i.gapResolved).length;
+        const total = entry.instances.length;
+        sections.push(
+          `- "${entry.tag}" [${entry.complexity}]: ${unresolved} unresolved / ${total} total instances`,
+        );
+        sections.push(`     definition: ${entry.definition}`);
+      });
     }
 
     // ── W1.3: FINDING CONTEXT (existing findings for reference) ──
@@ -1134,7 +1299,43 @@ export class SequentialDeepWalkService {
       result.findingEvolutions = parsedEvolutions;
     }
 
+    // Option 5 rebuild — parse top-level gapCandidates (sibling of
+    // paragraphUnderstanding). Lightweight per-layer recognition;
+    // Phase B (essay-level emission service) promotes 0-3 to full
+    // SpecificsNeedEmission shape with full essay context.
+    // STRICT-PASSTHROUGH per the same discipline as the prior round 1.8
+    // emission parsing — the LLM's output is preserved without coercion;
+    // Phase B's prompt is the next decision point.
+    const parsedCandidates = this.parseGapCandidates(raw.gapCandidates);
+    if (parsedCandidates.length > 0) {
+      result.gapCandidates = parsedCandidates;
+    }
+
     return result;
+  }
+
+  /**
+   * Option 5 rebuild — parse top-level gapCandidates array from the L3 walk's
+   * output. Each candidate is a lightweight {sourceLayer, anchorParagraph,
+   * anchorSentence?, triggeringArtifact, briefRecognition} record. Phase B
+   * (single Sonnet call after all per-layer analysis completes) reads these
+   * candidates + full essay + concept library, decides 0-3 to promote to full
+   * delivery (framingSeed/conceptTag/expectedDiscovery/etc), writes promoted
+   * emissions to profile.specificsNeedEmissions[].
+   *
+   * STRICT-PASSTHROUGH per the no-fallback charter — verify the wrapper is an
+   * array and elements are objects; do NOT defensively reshape or sanitize.
+   * Field-level shape violations surface at Phase B / aggregator validators.
+   */
+  private parseGapCandidates(raw: unknown): EssayGapCandidate[] {
+    if (!Array.isArray(raw)) return [];
+    const out: EssayGapCandidate[] = [];
+    for (const item of raw) {
+      if (item && typeof item === 'object') {
+        out.push(item as unknown as EssayGapCandidate);
+      }
+    }
+    return out;
   }
 
   /**
@@ -1722,6 +1923,15 @@ export class SequentialDeepWalkService {
 
     // Apply paragraph understanding
     para.understanding = output.paragraphUnderstanding;
+
+    // Option 5 rebuild: copy gap candidates onto the paragraph's
+    // ParagraphUnderstanding (transient — Phase B reads from here, then
+    // promotes 0-3 to full emissions on profile.specificsNeedEmissions).
+    // Concept library append happens at Phase B's
+    // applyEssayLevelEmissionsToProfile, NOT here.
+    if (output.gapCandidates && output.gapCandidates.length > 0) {
+      para.understanding.gapCandidates = output.gapCandidates;
+    }
 
     // Apply sentence understandings
     for (const sentenceOutput of output.sentenceUnderstandings) {

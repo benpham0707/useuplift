@@ -300,7 +300,7 @@ ANTHROPIC_API_KEY="..." npx tsx tests/test-deep-academic-report.ts
 
 ### Generate output:
 ```bash
-ANTHROPIC_API_KEY="..." npx tsx tests/generate-deep-report-output.ts > docs/DEEP_ANALYSIS_OUTPUT_E2E.md
+ANTHROPIC_API_KEY="..." npx tsx tests/generate-deep-report-output.ts > docs/archived/completion-snapshots/DEEP_ANALYSIS_OUTPUT_E2E.md
 ```
 
 ### Type check:

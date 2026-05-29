@@ -145,9 +145,6 @@ export {
 // ANALYSIS PIPELINE (L1 → L5)
 // ============================================================================
 
-// L1: First impressions + sentence/word analysis
-export { EssayUnderstandingService, essayUnderstandingService } from './essayUnderstandingService';
-
 // L2: Structural cartography (Haiku)
 export { StructuralCartographer, structuralCartographer } from './analysis/structuralCartographer';
 
@@ -261,21 +258,3 @@ export {
 } from './versionTracker';
 export type { ReanalysisTrigger } from './versionTracker';
 
-// ============================================================================
-// VERSION BRANCHING (Improvement #10: Snapshot + Compare)
-// ============================================================================
-
-export {
-  SnapshotManager,
-  compareToSnapshot,
-  hashCurrentState,
-  shouldAutoSnapshotForEdit,
-  shouldAutoSnapshotForMilestone,
-} from './versioning';
-export type {
-  SnapshotSummary,
-  CurrentEssayState,
-  EditEvent,
-  AutoSnapshotDecision,
-  MilestoneEvent,
-} from './versioning';

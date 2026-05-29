@@ -30,6 +30,8 @@ import type {
   ImprovementPhase,
   KnowledgePatternMatch,
   SentenceAnalysisConfidence,
+  SpecificsNeedEmission,
+  ConceptLibraryEntry,
 } from '../profileTypes';
 import { assessPhase } from './phaseAssessment';
 import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
@@ -692,7 +694,13 @@ SCHEMA BREVITY CAPS (Scope 1 Phase 2):
 - strengths[].evidence: MAX 10 words — a specific text quote, not commentary
 - weaknesses[].evidence: MAX 10 words — same
 - strengthSignatures[].evidence: MAX 10 words — same
-- effectivenessReasoning: UNCAPPED — this is your load-bearing reasoning chain and is consumed downstream by L4 and coaching. Write it fully.${piqAntiClusteringLine}`;
+- growthEdges: MAX 3 entries per paragraph output. Pick the highest-leverage gaps; the system trims excess. Each description: ≤25 words — concrete and specific, not generic.
+- effectivenessReasoning: UNCAPPED — this is your load-bearing reasoning chain and is consumed downstream by L4 and coaching. Write it fully.
+
+EVIDENCE CONTENT — FORBIDDEN PATTERNS (Bucket C, 2026-05-27):
+- NEVER paste the paragraph's verdict text into the evidence field of a strength signature or strength/weakness entry. The verdict belongs in \`paragraphVerdict\`; evidence is a SHORT QUOTED FRAGMENT from the paragraph text.
+- NEVER paste the paragraph text itself as evidence — evidence is a quote of the SPECIFIC fragment that demonstrates the signature.
+- If you cannot produce a ≤10-word quoted fragment, omit the evidence field rather than padding it with commentary or copy-paste from elsewhere in your output.${piqAntiClusteringLine}`;
 
   // Port B1: schema-extension appendix for pattern catalog emission. Kept
   // separate from the base prompt (and gated on essayType) so non-B1 call-
@@ -1503,13 +1511,18 @@ function validateAndTransform(
   }
 
   if (Array.isArray(rawHolistic.growthEdges) && rawHolistic.growthEdges.length > 0) {
-    holisticAnalysisEvolution.growthEdges = rawHolistic.growthEdges.map(
-      (ge: Record<string, unknown>) => ({
-        quality: String(ge.quality || ''),
-        description: String(ge.description || ''),
-        paragraphs: Array.isArray(ge.paragraphs) ? ge.paragraphs.map(Number) : [paragraphIndex],
-      })
-    );
+    // Phase 1 Cut G (2026-05-12): cap growthEdges at 3 per paragraph output.
+    // Prompt asks for the cap; validator backstops it. Downstream digest +
+    // router consumers iterate the array — smaller is fine.
+    holisticAnalysisEvolution.growthEdges = rawHolistic.growthEdges
+      .slice(0, 3)
+      .map(
+        (ge: Record<string, unknown>) => ({
+          quality: String(ge.quality || ''),
+          description: String(ge.description || ''),
+          paragraphs: Array.isArray(ge.paragraphs) ? ge.paragraphs.map(Number) : [paragraphIndex],
+        })
+      );
   }
 
   if (typeof rawHolistic.aoTakeaway === 'string' && rawHolistic.aoTakeaway.length > 0) {
@@ -1558,6 +1571,14 @@ function validateAndTransform(
   const narrativeQualityIndex = clampNarrativeQualityIndex(
     (raw as { narrativeQualityIndex?: unknown }).narrativeQualityIndex,
   );
+
+  // Option 5 rebuild: L3.5 no longer emits per-paragraph specificsNeedEmissions
+  // or gapCandidates. Phase B (essay-level emission service) reads L3.5's
+  // existing artifacts (weaknesses, growthEdges, improvementCandidates,
+  // narrativeQualityIndex) directly from the profile when deciding emissions
+  // at essay level. This drops L3.5 per-paragraph output cost meaningfully
+  // (no emission output) while preserving evaluative recognition (the
+  // weakness/growthEdge artifacts still capture L3.5's judgments).
 
   return {
     paragraphIndex,

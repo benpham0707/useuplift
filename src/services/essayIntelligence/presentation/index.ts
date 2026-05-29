@@ -1,4 +1,5 @@
 export { renderAnalysisForStudent } from './renderAnalysisForStudent';
+export { renderStudentDocumentMarkdown } from './renderStudentDocumentMarkdown';
 export type {
   StudentAnalysisDocument,
   AOReactionSection,

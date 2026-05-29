@@ -22,6 +22,9 @@
  * Profile Manager spec: docs/plan-sections/04-profile-manager.md
  */
 
+// Conversator-internal types (D-0.4) — referenced by EssayProfile.conversatorSessionLog (D-0.5).
+import type { ConversatorSessionEntry } from './conversator/types';
+
 // ============================================================================
 // CROSS-FILE TYPE IMPORTS
 // ============================================================================
@@ -233,6 +236,32 @@ export type HolisticSectionType =
   | 'craft_assessment'
   | 'cross_dimension_entanglements'
   | 'admissions_positioning';
+
+/**
+ * D-1.11: every holistic section key, frozen and ordered for deterministic
+ * iteration. Used by `CarryForwardDecision` emission at decision-point DP-5
+ * (focused-mode preserves all 10 holistic sections — the BIG carry-forward
+ * win that makes focused-mode's cost story honest). Also used by any
+ * future code that needs to enumerate all sections without re-listing the
+ * union type.
+ *
+ * The TypeScript type union (above) and this runtime array MUST stay in
+ * sync. A `const`-asserted array gives us a compile-time check via
+ * `assertSatisfies` patterns; we don't enforce that here but a future
+ * lint rule could.
+ */
+export const HOLISTIC_SECTION_KEYS: readonly HolisticSectionType[] = Object.freeze([
+  'voice_identity',
+  'voice_map',
+  'emotional_topography',
+  'moment_earnedness_map',
+  'thematic_architecture',
+  'narrative_strategy',
+  'character_revelation',
+  'craft_assessment',
+  'cross_dimension_entanglements',
+  'admissions_positioning',
+] as const);
 
 /**
  * Essay type classification — drives North Star scaling.
@@ -470,6 +499,7 @@ export type CheckpointReason =
   | 'after_l3_5'
   | 'after_l4'
   | 'after_l5'
+  | 'after_iteration_commit'
   | 'conversation_save'
   | 'before_reanalysis'
   | 'circuit_breaker';
@@ -676,13 +706,6 @@ export interface SentenceCraft {
   rhythm: RhythmTag;
   /** Specific craft techniques used */
   techniques: string[];
-  /**
-   * @deprecated Scope 1 removed `voiceAlignment` — no downstream consumers.
-   * Voice alignment is synthesized holistically by L3.75 voiceMap.
-   * Field kept optional for backward compat with profiles stored before
-   * the change. Writers no longer set it; readers see `undefined`.
-   */
-  voiceAlignment?: string;
 }
 
 /**
@@ -805,6 +828,19 @@ export interface ParagraphUnderstanding {
     voiceConsistency: string;
     standoutMoment: string | null;
   };
+
+  /**
+   * Specifics-need emissions surfaced by the L3 walk for this paragraph.
+   * Each emission documents a gap-and-approach: the walk noticed the essay
+   * is referencing something it doesn't yet specify, and it has a concrete
+   * angle for the question that would unlock the gap. The aggregator (D-2.7)
+   * concatenates these with emissions from L3.5 / L3.75 / L4 / FindingStore,
+   * dedupes, and mints UnderstandingQuestion[] into profile.questionQueue
+   * (D-2.8 integration). Optional — undefined / [] when the walk had no
+   * gap-and-approach to surface for this paragraph (silence is the audit
+   * signal per round 1.6 §3 Test 3, not a defect).
+   */
+  specificsNeedEmissions?: SpecificsNeedEmission[];
 }
 
 /**
@@ -826,6 +862,15 @@ export interface ParagraphAnalysis {
     quality: string;
     description: string;
   }>;
+
+  /**
+   * Specifics-need emissions surfaced by the L3.5 analysis pass for this
+   * paragraph. Same contract as ParagraphUnderstanding.specificsNeedEmissions
+   * (see that field). Aggregator (D-2.7) folds these in with L3 walk + L3.75
+   * holistic + L4 northStar emissions; D-2.8 integration site between Phase 5
+   * and Phase 6 is what calls the aggregator.
+   */
+  specificsNeedEmissions?: SpecificsNeedEmission[];
 }
 
 /**
@@ -1258,6 +1303,69 @@ export interface CharacterRevelation {
 }
 
 /**
+ * SignatureMove — the ONE defining structural / voice / rhetorical move that
+ * IS this writer's craft fingerprint. Distinct from `strengthSignatures`
+ * (plural list of things the writer does well) and `voiceIdentity.signature`
+ * (prose description of voice). The signature move is a single repeatable
+ * technique cited at specific paragraphs that an outside reader would
+ * recognize as "this writer."
+ *
+ * Null when the essay has no clear single move — that is a real signal, not
+ * a failure. Do not invent a move to fill the field.
+ */
+export interface SignatureMove {
+  /** One sentence, counselor-grade. Names the move concretely:
+   *  syntactic / structural / rhetorical shape + WHERE it appears.
+   *  Compound-move guidance (when X+Y counts as one move vs. two) lives
+   *  in the prompt, not here. */
+  oneSentenceName: string;
+  /** Why this is THIS writer's move, not just a generic technique. 1-2
+   *  sentences. MUST reference content-specific information from THIS essay
+   *  (e.g., "650 words covering a century" for compression, "Izzy scene" for
+   *  Three Days). Generic transferable claims signal the LLM did not actually
+   *  engage with the essay's specifics. */
+  whyItIsTheirs: string;
+  /** Cited evidence. Heterogeneous evidence types: some moves are
+   *  sentence-level quotes; some are paragraph-level structural patterns
+   *  where COMPRESSION is the move and no single quote represents it.
+   *  Schema supports both via the discriminated `kind` tag. */
+  instances: SignatureMoveInstance[];
+  /** What the move does for the reader's experience. 1 sentence. Pure
+   *  cognitive / felt effect (committed, surprised, primed for X, structural
+   *  relief, etc.). NOT "it's good" / "it works." Judgment lives in L3.5. */
+  readerEffect: string;
+}
+
+export type SignatureMoveInstance =
+  | {
+      kind: 'sentence_quote';
+      /** Reuses ParagraphLocation. ZERO-INDEXED to match the rest of the
+       *  codebase (renderer applies +1 at display time). */
+      location: ParagraphLocation;
+      /** Verbatim excerpt from the essay, ≤40 words. Validator confirms
+       *  this string is a substring of the cited paragraph text after
+       *  whitespace + smart-quote + em-dash normalization. */
+      quotedText: string;
+      /** One sentence: how this specific instance is the move (not a generic
+       *  description of the move itself). */
+      whatThisInstanceShows: string;
+    }
+  | {
+      kind: 'paragraph_compression';
+      /** Zero-indexed paragraph; the compression IS this paragraph. */
+      paragraph: number;
+      /** One sentence describing what is compressed and into what space. */
+      whatThisInstanceShows: string;
+    }
+  | {
+      kind: 'cross_paragraph_pattern';
+      /** Zero-indexed paragraphs where the pattern recurs. Min 2 entries. */
+      paragraphs: number[];
+      /** One sentence describing the pattern that links these paragraphs. */
+      whatThisInstanceShows: string;
+    };
+
+/**
  * CraftAssessment — strength signatures, growth edges, image system, patterns.
  */
 export interface CraftAssessment {
@@ -1300,6 +1408,12 @@ export interface CraftAssessment {
   sentencePatterns: string;
   /** Word-level patterns */
   wordPatterns: string;
+  /** The ONE defining move that IS this writer's craft fingerprint. Null
+   *  when the essay distributes craft rather than concentrating it in a
+   *  single technique. Populated by the L3.75 SignatureMove micro-call;
+   *  validated against essay text (substring + paragraph-index integrity)
+   *  before being written. */
+  signatureMove?: SignatureMove | null;
 }
 
 /**
@@ -1417,6 +1531,30 @@ export interface EssayNorthStar {
   lastUpdatedBy: string;
   /** Version/changelog tracking for re-crystallization (present after version >= 2) */
   evolution?: NorthStarEvolution;
+
+  /**
+   * Option 5 rebuild — gap candidates from L4 northStar crystallization
+   * (lightweight; Phase B promotes 0-3 with full essay context). Replaces
+   * the heavier specificsNeedEmissions field used in the prior round 1.8
+   * architecture for this layer.
+   */
+  gapCandidates?: EssayGapCandidate[];
+
+  /** @deprecated Replaced by gapCandidates + Phase B essay-level emission. */
+  specificsNeedEmissions?: SpecificsNeedEmission[];
+
+  /**
+   * Stage 2.B: terminal-state resolutions for essay-scope contradictions that
+   * L4 produced into `coherenceReport.contradictions`. Each entry tells L5 how
+   * to surface the underlying contradiction — resolved (one side suppressed),
+   * framed (both surface with framing reasoning), or escalated (student must
+   * decide). Optional for back-compat with profiles persisted before this
+   * field landed.
+   *
+   * See `CoherenceResolution` for the shape and L4b/composite prompts for the
+   * directive that produces it.
+   */
+  coherenceResolutions?: CoherenceResolution[];
 }
 
 /**
@@ -2170,6 +2308,17 @@ export interface EssayUnderstanding {
     trigger: 'walk' | 'deep_dive' | 'coaching' | 'edit' | 'coherence_check';
     whatChanged: string;
   }>;
+
+  /**
+   * Specifics-need emissions surfaced by L3.75 holistic synthesis (Phase A
+   * and / or Phase B). Essay-level emissions: gaps the synthesis noticed
+   * looking across paragraphs (cross-paragraph specificity gaps, holistic
+   * questions that no single paragraph would have flagged on its own).
+   * Same dedup contract as paragraph-scoped emissions; the aggregator
+   * (D-2.7) unifies all sources before minting questions. Optional —
+   * undefined / [] when the synthesis had no gap-and-approach to surface.
+   */
+  specificsNeedEmissions?: SpecificsNeedEmission[];
 }
 
 /**
@@ -2341,6 +2490,15 @@ export interface EssayProfile {
   /** Cross-profile contradiction detection (L4 output, optional until L4 completes) */
   coherenceReport?: CoherenceReport;
 
+  /**
+   * Stage 2.A: <300-word counselor-grade Executive Brief that sits at the
+   * top of every dump / coaching surface. Verdict + 5 directives + 3 model
+   * sentences. Optional — generated by `executiveBrief.generateExecutiveBrief`
+   * post-L5 when the `ENABLE_EXECUTIVE_BRIEF` flag is on. Null when the brief
+   * generator was disabled or its single retry failed validation.
+   */
+  executiveBrief?: ExecutiveBrief | null;
+
   // -- PARAGRAPH MAP (per-paragraph understanding + analysis) --
   paragraphs: ParagraphProfile[];
 
@@ -2358,6 +2516,32 @@ export interface EssayProfile {
   /** All questions ever raised — persistent store with status tracking.
    *  Managed by QuestionQueueManager, synced at growth cycle end. */
   questionQueue: UnderstandingQuestion[];
+
+  /**
+   * Option 5 rebuild — single essay-level emission storage. Phase B
+   * (essayLevelEmissionService) writes the promoted SpecificsNeedEmission[]
+   * here after reading per-layer gap candidates + the full essay context.
+   * D-2.8 integration helper at Phase 5.6 reads from here (single source
+   * of truth) and feeds the aggregator → questionQueue.
+   *
+   * Replaces the prior round 1.8 architecture's 4 per-layer storage
+   * locations (paragraph.understanding, paragraph.analysis,
+   * essayUnderstanding, northStar). Capped at 3 per essay by Phase B itself.
+   */
+  specificsNeedEmissions?: SpecificsNeedEmission[];
+
+  /**
+   * D-2.2 round 1.8 — concept library tracker for specifics-need emissions.
+   * Append-only across walk passes. User-accessible on demand for concept
+   * definitions + examples. Per-concept emission caps (simple=1, medium=2,
+   * complex=3 unresolved instances per essay) are enforced against this
+   * structure by the post-walk consolidation step (D-2.2 §11.12).
+   *
+   * Optional / defaults to `[]` for legacy profiles via
+   * `EssayProfileCoordinator.fromCheckpoint` migration (mirrors the
+   * `improvementCandidateSnapshot` migration pattern).
+   */
+  conceptLibrary?: ConceptLibraryEntry[];
 
   // -- CONVERSATION INSIGHTS (L6-sourced student revelations) --
   conversationInsights: ConversationInsight[];
@@ -2447,6 +2631,78 @@ export interface EssayProfile {
    * next compute — see `computeVoiceEvolution` docs.
    */
   voiceEvolution?: VoiceEvolutionSignals | null;
+
+  // ── INTEGRATED PIPELINE BUILD — Phase 0 D-0.5 root additions ─────────────
+  // The five fields below are required (no `?`) per the D-0.5 contract.
+  // Defaults populated by `createInitialProfile()` in essayProfileManager.ts:
+  //   iterationLedger:        { currentIteration: 0, iterations: [],
+  //                             taughtMoves: [], recentDecisions: [] }
+  //   groundTruthFacts:       []
+  //   storyFragments:         []
+  //   intentSignals:          []
+  //   conversatorSessionLog:  []
+  // D-0.8 backfills these onto existing JSONB profiles loaded from Supabase.
+
+  /**
+   * The iteration loop's substrate — currentIteration counter + append-only
+   * iteration audit + append-only TaughtMove ledger + recent CarryForwardDecision
+   * window. See `IterationLedger` (D-0.1) for the full shape and per-field
+   * producers/consumers.
+   *
+   * Producer: orchestrator (currentIteration increment, iterations[] append,
+   *   recentDecisions[] append/prune); L5 deepAnnotationService (taughtMoves[]
+   *   append at annotation emission); landingDetector (taughtMoves[i].landing
+   *   set on iteration AFTER delivery).
+   * Consumer: priorAnnotationsBuilder (Phase 1 dead-wire fix), focusedAnalyzer
+   *   mode-selection, L5 prompt iteration context, Conversator continuous-chat
+   *   handler, audit / calibration tooling.
+   */
+  iterationLedger: IterationLedger;
+
+  /**
+   * Durable factual claims captured by the Conversator from student dig
+   * answers. See `GroundTruthFact` (D-0.3). Survives iterations as
+   * first-class durable state per L5_E2E_INTEGRITY_AUDIT §5.3.
+   *
+   * Producer: digAnswerExtractor (Phase 3 D-3.7).
+   * Consumer: L1/L3/L3.5/L5 prompt cached blocks; L5 fabrication-guard
+   *   at Tier 3 (conflict detection essay vs ground truth).
+   */
+  groundTruthFacts: GroundTruthFact[];
+
+  /**
+   * Durable narrative fragments captured by the Conversator from student
+   * dig answers. See `StoryFragment` (D-0.3). Survives iterations.
+   *
+   * Producer: digAnswerExtractor when answers come back in `narrative` shape.
+   * Consumer: L3 Pass 2 Story lens (per F2 R-7); L3 Pass 3
+   *   `momentEarnednessMap.moments[].mechanisms` synthesis; L5 Move 6
+   *   multiplicity paths.
+   */
+  storyFragments: StoryFragment[];
+
+  /**
+   * Durable intent signals captured by the Conversator. See `IntentSignal`
+   * (D-0.3). The student's stated intent is authoritative over the system's
+   * inferred intent.
+   *
+   * Producer: digAnswerExtractor.
+   * Consumer: L4 northStar.intentBridge.alignments[] (validates or flags
+   *   mismatch); L5 Tier 1 prompt framing; coachingMap.transformativeInsight.
+   */
+  intentSignals: IntentSignal[];
+
+  /**
+   * Compact recent-session chat log. The full durable log lives in the
+   * `essay_chat_conversations` table (D-0.6). See `ConversatorSessionEntry`
+   * (D-0.4).
+   *
+   * Producer: conversatorPersistence (Phase 3 D-3.2).
+   * Consumer: continuous-chat handler (recent context); dig answer
+   *   extractor (question / answer / clarifying-turn thread); L6 cross-
+   *   iteration coaching ("have we worked on this before?").
+   */
+  conversatorSessionLog: ConversatorSessionEntry[];
 }
 
 // ============================================================================
@@ -2507,6 +2763,17 @@ export interface ParagraphScoreMatrix {
   }>;
   /** Structured coaching hierarchy — replaces flat prioritizedImprovements when available */
   coachingMap?: CoachingMap;
+
+  /**
+   * Stage 2.B: terminal-state resolutions for paragraph-scope contradictions
+   * surfaced by L3.5 `contradictionFlags`. L4 must emit one resolution per
+   * paragraph-scope contradiction; L5 reads `suppressedSignals` before
+   * surfacing any annotation tied to a paragraph-scope signal. Optional for
+   * back-compat with profiles persisted before this field landed.
+   *
+   * See `CoherenceResolution`.
+   */
+  coherenceResolutions?: CoherenceResolution[];
 }
 
 /**
@@ -2541,8 +2808,13 @@ export interface CoherenceIssue {
   evidenceA?: string;
   /** Direct evidence quote from section B */
   evidenceB?: string;
-  /** Whether detected by primary crystallization or adversarial pass */
-  source?: 'primary' | 'adversarial';
+  /**
+   * Phase 1 Cut B (2026-05-12): `source` field deprecated — was only used to
+   * distinguish primary L4 contradictions from the now-removed L4-Haiku
+   * adversarial pass. Field kept optional + nullable for back-compat with
+   * persisted profiles; new emissions never set it.
+   */
+  source?: 'primary';
 }
 
 /**
@@ -2558,8 +2830,113 @@ export interface CoherenceReport {
    * explicit evidence references.
    */
   programmaticContradictions?: ProgrammaticContradiction[];
-  /** Adversarial assessment of the North Star's coherence and irreplaceability */
-  northStarAssessment?: NorthStarAssessment;
+}
+
+/**
+ * Stage 2.A (Executive Brief): the <300-word counselor-grade top-of-dump
+ * surface. Verdict + 5 directives + 3 model sentences. Generated by a
+ * post-L5 Sonnet micro-call (`executiveBrief.generateExecutiveBrief`) that
+ * sees a compressed L4+L5 surface and produces an editorial-grade brief
+ * the student reads BEFORE the full diagnostic dump.
+ *
+ * `targetTier` is the school tier the verdict references; the default is
+ * inferred from `EssayProfile.admissionsPositioning.archetypeContext`,
+ * overridable by the workshop surface (per plan §0.5 D5).
+ *
+ * `totalWordCount` is computed post-emission; the generator enforces ≤300
+ * via a single retry. When `truncated` is true, the brief is emitted but
+ * the cap could not be met under retry — render layer may surface a warning.
+ */
+export interface ExecutiveBrief {
+  /** Calibrated competitive verdict — 1 sentence. */
+  verdict: string;
+  /** Target school tier this verdict references. */
+  targetTier: 'ivy_elite' | 'highly_selective' | 'very_selective' | 'selective' | 'competitive' | 'accessible';
+  /** 5 directives in priority order (rank 1 = read this first). */
+  directives: ExecutiveBriefDirective[];
+  /** 3 model sentences — the editorial last mile. */
+  modelSentences: ExecutiveBriefModelSentence[];
+  /** Computed post-emission. ≤300 enforced via single retry. */
+  totalWordCount: number;
+  /** True if the brief generator could not bring word count under 300 even after retry. */
+  truncated: boolean;
+  /** Sonnet call cost for this brief generation. */
+  cost: number;
+  /** Brief-generation wall time in ms. */
+  timingMs: number;
+}
+
+export interface ExecutiveBriefDirective {
+  rank: 1 | 2 | 3 | 4 | 5;
+  /** Concrete action ≤20 words; imperative voice. */
+  action: string;
+  /** Why ≤30 words; references the strategic frame. */
+  rationale: string;
+  /** Paragraph indices this directive operates on. */
+  affectedParagraphs: number[];
+}
+
+export interface ExecutiveBriefModelSentence {
+  /** Verbatim original sentence from the essay. */
+  originalSentence: string;
+  /** Where the original sits. */
+  originalLocation: { paragraphIndex: number; sentenceIndex: number };
+  /** Counselor-grade revision — must use only content present in the essay. */
+  revisedSentence: string;
+  /** Rationale ≤25 words. */
+  rationale: string;
+}
+
+/**
+ * Stage 2.B (Coherence-Resolution): terminal state assigned by L4 to every
+ * contradiction it surfaces, so the student-facing render never carries a raw
+ * contradiction. Three states:
+ *
+ *   - 'resolved'   — one side wins; the loser is in `suppressedSignals` and L5
+ *                    must not surface it.
+ *   - 'framed'     — both sides are partially true under different conditions;
+ *                    both surface, but only with the framing in `reasoning`.
+ *   - 'escalated'  — the contradiction reflects a genuine student decision;
+ *                    L5 surfaces it as an awareness annotation, not a fix.
+ *
+ * `contradictionId` is a stable string referencing either
+ * `CoherenceReport.contradictions[i]` (sectionA + sectionB form a natural key,
+ * or the index in the array prefixed `coherenceReport.`) or an L3.5
+ * `contradictionFlags[j]` (prefixed `contradictionFlags.`). The LLM picks the
+ * shape; downstream readers tolerate either.
+ *
+ * `surfaceSignals` and `suppressedSignals` identify which sides of the
+ * contradiction L5 should render. Signal IDs are free-text section identifiers
+ * (e.g., 'voiceMap.shiftPoints[1]', '7b.strongestBreakoutDimension').
+ *
+ * Lives on both `EssayNorthStar` (essay-scope) and `ParagraphScoreMatrix`
+ * (paragraph-scope); the L4 prompt produces resolutions on the appropriate
+ * surface based on the contradiction's scope.
+ */
+export interface CoherenceResolution {
+  /** Stable identifier for the contradiction this resolution terminates. */
+  contradictionId: string;
+  /** Terminal state. */
+  state: 'resolved' | 'framed' | 'escalated';
+  /**
+   * The resolution narrative.
+   *   - 'resolved': which side wins, why, and what the loser got wrong.
+   *   - 'framed':   the both/and the student should see, with conditions.
+   *   - 'escalated': the decision the student must make.
+   */
+  reasoning: string;
+  /**
+   * Signal IDs (free-text section identifiers) that L5 may surface. For
+   * 'resolved' this is the winning side; for 'framed' it is both sides; for
+   * 'escalated' it is both sides (the student needs to see what they're
+   * choosing between).
+   */
+  surfaceSignals: string[];
+  /**
+   * Signal IDs L5 must NOT surface. Populated for 'resolved' state only;
+   * empty for 'framed' and 'escalated'.
+   */
+  suppressedSignals: string[];
 }
 
 /**
@@ -2677,16 +3054,6 @@ export interface NorthStarEvolution {
   }>;
   coreIdentityStable: boolean;
   stabilityAssessment: string;
-}
-
-/**
- * NorthStarAssessment — adversarial pass assessment of the North Star's quality.
- * Tests whether the North Star captures something genuinely unique and irreplaceable.
- */
-export interface NorthStarAssessment {
-  passesIrreplaceabilityTest: boolean;
-  reasoning: string;
-  missingInsight: string | null;
 }
 
 // ============================================================================
@@ -3243,6 +3610,40 @@ export interface ImprovementEntry {
    * insight. Null is the correct "not applicable" value — not a failure.
    */
   collegeNote?: string | null;
+
+  /**
+   * Phase 0 D-0.17 — L4b absorption scaffold.
+   *
+   * The `pairedImprovement` payload migrates from
+   * `CraftAssessment.growthEdges[].pairedImprovement` (currently emitted
+   * by L3.75 at profileTypes.ts:1287-1298) to L4b's direct emission on
+   * each ImprovementEntry. Same field shape — single source of truth
+   * once the absorption lands.
+   *
+   * Producer:
+   *   - Today: orchestrator harvests from `CraftAssessment.growthEdges[].pairedImprovement`
+   *     into the ImprovementCandidateStore, then L4b reads via candidateStore.
+   *   - Post-absorption (Phase 4 sub-phase 4c, D-4c.1): L4b prompt extension
+   *     adds TECHNIQUE_VOCABULARY block; L4b emits this field directly per
+   *     priority entry. Output cap raised by ~2-3K tokens (D-4c.3).
+   * Consumers: L5 Tier 1 prompt (Move 7 contribution framing); manifest
+   *   merger (l5ManifestMerger.ts); L6 coaching reads via manifest.
+   * Note: contract calls the field's home "ImprovementManifestEntry" but
+   *   the actual existing type is `ImprovementEntry` (same intent). The
+   *   field lands on the existing type to avoid a churn-only rename.
+   */
+  pairedImprovement?: {
+    /** TECHNIQUE_VOCABULARY entry or null when no standard technique applies. */
+    technique: string | null;
+    /** One-sentence action the student should take. */
+    directive: string;
+    /** Why this matters to the essay's architecture specifically. */
+    architecturalReason: string;
+    /** 1-2 sentence sketch of the improved version, or null. */
+    demonstrationSketch: string | null;
+    /** Magnitude of the impact if applied. */
+    expectedImpact: 'transformative' | 'significant' | 'incremental';
+  } | null;
 }
 
 /**
@@ -3545,7 +3946,6 @@ export interface ParagraphFirstImpression {
     apparentPurpose: string;
     rhetoricalFunction: string;
     toneShift: boolean;
-    notableElements: string[];
     tags: string[];
   }>;
 
@@ -3682,6 +4082,18 @@ export interface UnderstandingWalkOutput {
     reasoning: string;
     supersedes?: string;
   }>;
+
+  /**
+   * Option 5 rebuild — gap candidates from this paragraph's walk
+   * (lightweight; Phase B promotes 0-3 to full emissions). Per-paragraph
+   * recognition stays here; full emission shape is filled in by Phase B
+   * with full essay context. Replaces the heavier round 1.8
+   * specificsNeedEmissions field on this layer output.
+   */
+  gapCandidates?: EssayGapCandidate[];
+
+  /** @deprecated Replaced by gapCandidates + Phase B essay-level emission. Kept for backward compat. */
+  specificsNeedEmissions?: SpecificsNeedEmission[];
 }
 
 /**
@@ -3773,6 +4185,17 @@ export interface HolisticSynthesisOutput {
     reasoning: string;
     supersedes?: string;
   }>;
+
+  /**
+   * Option 5 rebuild — gap candidates from L3.75 holistic synthesis
+   * (lightweight; Phase B promotes 0-3). Replaces the heavier
+   * specificsNeedEmissions field that lived here in the prior round 1.8
+   * architecture.
+   */
+  gapCandidates?: EssayGapCandidate[];
+
+  /** @deprecated Replaced by gapCandidates + Phase B essay-level emission. */
+  specificsNeedEmissions?: SpecificsNeedEmission[];
 }
 
 /**
@@ -3875,6 +4298,72 @@ export interface AnalysisPassOutput {
     growthEdges?: Array<{ quality: string; description: string; paragraphs: number[] }>;
     aoTakeaway?: string;
   };
+
+  // ── Phase 0 D-0.16 — L3.5 extension scaffold ─────────────────────────
+  // Spec: docs/pipeline-evolution/04-pipeline-architecture/L3-5/PLAN.md
+  // Both fields are optional during gradual rollout. Phase 4 sub-phase 4b
+  // (D-4b.1, D-4b.2) wires emission and verifies calibration windows.
+  // Existing L3.5 emitters that don't yet populate these fields continue
+  // to compile.
+
+  /**
+   * Cross-lens contradiction flags — emitted when ≥2 lenses make claims
+   * at the same location that cannot both be true.
+   *
+   * Per L3-5/PLAN.md: "do not flag complementary observations or
+   * different perspectives. Examples that qualify: Voice says P5 is
+   * intentional, Meaning says P5 is unearned. Examples that do NOT
+   * qualify: Voice says P5 is reflective, Story says P5 is structural —
+   * those are complementary."
+   *
+   * Producer: L3.5 prompt (extended in Phase 4 D-4b.1).
+   * Consumers: L4 (resolves in score reasoning OR surfaces unresolved
+   *   in coachingMap); L6 coaching (surfaces to student when relevant).
+   * Calibration: emission rate target 5–30% of analyses; outside that
+   *   range = prompt re-tune (D-4b.5 calibration check).
+   */
+  contradictionFlags?: Array<{
+    lens1: 'voice' | 'meaning' | 'story' | 'admissions';
+    lens2: 'voice' | 'meaning' | 'story' | 'admissions';
+    location: ParagraphLocation;
+    claim: string;
+    evidence: string;
+  }>;
+
+  /**
+   * Essay-level strength signatures — distinct craft techniques the essay
+   * demonstrates, with text evidence and paragraph anchors. Migrated
+   * from L3.75 `craftAssessment.strengthSignatures[]` (where the field
+   * was under-disciplined and ballooned to 21 entries on fixture 05).
+   *
+   * Producer: L3.5 prompt (extended in Phase 4 D-4b.2). Cap 5–8;
+   *   each entry must name a DISTINCT craft technique with NEW evidence
+   *   not used by a prior signature in this output.
+   * Consumers: L4 northStar.distinctivenessSignature articulation;
+   *   L5 Tier 2 protectedStrengths input (don't damage these on revision).
+   * Calibration: count distribution outside 4–10 = prompt re-tune.
+   *
+   * Note: shape matches `holisticAnalysisEvolution.strengthSignatures`
+   * above (the legacy nested home). Phase 4 sub-phase 4b moves emission
+   * to this top-level field; the legacy field is dropped post-absorption.
+   */
+  essayStrengthSignatures?: Array<{
+    quality: string;
+    evidence: string;
+    paragraphs: number[];
+  }>;
+
+  /**
+   * Option 5 rebuild — gap candidates from L3.5 analysis for this
+   * paragraph (lightweight; Phase B promotes 0-3 with full essay context).
+   * In Option 5, L3.5's emission proposals come from the essay-level mode
+   * (one call) rather than per-paragraph mode (10 calls), but the field
+   * lives here for type symmetry across layer-output types.
+   */
+  gapCandidates?: EssayGapCandidate[];
+
+  /** @deprecated Replaced by gapCandidates + Phase B essay-level emission. */
+  specificsNeedEmissions?: SpecificsNeedEmission[];
 }
 
 /**
@@ -3962,11 +4451,32 @@ export interface StalenessReport {
 
 /**
  * StalenessEffect — declares which mutations affect which profile sections.
+ *
+ * `findingIds[]` was added in Phase 0 D-0.14 of the integrated build per
+ * F2 R-12 + F1 audit + ITERATION_LOOP_DESIGN §2.3. Optional so existing
+ * StalenessEffect emitters that don't yet populate it continue to compile.
+ * When present, lets the orchestrator know "this edit invalidates F7"
+ * via explicit linkage — needed by D-1.6 (priorAnnotations builder)
+ * and D-4e.2 (focused_structural mode's Finding-lineage tracking
+ * through reorders).
  */
 export interface StalenessEffect {
   target: StalenessTarget;
   strength: StalenessStrength;
   reason: string;
+  /**
+   * Finding IDs this staleness applies to. When populated, downstream
+   * carry-forward arbitration can decide whether the named Findings need
+   * re-derivation or can carry. Empty / absent means "no Finding linkage
+   * declared" — staleness propagates per `target` alone.
+   *
+   * Producer: editUnderstandingService and any future mutation that
+   *   knows which Findings the staleness invalidates.
+   * Consumer: priorAnnotationsBuilder (Phase 1 D-1.6),
+   *   focusedAnalyzer escalation ladder (per ITERATION_LOOP_DESIGN §6.4),
+   *   focused_structural index-remap (Phase 4 D-4e.2).
+   */
+  findingIds?: string[];
 }
 
 /**
@@ -4269,12 +4779,27 @@ export interface UnderstandingQuestion {
   anchorParagraph?: number;
   /** What discovering the answer would reveal */
   expectedInsight: string;
-  /** Which layer/step raised this question */
-  source: 'walk' | 'synthesis' | 'deep_dive' | 'coaching' | 'maturity_gap';
-  /** Status tracking */
-  status: 'open' | 'resolved' | 'filtered';
+  /**
+   * Which layer/step raised this question. Type aliased to
+   * `UnderstandingQuestionSource` (D-0.2 extension) so the
+   * `analysis_specifics_gap` value is available alongside legacy values.
+   */
+  source: UnderstandingQuestionSource;
+  /**
+   * Status tracking. Type aliased to `UnderstandingQuestionStatus` (D-0.2
+   * extension) so the dig-pathway statuses (`asked_to_student`,
+   * `student_answered`, `student_declined`) are available alongside legacy.
+   */
+  status: UnderstandingQuestionStatus;
   /** Resolution (if resolved) */
   resolution?: string;
+  /**
+   * Dig context — populated only when `source === 'analysis_specifics_gap'`.
+   * Carries the analysis layer's reasoning, expected answer shape, downstream
+   * consumers, framing seed, and (post-delivery) the chat threading + the
+   * extracted structured answer. See `DigContext` (D-0.2).
+   */
+  dig?: DigContext;
 
   // ── Persistent Queue Fields (Gap 2) ──
 
@@ -4406,12 +4931,6 @@ export interface SynthesisIterationOutput {
   questionCuration: QuestionCurationOutput;
   /** Reading Strategy — meta-understanding of how to read THIS essay */
   readingStrategy: ReadingStrategy;
-  /** Which paragraphs would benefit from re-reading with full context */
-  reReadCandidates: Array<{
-    paragraph: number;
-    reason: string;
-    expectedDepthGain: 'significant' | 'moderate';
-  }>;
   /** What changed compared to previous iteration (LLM-generated narrative) */
   evolutionNarrative: string;
   /** Self-assessed convergence signal */
@@ -4580,8 +5099,6 @@ export interface EditUnderstandingOutput {
   understanding: EditUnderstanding;
   /** Pre-computed staleness effects based on the edit */
   stalenessEffects: StalenessEffect[];
-  /** Whether this edit triggered from focused or comprehensive analysis */
-  analysisMode: 'focused' | 'comprehensive';
 }
 
 // ─── L5 Annotation Types ────────────────────────────────────────────────────
@@ -4904,3 +5421,923 @@ export type { PIQPromptType } from '../piq/types';
 
 // EssayAuthenticityTier re-exported for AnalysisPassOutput consumers (Port B3).
 export type { EssayAuthenticityTier } from './rubrics/authenticityTiers';
+
+// ============================================================================
+// ITERATION LEDGER (Phase 0 D-0.1)
+// ============================================================================
+// Spec: docs/pipeline-evolution/04-pipeline-architecture/L5/L5_ITERATION_LOOP_DESIGN.md
+//   §7.1 (type shapes), §7.2 (producers), §7.3 (consumers), §7.4 (pruning).
+// Contract (D-0.1): types verbatim from the spec — no field additions, no
+// removals, no semantic changes. Per-field JSDocs name the producer and the
+// consumers so future readers can grep for field meaning without rereading
+// the design doc.
+// Q1 redirection retired per Tue's R-1 Resolution A (2026-04-26):
+// `comprehensiveBaselineCost` and `carryForwardSavings` are audit-only —
+// extra spend is escalation-driven (§6.4 + §9 of iteration design),
+// never scheduled redirection.
+
+/**
+ * Top-level iteration state on EssayProfile root.
+ *
+ * Persists across sessions on EssayProfile JSONB. Holds the per-essay
+ * iteration history: the append-only audit of every iteration's cost and
+ * decisions, the append-only ledger of every L5 annotation ever delivered
+ * (with cross-iteration landing status), and a recent-window of
+ * carry-forward decisions for diagnostic use.
+ *
+ * The substrate the entire iteration loop reads from. Producer and
+ * consumer details are field-level below.
+ *
+ * Added to EssayProfile root by D-0.5; this declaration only defines the
+ * shape (D-0.1).
+ */
+export interface IterationLedger {
+  /**
+   * Monotonically increasing iteration counter. Iteration 1 = first-pass.
+   *
+   * Producer: orchestrator increments at the start of every iteration
+   *   (analysisOrchestrator.ts entry; reanalysisOrchestrator.ts re-analysis entry).
+   * Consumers: priorAnnotationsBuilder (§7.5 dead-wire fix), focusedAnalyzer
+   *   mode-selection (`if iteration > 1, prefer focused`), L5 prompt iteration
+   *   context, UI iteration display.
+   * Pruning: never pruned.
+   */
+  currentIteration: number;
+  /**
+   * Append-only audit record of every iteration's cost and carry-forward
+   * decisions. `iterations[N-1]` is the audit record for iteration N.
+   *
+   * Producer: orchestrator pushes at iteration end after costs are tallied.
+   * Consumers: telemetry, cost-trajectory analysis, post-launch tuning.
+   * Pruning: kept indefinitely (one record ~500 bytes; 50 iterations ~25KB).
+   */
+  iterations: IterationRecord[];
+  /**
+   * Append-only ledger of every L5 annotation ever delivered. Each entry's
+   * `landing` field is `null` (absent) at delivery and populated by the
+   * landing detector on the *next* iteration (since landing is observable
+   * only after the student's response edit).
+   *
+   * Producer: L5 deepAnnotationService appends one entry per emitted
+   *   annotation (Phase 1 D-1.2).
+   * Consumers: priorAnnotationsBuilder groups prior moves by paragraph;
+   *   landingDetector reads as classification input; Conversator
+   *   continuous-chat handler reads for cross-iteration coaching context
+   *   ("have we worked on this before?"); cross-iteration synthesizer.
+   * Pruning: kept indefinitely (~100KB at 5 moves × 20 iterations).
+   */
+  taughtMoves: TaughtMove[];
+  /**
+   * Per-iteration carry-forward decisions for diagnostic / audit.
+   *
+   * Producer: orchestrator appends at every carry-forward decision point
+   *   (per-paragraph, per-Finding, per-lens-emission, etc.) via
+   *   `safeAppendCarryForwardDecision`.
+   *
+   * Consumers (Phase 1): the orchestrator reads this on commit to feed
+   *   `synthesizeCarryForwardSummary`, producing
+   *   `IterationRecord.carryForwardSummary` (the rolled-up audit shape).
+   *   That summary is persisted on the IterationRecord but has no Phase 1
+   *   runtime read consumer beyond the orchestrator's own debug log.
+   *
+   * Consumers (future, NOT YET WIRED — D-1.16-prefix F-08 honesty pass
+   * 2026-04-30): the regression-detection tooling and per-iteration
+   * cost-vs-baseline drift surface anticipated by the original spec are
+   * post-Phase-1 deliverables. Until they ship, this field's value is
+   * an audit trail only — populated correctly, persisted via checkpoint,
+   * but read by no live runtime feature. Any Phase 2/3 deliverable that
+   * adds a runtime consumer should update this JSDoc and add a
+   * branching-consumer test (see tests/unit/edit-process-response.test.ts
+   * for the pattern).
+   *
+   * Pruning: pruned to the last 5 iterations at iteration end (decisions
+   *   are dense and only audit-relevant short-term).
+   */
+  recentDecisions: CarryForwardDecision[];
+}
+
+/**
+ * Per-iteration audit record. Captures what triggered the iteration, the
+ * orchestrator's carry-vs-rederive-vs-refresh decisions, what was actually
+ * spent, what a comprehensive baseline would have spent (audit-only — see
+ * the R-1 retirement note in this section's header), whether escalation
+ * fired, and a free-text rationale for ambiguous calls.
+ *
+ * Producer: orchestrator commits at iteration end after costs tallied.
+ * Consumers: telemetry, audit/calibration tooling, escalation calibration
+ *   drift detection.
+ */
+export interface IterationRecord {
+  /** Iteration number this record describes. Matches `IterationLedger.currentIteration` at the time of commit. */
+  iteration: number;
+  /** What triggered this iteration. */
+  triggeredBy: 'first_pass' | 'edit' | 'student_request';
+  /**
+   * Edit-triggered iterations carry the diff scope. Absent for `first_pass`
+   * and `student_request`.
+   */
+  editScope?: {
+    /** Zero-indexed paragraph indices that changed. */
+    paragraphsChanged: number[];
+    /** Edit significance — drives mode selection and ripple sizing. */
+    significance: 'minor' | 'moderate' | 'significant' | 'transformative';
+    /** LLM-classified change types per editUnderstandingService. */
+    changeTypes: EditChangeType[];
+    /** Structural reordering metadata. */
+    structural: { reordered: boolean; added: number; removed: number };
+  };
+  /**
+   * What the orchestrator decided to re-derive vs carry. Item-keyed for
+   * audit traceability; the `recentDecisions[]` ledger holds the per-decision
+   * detail, this is the rolled-up summary.
+   *
+   * Consumers (Phase 1): the orchestrator reads `(carried.length,
+   * rederived.length, refreshed.length)` at commit time for a debug log
+   * line; the summary is then persisted on this IterationRecord and
+   * serialized via the checkpoint store. Beyond that one debug-log read,
+   * NO Phase 1 runtime consumer queries this field.
+   *
+   * Consumers (future, NOT YET WIRED — D-1.16-prefix F-09 honesty pass
+   * 2026-04-30): the original spec anticipated a student-facing surface
+   * showing "what we kept understanding from last iteration" (Tue's
+   * 2026-04-15 vision per L5_ITERATION_LOOP_DESIGN.md §9.4); that
+   * deliverable has not landed. The field's data is correct and persisted;
+   * activating a runtime consumer is post-Phase-1 work. Any future
+   * deliverable that surfaces this in L5/L6/UI should update this JSDoc
+   * and add a branching-consumer test.
+   */
+  carryForwardSummary: {
+    /** Items carried forward unchanged. e.g., `['voiceMap', 'P1.understanding', 'F3', 'F5']`. */
+    carried: string[];
+    /** Items re-derived. e.g., `['P3.understanding', 'P3.analysis', 'thematicArchitecture']`. */
+    rederived: string[];
+    /** Items partially refreshed. e.g., `['L5.P3.annotations', 'F7.maturity']`. */
+    refreshed: string[];
+  };
+  /** Cost actually spent this iteration, per layer. e.g., `{ L1: 0.005, 'L3.sweep': 0.12, L5: 0.30 }`. */
+  costBreakdown: Record<string, number>;
+  /**
+   * Cost a comprehensive baseline would have spent, recomputed from per-layer
+   * baseline costs.
+   *
+   * Audit-only — informs cost-trajectory monitoring, NOT redirection.
+   * Per R-1 Resolution A (Tue 2026-04-26): no mandated redirection fraction;
+   * extra spend is triggered by the escalation ladder per ITERATION_LOOP_DESIGN
+   * §6.4 + §9, never scheduled.
+   */
+  comprehensiveBaselineCost: number;
+  /**
+   * `comprehensiveBaselineCost - sum(costBreakdown)`.
+   *
+   * Genuine savings, not a slush fund. The carry-forward already delivers
+   * the quality booster for free (iteration N's L5 receives priorAnnotations
+   * + matured findings — structurally deeper than iter-1 cold pass at no
+   * extra cost). Savings are not redirected.
+   */
+  carryForwardSavings: number;
+  /**
+   * Whether escalation fired this iteration, and to which level. Levels per
+   * ITERATION_LOOP_DESIGN §6.4:
+   *   0 — no escalation (focused / focused_structural / comprehensive ran clean).
+   *   1 — re-walk affected paragraphs only.
+   *   2 — re-walk + neighbor sentences.
+   *   3 — re-walk + targeted lens re-runs (post-absorption replaces L3.75 refresh).
+   *   4 — comprehensive escalation.
+   * Used by: calibration drift detection (e.g., persistent over-escalation on small edits).
+   */
+  escalationLevel: 0 | 1 | 2 | 3 | 4;
+  /** Free-text rationale for any ambiguous decisions this iteration. LLM-generated. */
+  rationale: string;
+  /** ISO timestamp when iteration started. */
+  startedAt: string;
+  /** ISO timestamp when iteration ended (after this record's commit). */
+  finishedAt: string;
+  /**
+   * Telemetry events emitted during this iteration.
+   *
+   * Phase 0 D-0.9 amendment: optional addition to the §7.1 type spec.
+   * Telemetry module buffers events keyed by currentIteration in-memory
+   * during the iteration; orchestrator flushes the buffer to
+   * `events[]` at iteration commit (Phase 1 D-1.10).
+   *
+   * The optional shape preserves D-0.1's verbatim §7.1 promise: existing
+   * IterationRecord constructors that don't populate this field still
+   * compile. New code that wants the audit trail populates it.
+   *
+   * Producer: telemetry/iterationTelemetry.ts (D-0.9) buffer flush.
+   * Consumer: post-launch tuning, calibration drift detection, audit
+   *   tooling. Read-only after iteration commit.
+   */
+  events?: IterationTelemetryEvent[];
+  /**
+   * Snapshot of the essay text at the moment THIS iteration's analysis
+   * completed. From iteration N+1's perspective, `iterations[N-1].snapshotText`
+   * is the prior-iteration text — the OLD half of the diff that
+   * `priorAnnotationsBuilder` (D-1.6) and `paragraphRemapBuilder` (D-1.7)
+   * consume to remap prior taughtMoves into the current iteration's
+   * paragraph layout.
+   *
+   * Phase 1 D-1.8 amendment: optional addition. D-1.8 wires the orchestrator
+   * to READ this field via `getPriorIterationSnapshotText`. D-1.10 (orchestrator
+   * end-of-iteration commit) WRITES it. Until D-1.10 lands, records committed
+   * upstream may not have this field — readers handle `undefined` gracefully
+   * (structural absence, not silent fallback).
+   *
+   * Producer: orchestrator at iteration commit (Phase 1 D-1.10) — sets to
+   *   `profile.essayText` post-iteration.
+   * Consumer: priorAnnotationsBuilder via `getPriorIterationSnapshotText` in
+   *   essayProfileManager (D-1.8).
+   * Pruning: never pruned (one string per iteration; ~5KB × 20 iterations
+   *   ≈ 100KB upper bound on a heavily-iterated essay).
+   */
+  snapshotText?: string;
+}
+
+/**
+ * One telemetry event from a step within an iteration.
+ *
+ * Phase 0 D-0.9 — emit-side type. The telemetry module
+ * (`src/services/essayIntelligence/telemetry/iterationTelemetry.ts`)
+ * produces these from `emitStepStart` / `emitStepSuccess` /
+ * `emitStepFailure`. Pure data — no methods, no class instances —
+ * so events serialize cleanly to JSONB if a future deliverable
+ * persists them outside the in-memory iteration buffer.
+ *
+ * Consumers: IterationRecord.events[] (post-flush) for audit; console
+ *   log with `[IterationTelemetry]` prefix for tail-able local dev.
+ */
+export interface IterationTelemetryEvent {
+  /** Iteration this event belongs to. Matches IterationLedger.currentIteration at emit time. */
+  iteration: number;
+  /**
+   * Step identifier within the iteration. Free-form — examples:
+   * `'l1.firstImpressions'`, `'l3.sweep'`, `'l3.lens.voice'`,
+   * `'l5.tier2'`, `'landing.detector'`. Phase 1+ standardizes step
+   * names as orchestration sites stabilize.
+   */
+  step: string;
+  /** Optional paragraph index for per-paragraph events. */
+  paragraphIndex?: number;
+  /** Lifecycle stage of the event. */
+  status: 'started' | 'succeeded' | 'failed';
+  /** Failure context — populated only on `status: 'failed'`. */
+  error?: { message: string; code?: string; context?: Record<string, unknown> };
+  /** USD cost of the step (LLM-touching steps only). */
+  cost?: number;
+  /** Token usage for the step (LLM-touching steps only). */
+  tokenUsage?: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
+  };
+  /** Wall-clock duration in ms (populated on succeeded / failed). */
+  durationMs?: number;
+  /** Model name (LLM-touching steps only). */
+  model?: string;
+  /**
+   * Success-side context payload — counters, byLayer breakdowns, dedup
+   * deltas, anything observable about a successful step that doesn't fit
+   * the scalar fields above. Mirror to `error.context` for failures.
+   * Free-form by design (analogous to `error.context: Record<string, unknown>`).
+   * First consumer: Phase 5.6 specifics-need aggregation event (D-2.8) carries
+   * `{ totalEmissions, addedToQueue, deduplicatedAgainstExisting,
+   * deduplicatedWithinRun, byLayer }` here.
+   */
+  metadata?: Record<string, unknown>;
+  /** ISO timestamp of the event. */
+  timestamp: string;
+}
+
+/**
+ * One L5 annotation delivered, with cross-iteration tracking.
+ *
+ * The append-only ledger is the substrate for non-repetition (we know what
+ * was said before so we don't say it again), landing detection (we know
+ * which moves the student addressed), and cross-iteration synthesis
+ * ("you've been working on opening hooks across iterations 1–3").
+ *
+ * Producer: L5 deepAnnotationService appends at annotation emission
+ *   (Phase 1 D-1.2).
+ * Mutator (landing field only): landingDetector on the iteration AFTER
+ *   delivery (Phase 1 D-1.3 + D-1.6).
+ * Consumers: priorAnnotationsBuilder (groups by paragraph), landingDetector
+ *   (input to classification), Conversator continuous-chat handler,
+ *   cross-iteration synthesizer.
+ */
+export interface TaughtMove {
+  /**
+   * Stable ID: `M-{iteration}-{paragraphIndex}-{annotation.id}`. Property-tested
+   * for stability per Phase 1 D-1.13 (8-property battery in
+   * `tests/property/taughtMoveIdStability.ts`). The trailing segment is the
+   * `L5Annotation.id` rather than a per-paragraph sequence counter because
+   * sequence counters aren't deterministic across runs (annotation generation
+   * order is not guaranteed stable). `L5Annotation.id` is itself stable and
+   * unique within an `L5AnnotationResult`. Construction lives at
+   * `analysis/taughtMoveBuilder.ts:50` (generateTaughtMoveId).
+   */
+  id: string;
+  /** L5Annotation.id at time of generation. Bridges to the full annotation in the iteration checkpoint. */
+  annotationId: string;
+  /** Optional Finding link — the durable claim this move teaches against. */
+  findingId?: string;
+  /** Where the move was anchored. */
+  location: { paragraphIndex: number; sentenceIndex?: number; spanText?: string };
+  /** Iteration at which this move was delivered. */
+  taughtAtIteration: number;
+  /**
+   * Teaching mode for the move. Aliased to `L5TeachingMode` (defined above
+   * in this file) for single source of truth; the union is identical to
+   * the §7.1 inline literal: `'awareness' | 'consequence' | 'connection' | 'action'`.
+   */
+  teachingMode: L5TeachingMode;
+  /** 1–2 sentence content snapshot. Full annotation lives in the iteration checkpoint. */
+  contentSummary: string;
+  /** Optional stakes summary — what the student loses by not addressing this. */
+  stakesSnapshot?: string;
+  /**
+   * Landing status, populated on the iteration AFTER delivery.
+   *
+   * Set by: landingDetector (Phase 1 D-1.3 — single Haiku call combining
+   *   3 signals: edit-vs-critique, redetection, chat-behavior, with an
+   *   LLM-judged combiner, NOT a formula).
+   * Per Q4 (locked): confidence floor 0.7 to count as `addressed`; below →
+   *   `partially_addressed`. Asymmetric tolerance: prefer-not-to-repeat over
+   *   prefer-to-cover.
+   */
+  landing?: {
+    /**
+     * Landing classification.
+     *   `addressed` — student edit (or Conversator chat) substantively addressed the move.
+     *   `partially_addressed` — addressed weakly OR confidence < 0.7.
+     *   `unaddressed` — not addressed.
+     *   `changed_target` — student edit targets the spot but in a direction
+     *     that makes the original move no longer applicable.
+     *   `pending` — detector explicitly in-flight or partial. Distinct from
+     *     `landing` being absent (which is the default at delivery, per §7.2).
+     */
+    status: 'addressed' | 'partially_addressed' | 'unaddressed' | 'changed_target' | 'pending';
+    /** Iteration at which landing was detected (always `taughtAtIteration + N` for N >= 1). */
+    detectedAtIteration: number;
+    /** Detector confidence (0–1). Floor 0.7 to count as `addressed` per Q4. */
+    confidence: number;
+    /** Detector's free-text reasoning for the classification (LLM-generated). */
+    reasoning: string;
+    /** Which signals fed the LLM-judged combiner. */
+    signalsUsed: Array<'edit_vs_critique' | 'redetection' | 'chat_behavior'>;
+  };
+  // [D-1.6.6 closure 2026-04-30] `deepenedBy?: string[]` and
+  // `supersededBy?: string` were declared here for cross-iteration
+  // chain-tracking but had ZERO producers and ZERO consumers anywhere
+  // in src/services/essayIntelligence/. Phase 1 dead-wire audit (F-02,
+  // F-03) flagged them as type-level ceremony. Removed to keep the
+  // schema honest. If a Phase 2/3 deliverable needs cross-iteration
+  // chain-tracking on TaughtMove, add the fields back ALONGSIDE the
+  // producer (mutator + write site) and the consumer (the code path
+  // that READS the chain) in the same commit — so we don't grow a
+  // new dead wire. Note: `Finding.supersededBy` (profileTypes.ts:3622)
+  // and `ImprovementCandidate.supersededBy` (profileTypes.ts:2270)
+  // ARE wired and remain.
+}
+
+/**
+ * One carry-forward arbitration decision, recorded for audit / regression
+ * detection. Pruned with `IterationLedger.recentDecisions[]` to the last
+ * 5 iterations.
+ *
+ * Producer: orchestrator at every carry-forward decision point.
+ * Consumer: regression detection, calibration drift detection.
+ */
+export interface CarryForwardDecision {
+  /** Iteration this decision was made in. */
+  iteration: number;
+  /**
+   * Item key naming what was decided. Examples: `'voiceMap.signature'`,
+   * `'F7'` (Finding ID), `'P3.analysis'`, `'L5.P3.annotations'`. Keys
+   * follow per-layer conventions in ITERATION_LOOP_DESIGN §3 carry-forward
+   * inventory.
+   */
+  itemKey: string;
+  /**
+   * What the orchestrator decided.
+   *   `carry` — keep prior iteration's value.
+   *   `rederive` — fully re-compute.
+   *   `partial_refresh` — refresh some sub-fields, carry others.
+   */
+  decision: 'carry' | 'rederive' | 'partial_refresh';
+  /**
+   * Free-text rationale for the decision. LLM-generated for ambiguous calls
+   * (`arbitrationMechanism === 'llm_judgment'`); deterministic-template for
+   * validity-test calls.
+   */
+  rationale: string;
+  /** Baseline re-derive cost the carry would have incurred. 0 if `decision === 'rederive'`. */
+  costSavedIfCarry: number;
+  /** Cost actually spent on re-derive. 0 if `decision === 'carry'`. */
+  costSpentIfRederive: number;
+  /**
+   * Which arbitration mechanism made the call.
+   *   `validity_test` — deterministic per-item rule (e.g., "carry voiceMap
+   *     unless register-shift detector flags drift on changed paragraphs").
+   *   `llm_judgment` — Sonnet/Haiku call resolved ambiguity.
+   *   `comprehensive_rule` — comprehensive mode forced re-derive (no arbitration).
+   */
+  arbitrationMechanism: 'validity_test' | 'llm_judgment' | 'comprehensive_rule';
+}
+
+// ============================================================================
+// CONVERSATOR GROUND TRUTH (Phase 0 D-0.3)
+// ============================================================================
+// Spec: docs/pipeline-evolution/04-pipeline-architecture/L5/L5_E2E_INTEGRITY_AUDIT.md
+//   §4.5 (type shapes), §5.2 (consumption by next iteration), §5.3 (carry-forward).
+// Contract (D-0.3): exact types per §4.5 — all three types, full field set.
+// Co-located with EssayProfile types here (rather than in conversator/types.ts)
+// because they are essay-profile-level durable state — D-0.5 adds them to
+// EssayProfile root as `groundTruthFacts: GroundTruthFact[]`,
+// `storyFragments: StoryFragment[]`, `intentSignals: IntentSignal[]`. They
+// survive iterations as first-class durable state (like Findings); iteration
+// N+1's analysis layers read them as input. DigContext (D-0.2) references
+// these types via its `structuredAnswer` field.
+
+/**
+ * One captured factual claim from a student dig answer.
+ *
+ * The factual ground truth substrate for L5 fabrication-guard (Tier 3) and
+ * for analysis-layer prompts that need student-side anchors text alone can't
+ * provide. Example: "5 people on the team, not 50" — the essay's number was
+ * ambiguous; the student answered the dig and we now know the truth.
+ *
+ * Producer: digAnswerExtractor (Phase 3 D-3.7) — Sonnet call extracting
+ *   structured shape from raw chat answer.
+ * Consumers: L1/L3/L3.5/L5 prompt cached blocks (the analysis-side facts
+ *   block); L5 fabrication-guard at Tier 3; future-iteration evidence
+ *   anchoring on Findings.
+ * Carry-forward: durable across iterations; superseded only by explicit
+ *   student correction (per §5.3).
+ */
+export interface GroundTruthFact {
+  /** Stable record ID. */
+  id: string;
+  /** The factual claim, in the student's words or the extractor's faithful paraphrase. */
+  claim: string;
+  /** Raw student statements that grounded the claim. */
+  evidence: string[];
+  /** Extractor's confidence in the claim. */
+  confidence: 'high' | 'medium' | 'low';
+  /** Chat message ID that carried the answer (links into essay_chat_conversations). */
+  sourceTurn?: string;
+  /** Where in the essay this fact applies. */
+  appliesTo?: { paragraph: number; sentence?: number; spanText?: string };
+  /** ISO timestamp of capture. */
+  capturedAt: string;
+  /** Dig question ID that prompted the answer (links into UnderstandingQuestion). */
+  digQuestionId?: string;
+}
+
+/**
+ * One narrative fragment from a student dig answer.
+ *
+ * Story fragments are richer than facts — they carry arc framing, sensory
+ * anchors, emotional thread. Used by L3 Pass 2 Story lens to enrich
+ * `momentEarnednessMap` synthesis and by L5 Move 6 multiplicity paths
+ * (the rewrite layer can offer paths grounded in the student's own
+ * remembered specifics).
+ *
+ * Producer: digAnswerExtractor (Phase 3 D-3.7) when the answer comes back
+ *   in `narrative` shape.
+ * Consumers: L3 Pass 2 Story lens (per F2 R-7 contributor table); L3 Pass 3
+ *   `momentEarnednessMap.moments[].mechanisms` synthesis; L5 Move 6 path
+ *   composition.
+ * Carry-forward: durable across iterations.
+ */
+export interface StoryFragment {
+  /** Stable record ID. */
+  id: string;
+  /** The raw narrative the student shared. */
+  fragment: string;
+  /** Student's own framing of the arc, if they offered one. */
+  arc?: string;
+  /** Sensory details the student named (sights, sounds, textures). */
+  sensoryAnchors?: string[];
+  /** Emotional register of the fragment. */
+  emotionalThread?: string;
+  /** Where this could ground in the essay (LLM-suggested, NOT student-asserted). */
+  potentialAnchorParagraphs: number[];
+  /** ISO timestamp of capture. */
+  capturedAt: string;
+  /** Dig question ID that prompted the answer. */
+  digQuestionId?: string;
+}
+
+/**
+ * One captured intent signal from a student dig answer.
+ *
+ * Intent signals encode "what the student says they're trying to do" —
+ * usable by L4 northStar.intentBridge to align (or surface mismatch with)
+ * the system's inferred intent. The student's stated intent is authoritative
+ * over the system's inferred intent for this layer.
+ *
+ * Producer: digAnswerExtractor (Phase 3 D-3.7) when the answer reveals
+ *   intent (typically `short_phrase` or `narrative` shape).
+ * Consumers: L4 northStar.intentBridge.alignments[] (validates or flags
+ *   mismatch); L5 Tier 1 prompt's framing (don't propose paths that violate
+ *   stated intent); coachingMap.transformativeInsight framing.
+ * Carry-forward: durable across iterations.
+ */
+export interface IntentSignal {
+  /** Stable record ID. */
+  id: string;
+  /** What the student says they're trying to do at this point. */
+  intent: string;
+  /** Where the intent applies — paragraph-level, sentence-level, or essay-level. */
+  appliesTo: { paragraph?: number; sentence?: number; essayLevel?: boolean };
+  /** Whether the system's analysis-side read aligned with the student's stated intent. */
+  alignmentWithSystemRead: 'aligned' | 'partial' | 'mismatch';
+  /** ISO timestamp of capture. */
+  capturedAt: string;
+  /** Dig question ID that prompted the answer. */
+  digQuestionId?: string;
+}
+
+// ============================================================================
+// SPECIFICS-NEED / DIG CONTEXT (Phase 0 D-0.2)
+// ============================================================================
+// Spec: docs/pipeline-evolution/04-pipeline-architecture/L5/L5_E2E_INTEGRITY_AUDIT.md
+//   §3.1 (type extensions for UnderstandingQuestion + DigContext shape).
+// Contract (D-0.2): extend UnderstandingQuestion with the new
+// `analysis_specifics_gap` source and three new statuses; add the
+// `dig?: DigContext` sub-object populated only when source ===
+// 'analysis_specifics_gap'. The new unions are SUPERSETS of the legacy
+// unions, so existing consumers keep working unchanged.
+//
+// Per Q-B (analysis-driven dig): every analysis layer that produces an
+// output contributes specifics-need entries. The Conversator (Phase 3)
+// reads the queue, composes student-facing framings, captures answers,
+// and routes structured records back into the analysis prompts via
+// GroundTruthFact / StoryFragment / IntentSignal (D-0.3).
+
+/**
+ * The set of layers/steps that can raise an UnderstandingQuestion.
+ *
+ * Legacy values (`walk`, `synthesis`, `deep_dive`, `coaching`,
+ * `maturity_gap`) carry forward unchanged. The NEW value
+ * `analysis_specifics_gap` flags a question whose answer requires
+ * student input — text re-investigation alone won't resolve it.
+ */
+export type UnderstandingQuestionSource =
+  | 'walk'
+  | 'synthesis'
+  | 'deep_dive'
+  | 'coaching'
+  | 'maturity_gap'
+  | 'analysis_specifics_gap';
+
+/**
+ * The lifecycle states of an UnderstandingQuestion.
+ *
+ * Legacy values (`open`, `resolved`, `filtered`) carry forward unchanged.
+ * THREE NEW values cover the dig pathway:
+ *   `asked_to_student` — Conversator surfaced the question; awaiting answer.
+ *   `student_answered` — student answered; structured answer attached on `dig`.
+ *   `student_declined` — student declined to answer (e.g., "skip" / "I don't know"); deferred.
+ */
+export type UnderstandingQuestionStatus =
+  | 'open'
+  | 'resolved'
+  | 'filtered'
+  | 'asked_to_student'
+  | 'student_answered'
+  | 'student_declined';
+
+/**
+ * Sub-object populated on questions where `source === 'analysis_specifics_gap'`.
+ *
+ * Captures the analysis layer's reasoning ("why we need this"), what shape
+ * answer would resolve it, what downstream layers will consume the
+ * structured answer, what fields it populates, the Conversator's
+ * non-leading framing seed, and (after delivery) the chat threading +
+ * extraction state.
+ *
+ * Producers:
+ *   - Analysis layers populate `whyAsked` / `expectedAnswerShape` /
+ *     `consumers` / `populates` / `framingSeed` at emission.
+ *   - Conversator timing policy + composer (Phase 3 D-3.5) populate
+ *     `askedAt` and `conversatorMessageId` when surfacing.
+ *   - Conversator answer extractor (Phase 3 D-3.7) populates
+ *     `studentAnswerRaw` and either `structuredAnswer` (success) or
+ *     `extractionPending` (failure with raw answer + reason for retry).
+ * Consumers:
+ *   - The Conversator timing policy reads `expectedAnswerShape` /
+ *     `framingSeed` to compose the student-facing question.
+ *   - Iteration N+1 analysis-layer prompts read `structuredAnswer` from the
+ *     ground-truth blocks (also persisted to GroundTruthFact[] /
+ *     StoryFragment[] / IntentSignal[]) — the dig sub-object is the
+ *     bookkeeping; the durable records are the consumption substrate.
+ */
+export interface DigContext {
+  /** Why this dig matters — the analysis layer's reasoning. */
+  whyAsked: string;
+  /** What shape of answer would resolve the dig. Drives extractor routing. */
+  expectedAnswerShape: 'scalar' | 'short_phrase' | 'specific_memory' | 'list' | 'narrative';
+  /** Which downstream layer(s) will consume the structured answer. */
+  consumers: Array<'l3' | 'l3_5' | 'l3_75' | 'l4' | 'l5' | 'finding_maturity'>;
+  /**
+   * Field paths on the profile (or store) that the structured answer
+   * populates. e.g., `['groundTruthFacts.factsByLocation', 'finding.evidence']`.
+   * Free-form strings — these are documentation, not enforced.
+   */
+  populates: string[];
+  /**
+   * Conversator-facing seed — a non-leading way to phrase the question.
+   * The composer prompt (Phase 3 D-3.5) revises this seed into the
+   * actual student-facing message; the seed encodes the analytic intent.
+   */
+  framingSeed: string;
+  /**
+   * Optional sentence-level anchor (zero-indexed) within the parent
+   * `UnderstandingQuestion.anchorParagraph`. Some emission sources
+   * naturally anchor at sentence granularity (e.g., L3.5's per-sentence
+   * confidence judgments) and persisting that granularity lets the
+   * Conversator (Phase 3) compose questions that reference the exact
+   * sentence rather than the whole paragraph.
+   *
+   * Added by D-2.7 (round-1 audit HIGH-1 closure 2026-05-01) so emissions
+   * carrying anchorSentence persist that signal end-to-end rather than
+   * being silently dropped at mint time.
+   */
+  anchorSentence?: number;
+  /** ISO timestamp when the question was asked to the student. */
+  askedAt?: string;
+  /** Conversator chat message ID that surfaced the question (links into essay_chat_conversations). */
+  conversatorMessageId?: string;
+  /** Raw student answer text. Persisted before extraction in case extraction fails. */
+  studentAnswerRaw?: string;
+  /**
+   * Structured answer extracted by the Conversator (D-3.7). One of the
+   * three durable record types — the same record is also persisted to
+   * the corresponding store on EssayProfile root for cross-iteration
+   * carry-forward.
+   */
+  structuredAnswer?: GroundTruthFact | StoryFragment | IntentSignal | null;
+  /**
+   * If extraction failed, the raw answer + reason. Allows retry without
+   * re-asking the student.
+   */
+  extractionPending?: {
+    rawAnswer: string;
+    failureReason: string;
+  };
+}
+
+// ============================================================================
+// SPECIFICS-NEED EMISSION (Phase 2 D-2.7)
+// ============================================================================
+// Spec: docs/pipeline-evolution/04-pipeline-architecture/L5/L5_E2E_INTEGRITY_AUDIT.md
+//   §3.2 (per-layer contributors).
+// Contract (D-2.7): The input type that the analysis layers (D-2.2 L3
+// walk, D-2.3 L3.5 analysis, D-2.4 L3.75 holistic Phase A/B, D-2.5 L4
+// northStar, D-2.6 FindingStore stuck-hypothesis) emit when they
+// recognize a gap that re-reading the text alone cannot resolve. The
+// aggregator (`specificsNeedAggregator.ts`) consumes these emissions,
+// deduplicates them against the existing question queue, and mints
+// new `UnderstandingQuestion` entries with `source: 'analysis_specifics_gap'`
+// + populated `dig: DigContext` for unmatched emissions.
+//
+// Why this type exists alongside DigContext: DigContext is the persisted
+// sub-object on `UnderstandingQuestion`; SpecificsNeedEmission is the
+// per-iteration emission shape the layers produce BEFORE aggregation
+// decides whether to mint a new question. Carrying analytical reasoning
+// (whyAsked, framingSeed) and routing fields (consumers, populates,
+// expectedAnswerShape) on the emission keeps the aggregator's dedup
+// + minting logic deterministic — no LLM call inside the aggregator,
+// just pure transformation.
+
+/**
+ * The set of analysis-layer surfaces that can emit a SpecificsNeedEmission.
+ *
+ * Closed enum — system bookkeeping for telemetry routing and dedup tie-
+ * breaking (Rule 6 of feedback_llm-first-design.md). Phase 2 deliverables
+ * map 1:1 to entries: D-2.2 → 'l3_walk', D-2.3 → 'l3_5_analysis',
+ * D-2.4 → 'l3_75_phase_a' / 'l3_75_phase_b', D-2.5 → 'l4_north_star',
+ * D-2.6 → 'finding_maturity'. New emission sources require a deliberate
+ * enum extension (and a corresponding plan-doc deliverable).
+ */
+export type SpecificsNeedSourceLayer =
+  | 'l3_walk'
+  | 'l3_5_analysis'
+  | 'l3_75_phase_a'
+  | 'l3_75_phase_b'
+  | 'l4_north_star'
+  | 'finding_maturity';
+
+/**
+ * One specifics-need emission from an analysis layer.
+ *
+ * The emission carries:
+ *   - PROVENANCE (sourceLayer, emittingTrigger) — for telemetry, dedup
+ *     tie-breaking, and audit-trail debugging
+ *   - ANCHOR (anchorParagraph, anchorSentence?) — where in the essay
+ *     this gap lives; load-bearing for the dedup key
+ *   - QUESTION CONTENT (question, dimensions, expectedInsight, priority)
+ *     — populates the UnderstandingQuestion top-level fields
+ *   - DIG-CONTEXT FIELDS (whyAsked, expectedAnswerShape, consumers,
+ *     populates, framingSeed) — populates the `dig: DigContext` sub-object
+ *     on the minted UnderstandingQuestion
+ *
+ * Producer: each of D-2.2 through D-2.6 emits an array of these from
+ * the layer's structured output.
+ *
+ * Consumer: D-2.7 specificsNeedAggregator validates schema, deduplicates,
+ * mints new UnderstandingQuestion entries, increments iterationsSurvived
+ * on matched existing questions.
+ *
+ * Failure surface (per the no-fallback charter): the aggregator throws on
+ * malformed emissions with structured context (sourceLayer, emission index,
+ * missing/invalid field). Iteration completes without that signal but
+ * with a visible flag; we do NOT silently drop the entry.
+ */
+export interface SpecificsNeedEmission {
+  /** Which layer surface emitted this. */
+  sourceLayer: SpecificsNeedSourceLayer;
+  /**
+   * Free-text describing what specifically triggered the emission within
+   * the layer (e.g., "F12 deepeningPotential != null with raisesQuestions[0]
+   * citing student's mother's reaction"). Diagnostic, not load-bearing
+   * for dedup or queue insertion. Required to be non-empty.
+   */
+  emittingTrigger: string;
+  /** Zero-indexed paragraph this emission anchors to. */
+  anchorParagraph: number;
+  /** Optional zero-indexed sentence within the anchor paragraph. */
+  anchorSentence?: number;
+  /**
+   * The question the layer would ask if the student were reachable.
+   * Populates `UnderstandingQuestion.question` on the minted entry.
+   * Plain language; the Conversator's composer (Phase 3 D-3.5) will
+   * polish into the actual student-facing message via `framingSeed`.
+   */
+  question: string;
+  /**
+   * Dimensions the question touches (one or more of the holistic
+   * dimensions). Populates `UnderstandingQuestion.dimensions`.
+   */
+  dimensions: string[];
+  /**
+   * What the layer expects to learn that would let it advance. Populates
+   * `UnderstandingQuestion.expectedInsight`.
+   */
+  expectedInsight: string;
+  /**
+   * LLM-assigned priority. Populates `UnderstandingQuestion.priority`
+   * directly; mergeCuratedOutput's auto-promotion path (3+ iterations
+   * → high) applies in subsequent iterations.
+   */
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  /** Why this dig matters — populates `dig.whyAsked`. */
+  whyAsked: string;
+  /** Populates `dig.expectedAnswerShape`. Drives Conversator extractor routing. */
+  expectedAnswerShape: DigContext['expectedAnswerShape'];
+  /** Populates `dig.consumers`. Names which downstream layers consume the answer. */
+  consumers: DigContext['consumers'];
+  /** Populates `dig.populates`. Documents which profile fields the structured answer fills. */
+  populates: string[];
+  /** Populates `dig.framingSeed`. Non-leading way to phrase the question. */
+  framingSeed: string;
+
+  // ── D-2.2 round 1.8 extensions (ratified 2026-05-01) ─────────────────
+  // Five new fields capture the emission's user-facing rationale + concept
+  // library record. See `docs/pipeline-evolution/04-pipeline-architecture/
+  // L5/prompts/D-2.2/RATIONALE.md` and `ROUND_1_8_DRAFT.md` for the spec.
+
+  /**
+   * One-sentence articulation of WHAT the writer would discover about their
+   * own essay from answering — a pattern, an inversion, a hidden choice, an
+   * unowned emotion. Required for emissions whose value is (a) discovery
+   * (per round 1.8 §2.5). May be `null` only if the emission's value is
+   * purely (b) coaching-unlock with no discovery component.
+   *
+   * Banned trivial phrasings (round 1.8 §2.5): "the writer would discover
+   * what they were feeling," "the writer would discover their actual
+   * emotion," "the writer would discover a specific detail," "the writer
+   * would discover more about themselves." Name the SPECIFIC content —
+   * WHICH pattern, WHICH inversion, WHICH unowned emotion.
+   */
+  expectedDiscovery: string | null;
+
+  /**
+   * Short PROSE phrase (NOT snake_case) naming the writing principle this
+   * emission teaches. Free-form per Rule 3 (no closed taxonomy on LLM
+   * perception). Examples: "specific over general", "discovery over
+   * delivery", "concrete moment over summary", "honest word over easy word".
+   *
+   * Reuse policy (round 1.8 §3 + §8): before minting a new tag, scan
+   * `EssayProfile.conceptLibrary[]`. Reuse an existing tag if the underlying
+   * mechanism is identical — not just thematically similar. Required
+   * non-empty after trim.
+   */
+  conceptTag: string;
+
+  /**
+   * Drives the per-concept emission cap (round 1.8 §10).
+   *   simple   → max 1 unresolved instance per essay
+   *   medium   → max 2 unresolved instances per essay
+   *   complex  → max 3 unresolved instances per essay
+   * Applied alongside the per-essay hard ceiling of 3.
+   */
+  conceptComplexity: 'simple' | 'medium' | 'complex';
+
+  /**
+   * One-sentence universal definition of the concept, written GENERICALLY
+   * (NOT this student's essay). Stored in the concept library; user can
+   * reference on demand. Required non-empty after trim.
+   *
+   * Example: "Specific over general means choosing the precise concrete
+   * detail (a chair, an hour, a smell) over the abstract category
+   * (a place, sometime, a feeling) because precision earns trust where
+   * abstraction loses it."
+   */
+  conceptDefinition: string;
+
+  /**
+   * One corpus-quality EXAMPLE demonstrating the concept, written
+   * generically (NOT this student's essay). Stored in the concept library;
+   * user can reference on demand. Required non-empty after trim.
+   */
+  conceptExample: string;
+}
+
+/**
+ * Option 5 rebuild — lightweight gap-candidate proposal emitted by per-layer
+ * analysis (L3 walk, L3.5 analysis, L3.75 holistic, L4 northStar). NOT
+ * persisted on the profile; transient between Phase A (recognition at the
+ * cognitive moment that surfaced the gap) and Phase B (single essay-level
+ * decision that promotes 0-3 candidates into full SpecificsNeedEmission[]).
+ *
+ * Per-layer emission was costly because each layer filled in 17 fields per
+ * emission. Splitting into recognition (lightweight) + decision (full shape,
+ * once at essay level) preserves depth (recognition stays in the cognitive
+ * moment) while collapsing cost (one Sonnet call instead of N per-layer
+ * full-emission outputs).
+ *
+ * Source layers populate `sourceLayer` so Phase B can audit-trace each
+ * promoted emission back to which layer's recognition produced it.
+ */
+export interface EssayGapCandidate {
+  /** Which layer's cognitive work surfaced this candidate. */
+  sourceLayer: SpecificsNeedSourceLayer;
+  /** Zero-indexed paragraph the candidate anchors to. */
+  anchorParagraph: number;
+  /** Optional zero-indexed sentence within the anchor paragraph. */
+  anchorSentence?: number;
+  /**
+   * Free-text describing the artifact whose recognition triggered the
+   * candidate (e.g., "F12 deepeningPotential cites moment writer's mother
+   * reacted but text doesn't show it"). Phase B reads this to understand
+   * which finding/weakness/pattern the layer was working on when the gap
+   * appeared.
+   */
+  triggeringArtifact: string;
+  /**
+   * One sentence — what the layer NOTICED about the gap. Brief because
+   * Phase B will fill in the full delivery shape (framingSeed, conceptTag,
+   * conceptDefinition, etc.) with full essay context.
+   */
+  briefRecognition: string;
+}
+
+/**
+ * D-2.2 round 1.8 — Concept library entry on EssayProfile.
+ *
+ * Append-only across walk passes. User-accessible on demand (definitions +
+ * examples). Each entry tracks where the concept was taught (`instances[]`)
+ * and which prior gaps the user has resolved via iteration (`gapResolved`).
+ *
+ * Per-concept emission caps (round 1.8 §10) count UNRESOLVED instances:
+ * once `instances.filter(i => !i.gapResolved).length >= cap[complexity]`,
+ * the walk stops emitting on this concept. When the user iterates and the
+ * gap-resolution detector marks prior instances resolved, the cap relaxes
+ * and new instances of the same concept can fire fresh teaching.
+ */
+export interface ConceptLibraryEntry {
+  /** Prose tag matching the emission's `conceptTag`. Reuse-respected. */
+  tag: string;
+  /** Drives the per-concept cap (mirror of emission's `conceptComplexity`). */
+  complexity: 'simple' | 'medium' | 'complex';
+  /** Universal definition for the user-accessible library lookup. */
+  definition: string;
+  /** Generic corpus-quality example for the library. */
+  example: string;
+  /** Where this concept has been taught across walk passes for this essay. */
+  instances: Array<{
+    /** Zero-indexed paragraph of the original gap. */
+    paragraph: number;
+    /** Optional zero-indexed sentence of the original gap. */
+    sentence?: number;
+    /** Walk pass / iteration that produced this instance. */
+    iteration: number;
+    /** True iff the gap-resolution detector judged this gap closed in a later iteration. */
+    gapResolved: boolean;
+    /** Iteration at which `gapResolved` flipped to true; undefined while still unresolved. */
+    resolvedAtIteration?: number;
+  }>;
+}
