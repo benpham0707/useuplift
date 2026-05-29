@@ -28,8 +28,22 @@ interface SuiteResult {
 
 async function runSuite(file: string): Promise<SuiteResult> {
   const start = Date.now();
+  // Two test styles coexist in this directory: plain tsx scripts (top-level
+  // assertions) and vitest-style suites (import { describe, it, expect } from
+  // 'vitest'). Vitest tests cannot run under raw `tsx` — vitest's internal
+  // worker state is never initialised, so every assertion throws. Detect the
+  // vitest import and route those files through the vitest CLI instead.
+  let usesVitest = false;
+  try {
+    usesVitest = /from\s+['"]vitest['"]/.test(await fs.readFile(file, 'utf8'));
+  } catch {
+    /* unreadable file falls back to tsx and surfaces the real error */
+  }
+  const [cmd, args] = usesVitest
+    ? ['npx', ['vitest', 'run', file]]
+    : ['npx', ['tsx', file]];
   return new Promise((resolve) => {
-    const child = spawn('npx', ['tsx', file], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(cmd, args as string[], { stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', (d) => { stdout += d.toString(); });
