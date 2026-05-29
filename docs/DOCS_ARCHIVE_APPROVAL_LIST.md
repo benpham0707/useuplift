@@ -281,3 +281,19 @@
     - fix: File is empty and staged for deletion (git status: D) yet 10+ live pipeline-evolution docs + memory/sprint-status.md still reference docs/ESSAY_NORTH_STAR_DESIGN.md. Confirm whether content was migrated (likely into pipeline-evolution/04-pipeline-architecture/MASTER_INTEGRATION_PLAN.md) and repoint those references, or restore the file.
 - [ ] **RE_ANALYSIS_LIFECYCLE_DESIGN.md** — Re-analysis lifecycle design (incremental update / focused-mode pipeline) for Essay Intelligence.
     - fix: File is deleted on this branch (git status shows 'D') but is still referenced by multiple live pipeline-evolution docs, an audit doc, and memory/sprint-status.md. Either restore the doc or update those references to its successor in pipeline-evolution/04-pipeline-architecture.
+
+---
+
+## Note on the 2 rewire-needed items (in-flight migration — not auto-fixed)
+
+`ESSAY_NORTH_STAR_DESIGN.md` and `RE_ANALYSIS_LIFECYCLE_DESIGN.md` were **deleted at
+the top level** and their content **relocated into `pipeline-evolution/`** (still
+untracked — part of your active pipeline-evolution reorganization):
+
+- `docs/ESSAY_NORTH_STAR_DESIGN.md` → `docs/pipeline-evolution/04-pipeline-architecture/L4/ESSAY_NORTH_STAR_DESIGN.md` (150 lines)
+- `docs/RE_ANALYSIS_LIFECYCLE_DESIGN.md` → `docs/pipeline-evolution/04-pipeline-architecture/cross-cutting/RE_ANALYSIS_LIFECYCLE_DESIGN.md` (1145 lines)
+
+But **10+ docs + `memory/sprint-status.md` still link to the old top-level paths.**
+Left untouched because this is mid-migration in-flight work. When you finalize the
+pipeline-evolution reorg, decide: commit the relocated copies + repoint these
+references to the new paths (recommended), or restore the originals.
