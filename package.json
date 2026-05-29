@@ -14,6 +14,7 @@
     "setup:local": "bash scripts/setup-local-dev.sh",
     "test": "tsx tests/unit/run-all.ts",
     "test:integration": "tsx tests/integration/run-all.ts",
+    "test:vitest": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -51,6 +52,9 @@
     "@stripe/stripe-js": "^8.5.2",
     "@supabase/supabase-js": "^2.98.0",
     "@tanstack/react-query": "^5.83.0",
+    "@tiptap/pm": "^3.22.4",
+    "@tiptap/react": "^3.22.4",
+    "@tiptap/starter-kit": "^3.22.4",
     "@types/compression": "^1.8.1",
     "@types/uuid": "^10.0.0",
     "class-variance-authority": "^0.7.1",
@@ -107,6 +111,8 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",
-    "vite": "^5.4.19"
+    "vite": "^5.4.19",
+    "vitest": "^1.6.1",
+    "@vitest/coverage-v8": "^1.6.1"
   }
 }

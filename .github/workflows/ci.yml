@@ -23,8 +23,10 @@ jobs:
         run: npx tsc --noEmit
       - name: Descriptive-contract lint (L1/L3/L3.75 prompt purity)
         run: npx tsx tests/test-descriptive-contract-lint.ts
-      - name: Unit tests
+      - name: Unit tests (tsx runner)
         run: npm test
+      - name: Unit tests (vitest suites)
+        run: npm run test:vitest
 
   integration:
     name: Integration tests
