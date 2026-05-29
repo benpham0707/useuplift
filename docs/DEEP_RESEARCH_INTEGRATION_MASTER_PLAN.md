@@ -76,7 +76,7 @@
 
 **Status**: ✅ FULLY INTEGRATED (January 2025)
 **Research File**: `I need comprehensive research on how emotional int.md`
-**Complete Extraction Document**: `docs/EI_RESEARCH_COMPLETE_EXTRACTION.md`
+**Complete Extraction Document**: `docs/archived/deep-research/EI_RESEARCH_COMPLETE_EXTRACTION.md`
 
 ### Completed Implementations (January 2025)
 
@@ -84,8 +84,8 @@
 |-----------|------|-------|--------|
 | Citation Sources (35 total) | `data/emotionalIntelligenceSources.ts` | 18 original + 17 additional | ✅ Complete |
 | Cliché Detection (67 new patterns) | `services/semanticClicheAnalyzer.ts` | 6 new categories | ✅ Complete |
-| Complete Extraction Doc | `docs/EI_RESEARCH_COMPLETE_EXTRACTION.md` | Full extraction | ✅ Complete |
-| Future Integrations Doc | `docs/FUTURE_DEEP_INTEGRATIONS.md` | Roadmap | ✅ Complete |
+| Complete Extraction Doc | `docs/archived/deep-research/EI_RESEARCH_COMPLETE_EXTRACTION.md` | Full extraction | ✅ Complete |
+| Future Integrations Doc | `docs/archived/deep-research/FUTURE_DEEP_INTEGRATIONS.md` | Roadmap | ✅ Complete |
 
 ### New Source Categories Added
 
@@ -519,4 +519,4 @@ const FALSE_CLOSURE = [
 *Last Updated: January 2025*
 *Total Sources Extracted: 71 (18 SDT + 18 EI original + 17 EI additional + 18 college-specific)*
 *Total Cliché Patterns: 195+ (65 SDT + 40 EI original + 67 EI additional + 23 other)*
-*Complete Extraction Documents: EI_RESEARCH_COMPLETE_EXTRACTION.md, FUTURE_DEEP_INTEGRATIONS.md*
+*Complete Extraction Documents: docs/archived/deep-research/EI_RESEARCH_COMPLETE_EXTRACTION.md, docs/archived/deep-research/FUTURE_DEEP_INTEGRATIONS.md*

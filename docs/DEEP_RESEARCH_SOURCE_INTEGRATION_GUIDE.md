@@ -55,7 +55,7 @@
 
 ### Step 1: Run Perplexity Research
 
-Use the appropriate prompt from `docs/PERPLEXITY_PROMPTS_PRIORITY_2.md`. Save the results.
+Use the appropriate prompt from `docs/archived/deep-research/PERPLEXITY_PROMPTS_PRIORITY_2.md`. Save the results.
 
 ### Step 2: Create Source File
 
