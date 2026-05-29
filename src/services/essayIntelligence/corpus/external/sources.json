@@ -1,0 +1,107 @@
+{
+  "sources": [
+    {
+      "id": "jhu_etw",
+      "name": "Johns Hopkins Essays That Worked",
+      "url": "https://apply.jhu.edu/application-process/essays-that-worked/",
+      "type": "school_publication",
+      "author_role": "school_admissions_office",
+      "author_name": "JHU Office of Undergraduate Admissions",
+      "school_affiliation": "Johns Hopkins University",
+      "credibility": "S",
+      "notes": "Essays selected by JHU admissions with first-person commentary by the AO who read each one."
+    },
+    {
+      "id": "tufts_etw",
+      "name": "Tufts Past Common App Essays That Worked",
+      "url": "https://admissions.tufts.edu/blogs/inside-admissions/category/essays-that-worked/",
+      "type": "school_publication",
+      "author_role": "school_admissions_office",
+      "author_name": "Tufts Office of Undergraduate Admissions",
+      "school_affiliation": "Tufts University",
+      "credibility": "S"
+    },
+    {
+      "id": "conncoll_etw",
+      "name": "Connecticut College Essays That Worked",
+      "url": "https://www.conncoll.edu/admission/apply/essays-that-worked/",
+      "type": "school_publication",
+      "author_role": "school_admissions_office",
+      "author_name": "Connecticut College Office of Admission",
+      "school_affiliation": "Connecticut College",
+      "credibility": "S"
+    },
+    {
+      "id": "hamilton_etw",
+      "name": "Hamilton College Essays That Worked",
+      "url": "https://www.hamilton.edu/admission/apply/essays-that-worked",
+      "type": "school_publication",
+      "author_role": "school_admissions_office",
+      "author_name": "Hamilton College Office of Admission",
+      "school_affiliation": "Hamilton College",
+      "credibility": "S"
+    },
+    {
+      "id": "mit_blogs",
+      "name": "MIT Admissions Blog — Essay Analysis Posts",
+      "url": "https://mitadmissions.org/blogs/",
+      "type": "official_blog",
+      "author_role": "current_ao",
+      "author_name": "MIT Admissions Officers (named per post)",
+      "school_affiliation": "MIT",
+      "credibility": "S"
+    },
+    {
+      "id": "khan_admissions",
+      "name": "Khan Academy — Writing the College Application Essay",
+      "url": "https://www.khanacademy.org/college-careers-more/college-admissions",
+      "type": "video",
+      "author_role": "dean",
+      "author_name": "Stanford and other admissions deans (named per video)",
+      "credibility": "S"
+    },
+    {
+      "id": "selingo_book",
+      "name": "Who Gets In and Why — Jeffrey Selingo",
+      "url": "https://www.jeffselingo.com/who-gets-in-and-why",
+      "type": "book",
+      "author_role": "current_ao",
+      "author_name": "Jeffrey Selingo (with embedded access at Emory, Davidson, Univ. of Washington admissions)",
+      "credibility": "S",
+      "ingestion": "user-supplied EPUB to raw/"
+    },
+    {
+      "id": "hernandez_book",
+      "name": "A is for Admission — Michele Hernández",
+      "url": "https://www.michelehernandez.com/",
+      "type": "book",
+      "author_role": "former_ao",
+      "author_name": "Michele Hernández (former Dartmouth Assistant Director of Admissions)",
+      "school_affiliation": "Dartmouth College",
+      "credibility": "S",
+      "ingestion": "user-supplied EPUB to raw/"
+    },
+    {
+      "id": "sabky_book",
+      "name": "Valedictorians at the Gate — Becky Munsterer Sabky",
+      "url": "https://www.beckysabky.com/",
+      "type": "book",
+      "author_role": "former_ao",
+      "author_name": "Becky Munsterer Sabky (former Dartmouth Director of Admissions)",
+      "school_affiliation": "Dartmouth College",
+      "credibility": "S",
+      "ingestion": "user-supplied EPUB to raw/"
+    },
+    {
+      "id": "steinberg_book",
+      "name": "The Gatekeepers — Jacques Steinberg",
+      "url": "https://www.nytimes.com/books/first/s/steinberg-gatekeepers.html",
+      "type": "book",
+      "author_role": "current_ao",
+      "author_name": "Jacques Steinberg (year-long embedded access at Wesleyan admissions)",
+      "school_affiliation": "Wesleyan University",
+      "credibility": "S",
+      "ingestion": "user-supplied EPUB to raw/"
+    }
+  ]
+}
