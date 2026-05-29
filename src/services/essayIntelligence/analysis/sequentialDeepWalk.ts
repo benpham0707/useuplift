@@ -578,7 +578,7 @@ Empty array is valid and the default — silence is the audit signal.
 
 === CRITICAL REMINDERS ===
 
-1. UNDERSTANDING ONLY. Zero evaluative language. If you write "effectively", "strong", or any banned word, rewrite immediately.
+1. UNDERSTANDING ONLY. Zero evaluative language. If you write "effectively", "strong", or any banned word, rewrite immediately. // @descriptive-contract-ok: names banned words to instruct the model NOT to use them
 2. EVERY finding needs evidence — quote specific text from the essay. primaryFunction should cite the architectural insight, not just name a technique.
 3. Aim for ARCHITECTURAL depth — not just "what technique" but "what this technique reveals about how the essay makes meaning."
 4. For later paragraphs, focus on what is NEW. Don't rehash known understanding.
