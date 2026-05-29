@@ -1,0 +1,485 @@
+/*
+ * Annotation V2 — Workshop CSS
+ * Workstream A (Wave α). Defines the tier CSS custom properties, paragraph
+ * tint classes, tier underline classes, glass morphism base class, and every
+ * named keyframe animation referenced across Phases 4–11.
+ *
+ * Authority:
+ *   - docs/INLINE_ANNOTATION_UX_PLAN.md §1 Color / §14 Animation / §16 A11y
+ *   - docs/ux_phases/phase_4_loading_state.md (vapor scan, ribbon)
+ *   - docs/ux_phases/phase_5_first_reveal.md (tint saturation 40% → 55%,
+ *     strengths wave, shimmer, stroke-dashoffset underline bloom)
+ *   - docs/ux_phases/phase_10_navigation.md (3px tier-gradient progress bar)
+ *
+ * Consumers:
+ *   - tokens.ts (TIER_CSS_VAR references these names)
+ *   - editor/decorations.ts (applies underline + tint classes to Decorations)
+ *   - editor/paragraphTint.ts (applies .anno-paragraph-tint-{tier}-{state})
+ *   - loading/VaporScan.tsx (uses @keyframes vapor-scan)
+ *   - bloom/StrengthsWave.tsx (uses @keyframes strengths-wave-bloom)
+ *
+ * NOTE ON CSS VAR SCOPE: the `:root` block below defines the tier variables
+ * locally to this stylesheet. Global `:root` cascade is preserved — if
+ * src/index.css also defines these, the later-loaded declaration wins.
+ * Wave β consumers should assume these vars cascade globally once
+ * workshop.css is imported at the editor route boundary.
+ */
+
+/* ==========================================================================
+   Root — tier color custom properties (HSL, opacity-variant enabled)
+   UX_PLAN §1 CSS Custom Properties / BUILD_PLAN Shared Contracts.
+   ========================================================================== */
+
+:root {
+  /* --- Core tier colors (HSL space-separated to enable
+         `hsl(var(--anno-<tier>) / <alpha>)` opacity variants) ---------- */
+
+  /** Phase 5 §2.4 CRITICAL — red, wavy underline, <40 effectiveness. */
+  --anno-critical: 0 70% 55%;
+  /** Phase 5 §2.4 NEEDS WORK — amber, solid underline, 40–54. */
+  --anno-needs-work: 30 85% 58%;
+  /** Phase 5 §2.4 FUNCTIONAL — sage, never underlined by default, 55–75.
+      Used only for meta labels and "Show all" toggled sage underlines. */
+  --anno-functional: 150 20% 60%;
+  /** Phase 5 §2.4 STRONG — green, solid understated underline, 76–85. */
+  --anno-strong: 145 55% 45%;
+  /** Phase 5 §2.4 EXCEPTIONAL — teal, solid underline, 86–95. */
+  --anno-exceptional: 175 65% 42%;
+  /** Phase 5 §2.4 MASTERFUL — purple, shimmer underline, 96–100. */
+  --anno-masterful: 270 60% 60%;
+
+  /* --- Alpha tint helpers — 8% saturation washes used for paragraph
+         tint backgrounds and inline sentence highlights.
+         UX_PLAN §1 Visual Treatment table. ------------------------------ */
+  --anno-critical-tint: hsl(var(--anno-critical) / 0.08);
+  --anno-needs-work-tint: hsl(var(--anno-needs-work) / 0.08);
+  --anno-functional-tint: hsl(var(--anno-functional) / 0.06);
+  --anno-strong-tint: hsl(var(--anno-strong) / 0.06);
+  --anno-exceptional-tint: hsl(var(--anno-exceptional) / 0.08);
+  --anno-masterful-tint: hsl(var(--anno-masterful) / 0.10);
+
+  /* --- Paragraph-tint alpha ladder.
+         Phase 5 §2.1 steps 1–6: Phase 4 ended at 40% saturation; Phase 5
+         deepens to 55% during cross-lap. Expressed as opacities of the
+         tier hue applied as background-color. ------------------------- */
+  --anno-tint-alpha-loading: 0.40;
+  --anno-tint-alpha-reveal: 0.55;
+
+  /* --- 3px tier-gradient progress bar fill.
+         Phase 10 §progress bar token table. Left → right = critical →
+         amber → sage → green → teal. Purple deliberately omitted (the
+         progress bar shows *reviewed* state, not quality distribution). */
+  --anno-progress-bar-height: 3px;
+  --anno-progress-bar-gradient: linear-gradient(
+    90deg,
+    hsl(var(--anno-critical)) 0%,
+    hsl(var(--anno-needs-work)) 25%,
+    hsl(var(--anno-functional)) 50%,
+    hsl(var(--anno-strong)) 75%,
+    hsl(var(--anno-exceptional)) 100%
+  );
+
+  /* --- Masterful gradient for linear-gradient underline + shimmer overlay.
+         UX_PLAN §1 MASTERFUL visual treatment. ------------------------- */
+  --anno-masterful-gradient: linear-gradient(
+    135deg,
+    hsl(var(--anno-strong)),
+    hsl(var(--anno-exceptional)),
+    hsl(var(--anno-masterful))
+  );
+}
+
+/* ==========================================================================
+   Paragraph tint backgrounds
+   Phase 4 §2.2 + Phase 5 §2.1 — 40% on L3.5 completion (loading),
+   deepens to 55% on reveal.
+   ========================================================================== */
+
+.anno-paragraph-tint {
+  background-color: transparent;
+  transition: background-color var(--anno-tint-transition, 600ms)
+    cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* Loading-state tints (40% saturation) — applied when L3.5 completes. */
+.anno-paragraph-tint-critical-loading {
+  background-color: hsl(var(--anno-critical) / var(--anno-tint-alpha-loading));
+}
+.anno-paragraph-tint-needs-work-loading {
+  background-color: hsl(var(--anno-needs-work) / var(--anno-tint-alpha-loading));
+}
+.anno-paragraph-tint-functional-loading {
+  /* Sage is intentionally the lightest tint; matches §1 "visual silence". */
+  background-color: hsl(var(--anno-functional) / calc(var(--anno-tint-alpha-loading) * 0.5));
+}
+.anno-paragraph-tint-strong-loading {
+  background-color: hsl(var(--anno-strong) / var(--anno-tint-alpha-loading));
+}
+.anno-paragraph-tint-exceptional-loading {
+  background-color: hsl(var(--anno-exceptional) / var(--anno-tint-alpha-loading));
+}
+.anno-paragraph-tint-masterful-loading {
+  background-color: hsl(var(--anno-masterful) / var(--anno-tint-alpha-loading));
+}
+
+/* Reveal-state tints (55% saturation) — deepened at Phase 5 cross-lap. */
+.anno-paragraph-tint-critical-reveal {
+  background-color: hsl(var(--anno-critical) / var(--anno-tint-alpha-reveal));
+}
+.anno-paragraph-tint-needs-work-reveal {
+  background-color: hsl(var(--anno-needs-work) / var(--anno-tint-alpha-reveal));
+}
+.anno-paragraph-tint-functional-reveal {
+  background-color: hsl(var(--anno-functional) / calc(var(--anno-tint-alpha-reveal) * 0.5));
+}
+.anno-paragraph-tint-strong-reveal {
+  background-color: hsl(var(--anno-strong) / var(--anno-tint-alpha-reveal));
+}
+.anno-paragraph-tint-exceptional-reveal {
+  background-color: hsl(var(--anno-exceptional) / var(--anno-tint-alpha-reveal));
+}
+.anno-paragraph-tint-masterful-reveal {
+  background-color: hsl(var(--anno-masterful) / var(--anno-tint-alpha-reveal));
+}
+
+/* ==========================================================================
+   Tier underlines
+   Phase 5 §2.4 — wavy (critical), solid (needs-work/strong/exceptional),
+   shimmer (masterful), none (functional).
+   Phase 5 §2.1 step 6 — bloom-in via stroke-dashoffset (reads as drawn,
+   not materialized).
+   ========================================================================== */
+
+/*
+ * Underlines are rendered as ::after pseudo-elements carrying an SVG-like
+ * stroke. For solid/wavy variants we use background-image so the text
+ * decoration color supports opacity variants; for the draw-in animation
+ * we lean on `stroke-dashoffset` via an inline SVG rendered by the
+ * editor decoration layer.
+ *
+ * The bloom animation is intentionally defined as a *custom property*
+ * (--anno-bloom-progress: 0 → 1) rather than a keyframe, so the bloom
+ * waves in Phase 5 §3 can drive it from motion/react useMotionValue and
+ * pause/reverse mid-flight without fighting CSS animation state.
+ */
+
+.anno-underline {
+  position: relative;
+  /* Underline is a pseudo-element to preserve text layout metrics. */
+  text-decoration: none;
+}
+
+.anno-underline::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  pointer-events: none;
+  /* stroke-dashoffset animation proxy: clip-path from 0% to 100% width. */
+  clip-path: inset(0 calc(100% * (1 - var(--anno-bloom-progress, 1))) 0 0);
+  transition: clip-path var(--anno-underline-bloom-duration, 160ms)
+    cubic-bezier(0.22, 1, 0.36, 1); /* Phase 5 §2.1 ease-out-quart. */
+}
+
+/* Solid — NEEDS_WORK / STRONG / EXCEPTIONAL. */
+.anno-underline-solid::after {
+  background-color: hsl(var(--anno-underline-color, var(--anno-strong)) /
+                        var(--anno-underline-opacity, 0.75));
+  height: 2px;
+}
+
+/* Wavy — CRITICAL. Phase 5 §2.4 — draws attention. */
+.anno-underline-wavy::after {
+  height: 3px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 3' preserveAspectRatio='none'><path d='M0 1.5 Q 2 0, 4 1.5 T 8 1.5' stroke='currentColor' stroke-width='1.2' fill='none'/></svg>");
+  background-repeat: repeat-x;
+  background-size: 8px 3px;
+  color: hsl(var(--anno-critical) / 0.85);
+  background-color: transparent;
+}
+
+/* Shimmer — MASTERFUL. Phase 5 §2.4 — gradient + moving highlight. */
+.anno-underline-shimmer::after {
+  height: 2px;
+  background: var(--anno-masterful-gradient);
+  background-size: 200% 100%;
+  animation: shimmer 3.2s linear infinite;
+}
+
+/* STRONG understated treatment — 1.5px + 0.6 opacity per Phase 5 §2.4. */
+.anno-underline-strong {
+  --anno-underline-color: var(--anno-strong);
+  --anno-underline-opacity: 0.60;
+}
+.anno-underline-strong::after {
+  height: 1.5px;
+}
+.anno-underline-needs-work {
+  --anno-underline-color: var(--anno-needs-work);
+  --anno-underline-opacity: 0.80;
+}
+.anno-underline-exceptional {
+  --anno-underline-color: var(--anno-exceptional);
+  --anno-underline-opacity: 0.75;
+}
+
+/* Functional — no underline (visual silence). Class exists for consistency
+   (consumers can apply it unconditionally); it is a no-op by design. */
+.anno-underline-none::after {
+  display: none;
+}
+
+/* ==========================================================================
+   Glass morphism base
+   Phase 8 §3.1 panel glass; UX_PLAN §14 aesthetic inherited from
+   VaporChatMessage.
+   ========================================================================== */
+
+.glass-panel {
+  background: rgba(248, 249, 251, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+}
+
+.glass-toolbar {
+  background: rgba(250, 251, 253, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+}
+
+.glass-tooltip {
+  background: rgba(255, 255, 255, 0.90);
+  border: 1px solid rgba(255, 255, 255, 0.50);
+  backdrop-filter: blur(10px) saturate(1.3);
+  -webkit-backdrop-filter: blur(10px) saturate(1.3);
+  box-shadow: 0 4px 16px -4px rgba(15, 23, 42, 0.12);
+}
+
+.glass-modal {
+  background: rgba(255, 255, 255, 0.80);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(24px) saturate(1.5);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  box-shadow: 0 20px 60px -20px rgba(15, 23, 42, 0.25);
+}
+
+/* ==========================================================================
+   Keyframes
+   ========================================================================== */
+
+/*
+ * Phase 5 §2.4 MASTERFUL shimmer — subtle moving highlight over the
+ * gradient underline. 3.2s loop, linear so the motion is steady and
+ * non-dominant.
+ */
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/*
+ * Phase 4 §2.4 vapor scan — the luminous band that drifts top-to-bottom
+ * across the editor during analysis. Progress is normally driven by
+ * motion/react useMotionValue (mapped from SSE progress), but the
+ * keyframe is the reduced-motion / fallback path.
+ *
+ * Idle oscillation (±8px on 2.4s sine) is applied as a secondary
+ * transform on the consuming component — not bundled into this keyframe
+ * so the motion library can layer them cleanly.
+ */
+@keyframes vapor-scan {
+  0% {
+    transform: translateY(-140px);
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.85;
+  }
+  92% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateY(var(--anno-vapor-scan-end, 100%));
+    opacity: 0;
+  }
+}
+
+/*
+ * Phase 5 §2.1 step 4 — strengths wave bloom (per-sentence).
+ * Consumers set `--anno-bloom-delay` per sentence (35ms stagger).
+ * The keyframe handles the single-sentence reveal: underline draws in via
+ * clip-path (proxy for stroke-dashoffset), opacity fades from 0 to final.
+ */
+@keyframes strengths-wave-bloom {
+  0% {
+    --anno-bloom-progress: 0;
+    opacity: 0;
+  }
+  100% {
+    --anno-bloom-progress: 1;
+    opacity: 1;
+  }
+}
+
+/*
+ * Phase 5 §2.1 step 6 — critical/needs-work wave bloom.
+ * Same shape as strengths wave; separated so reduced-motion can collapse
+ * them independently if needed.
+ */
+@keyframes critical-wave-bloom {
+  0% {
+    --anno-bloom-progress: 0;
+    opacity: 0;
+  }
+  100% {
+    --anno-bloom-progress: 1;
+    opacity: 1;
+  }
+}
+
+/*
+ * Phase 5 §2.1 step 7 — single-shot luminous ring on the auto-selected
+ * strongest sentence. Opacity 0 → 0.35 → 0 over 400ms, no repeat.
+ * Uses the EXCEPTIONAL tier's hue (teal) per spec.
+ */
+@keyframes auto-select-pulse {
+  0% {
+    box-shadow: 0 0 0 0 hsl(var(--anno-exceptional) / 0);
+    opacity: 0;
+  }
+  50% {
+    box-shadow: 0 0 0 6px hsl(var(--anno-exceptional) / 0.35);
+    opacity: 1;
+  }
+  100% {
+    box-shadow: 0 0 0 10px hsl(var(--anno-exceptional) / 0);
+    opacity: 0;
+  }
+}
+
+/*
+ * Phase 4 §2.1 ribbon active-dot breathe. 1.5s loop, ease-in-out, while
+ * a layer is active. Stops on layer_complete.
+ */
+@keyframes ribbon-dot-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.80;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
+/*
+ * Phase 8 §2.10 / §14 staleHatch — slow diagonal hatching for stale
+ * analysis results (essay edited while analysis was in-flight).
+ */
+@keyframes stale-hatch {
+  0% {
+    background-position-x: 0%;
+  }
+  100% {
+    background-position-x: 100%;
+  }
+}
+
+/* ==========================================================================
+   Reduced motion
+   UX_PLAN §16 + Phase 5 §2.1. Collapse all bloom/pulse to a 220ms
+   crossfade. Underline draw-in becomes an opacity crossfade; paragraph
+   tints cross-fade without stagger; vapor scan becomes a static hairline;
+   shimmer stops; auto-select pulse is suppressed (value lands without
+   the ring).
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  /* Paragraph tints: instant/short crossfade, no transition stagger. */
+  .anno-paragraph-tint {
+    transition: background-color 220ms linear;
+  }
+
+  /* Underline bloom: replace clip-path draw with opacity crossfade. */
+  .anno-underline::after {
+    transition: opacity 220ms linear;
+    clip-path: none;
+  }
+  .anno-underline[data-bloom-progress='0']::after {
+    opacity: 0;
+  }
+  .anno-underline[data-bloom-progress='1']::after {
+    opacity: 1;
+  }
+
+  /* Masterful shimmer: freeze the gradient, no animation. */
+  .anno-underline-shimmer::after {
+    animation: none;
+    background-position: 0 0;
+  }
+
+  /* Vapor scan: collapse the keyframe to a static band at final position. */
+  @keyframes vapor-scan {
+    0%, 100% {
+      transform: translateY(var(--anno-vapor-scan-end, 50%));
+      opacity: 0.6;
+    }
+  }
+
+  /* Bloom waves: collapse to a single opacity crossfade (no stagger, no
+     draw-in). Consumers should also skip per-sentence stagger delays when
+     prefers-reduced-motion matches. */
+  @keyframes strengths-wave-bloom {
+    0% {
+      opacity: 0;
+      --anno-bloom-progress: 1;
+    }
+    100% {
+      opacity: 1;
+      --anno-bloom-progress: 1;
+    }
+  }
+  @keyframes critical-wave-bloom {
+    0% {
+      opacity: 0;
+      --anno-bloom-progress: 1;
+    }
+    100% {
+      opacity: 1;
+      --anno-bloom-progress: 1;
+    }
+  }
+
+  /* Auto-select pulse: suppressed. The sentence still becomes "selected"
+     state, but without the ring. Accessibility review open per Phase 5
+     §11 item 9. */
+  @keyframes auto-select-pulse {
+    0%, 100% {
+      box-shadow: none;
+      opacity: 1;
+    }
+  }
+
+  /* Ribbon dot pulse: suppressed — active dot holds at steady state. */
+  @keyframes ribbon-dot-pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  /* Stale hatch: hold static. */
+  @keyframes stale-hatch {
+    0%, 100% {
+      background-position-x: 0%;
+    }
+  }
+}
