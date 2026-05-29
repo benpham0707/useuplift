@@ -52,10 +52,23 @@ async function runSuite(file: string): Promise<SuiteResult> {
 }
 
 async function main(): Promise<void> {
-  const files = (await fs.readdir(__dirname))
+  // Like tests/unit/run-all.ts, this tsx runner owns ONLY the plain-tsx
+  // integration scripts. Vitest-style suites (import from 'vitest') are
+  // enumerated in vitest.config.ts and run via `npm run test:vitest` — they
+  // crash under raw tsx (vitest worker state never initialises), so skip them.
+  const allFiles = (await fs.readdir(__dirname))
     .filter((f) => f.endsWith('.test.ts'))
-    .sort()
-    .map((f) => path.join(__dirname, f));
+    .sort();
+  const files: string[] = [];
+  let skippedVitest = 0;
+  for (const f of allFiles) {
+    const abs = path.join(__dirname, f);
+    if (/from\s+['"]vitest['"]/.test(await fs.readFile(abs, 'utf8'))) { skippedVitest++; continue; }
+    files.push(abs);
+  }
+  if (skippedVitest > 0) {
+    console.log(`(skipping ${skippedVitest} vitest-style suite(s) — run via 'npm run test:vitest')`);
+  }
 
   if (files.length === 0) {
     console.log('no integration test files found in tests/integration/');
