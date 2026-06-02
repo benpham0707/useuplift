@@ -4,7 +4,7 @@
  * Runs the translation essay through the full pipeline, then tests
  * each coaching mode with realistic scenarios. Outputs go to
  * tests/output/v3-audit-{mode}.txt for evaluation against the V3 rubric
- * in COACHING_BLOCK_SYSTEM_AUDIT_V3.md.
+ * in docs/archived/misc/COACHING_BLOCK_SYSTEM_AUDIT_V3.md.
  *
  * Estimated cost: ~$1.50-2.50 (pipeline ~$0.30 + 5 coaching turns ~$0.20 each)
  *
@@ -441,7 +441,7 @@ async function main(): Promise<void> {
   console.log(`  v3-audit-mode4-architecture.txt`);
   console.log(`  v3-audit-mode5-polish.txt`);
   console.log(`\nNext: Feed each output file into its V3 rubric prompt`);
-  console.log(`(COACHING_BLOCK_SYSTEM_AUDIT_V3.md) for scoring.`);
+  console.log(`(docs/archived/misc/COACHING_BLOCK_SYSTEM_AUDIT_V3.md) for scoring.`);
 }
 
 main().catch((err) => {

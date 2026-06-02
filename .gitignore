@@ -71,3 +71,6 @@ mcp-uplift-portfolio/node_modules/
 # explicitly; ignore transient JSON/JSONL dumps and phase dumps)
 tests/output/**/*.jsonl
 tests/output/phase-b-dump.json
+
+# Vite writes a temp transpiled config next to vite.config.ts on load
+vite.config.ts.timestamp-*

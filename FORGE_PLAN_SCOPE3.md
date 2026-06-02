@@ -115,7 +115,7 @@ The enrichment function uses property reads with `in` checks so that if Scope 2'
  * first message. Pure synchronous lookups into a singleton — zero LLM calls,
  * <15ms total for a 10-item manifest.
  *
- * Design decisions (see FORGE_DEBATES_SCOPE3.md for full rationale):
+ * Design decisions (see docs/archived/forge/FORGE_DEBATES_SCOPE3.md for full rationale):
  *  - Late-bound at coaching time, not at analysis time (collegeId isn't on PipelineInput)
  *  - Mutates the manifest in place (matches existing conversatorEnrichments.push pattern
  *    at coachingService.ts:1233)
