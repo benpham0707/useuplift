@@ -398,7 +398,7 @@ No cached walk JSON exists for Three Days. Two options:
 
 **Option A (preferred)**: Run L1+L2+L2.5+walk for Three Days fresh, save the walk JSON to disk, then run the focused L3.75 harness on it. Total ~$1.20. Establishes a reusable Three Days walk artifact for future gap work — pays back across Gaps 2-5.
 
-**Option B (fallback)**: Run the existing `tests/test-l375-earned-voice-audit.ts` harness adapted with a `--essay 06-...` flag.
+**Option B (fallback)**: Run the existing `tests/essay-intelligence/test-l375-earned-voice-audit.ts` harness adapted with a `--essay 06-...` flag.
 
 I'll go with Option A unless the user prefers B — the reusable artifact is cheap insurance.
 

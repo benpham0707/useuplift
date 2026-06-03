@@ -763,7 +763,7 @@ The Crystallizer transfers L3.5 effectiveness scores directly to its score matri
 
 ### Step 8: Testing (2-3 hours)
 
-Create test file: `tests/test-l35-anti-clustering.ts`
+Create test file: `tests/essay-intelligence/test-l35-anti-clustering.ts`
 
 1. **Anchor selection test**: construct profiles with various structural configurations, verify correct anchor paragraph is selected
 

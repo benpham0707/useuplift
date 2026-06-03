@@ -123,12 +123,12 @@ The codebase has **three** independent dimension systems:
 
 | File | V2 Impact |
 |------|-----------|
-| `tests/test-kb-and-cross-user-cache.ts` | **LOW**: Activity scoring tests, may reference dimension counts |
-| `tests/test-hybrid-scoring-calibration.ts` | **HIGH**: Likely validates 13-dimension scores |
-| `tests/test-workshop-integration.ts` | **HIGH**: Workshop integration, dimension validation |
-| `tests/test-workshop-registry.ts` | **HIGH**: Registry tests, dimension count assertions |
-| `tests/test-workshop-llm-e2e.ts` | **MEDIUM**: LLM scoring E2E |
-| `tests/test-essay-profiles-calibration.ts` | **HIGH**: Profile weight assertions |
+| `tests/activity/test-kb-and-cross-user-cache.ts` | **LOW**: Activity scoring tests, may reference dimension counts |
+| `tests/workshop/test-hybrid-scoring-calibration.ts` | **HIGH**: Likely validates 13-dimension scores |
+| `tests/workshop/test-workshop-integration.ts` | **HIGH**: Workshop integration, dimension validation |
+| `tests/workshop/test-workshop-registry.ts` | **HIGH**: Registry tests, dimension count assertions |
+| `tests/workshop/test-workshop-llm-e2e.ts` | **MEDIUM**: LLM scoring E2E |
+| `tests/workshop/test-essay-profiles-calibration.ts` | **HIGH**: Profile weight assertions |
 
 ---
 

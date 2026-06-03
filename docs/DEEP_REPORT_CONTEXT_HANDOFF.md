@@ -86,8 +86,8 @@ deepAcademicReport/
 |----------------|---------|
 | `deepAcademicReportTypes.ts` | All type definitions: `DeepAcademicReport`, `BottomLineSummary`, section types, `UPLIFT_SCALE_DATABASE` |
 | `deepAcademicReportService.ts` | **DEPRECATED** — old monolith kept for reference only |
-| `tests/test-deep-academic-report.ts` | E2E test with mock Sarah Chen (CS, 11th grade) |
-| `tests/generate-deep-report-output.ts` | Generates markdown report to stdout |
+| `tests/academic/test-deep-academic-report.ts` | E2E test with mock Sarah Chen (CS, 11th grade) |
+| `tests/harness/generate-deep-report-output.ts` | Generates markdown report to stdout |
 
 ---
 
@@ -295,12 +295,12 @@ Uplift Rating: B+ (Very Good)
 
 ### Run E2E test:
 ```bash
-ANTHROPIC_API_KEY="..." npx tsx tests/test-deep-academic-report.ts
+ANTHROPIC_API_KEY="..." npx tsx tests/academic/test-deep-academic-report.ts
 ```
 
 ### Generate output:
 ```bash
-ANTHROPIC_API_KEY="..." npx tsx tests/generate-deep-report-output.ts > docs/archived/completion-snapshots/DEEP_ANALYSIS_OUTPUT_E2E.md
+ANTHROPIC_API_KEY="..." npx tsx tests/harness/generate-deep-report-output.ts > docs/archived/completion-snapshots/DEEP_ANALYSIS_OUTPUT_E2E.md
 ```
 
 ### Type check:

@@ -245,7 +245,7 @@ RESULTS: 10 passed, 0 failed
    - `generateResearchBackedGuidance()` function
    - Quick access utility functions
 
-2. **`tests/test-research-backed-guidance.ts`**
+2. **`tests/academic/test-research-backed-guidance.ts`**
    - 10 comprehensive integration tests
 
 ### Modified Files

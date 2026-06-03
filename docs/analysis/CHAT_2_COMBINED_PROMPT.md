@@ -265,17 +265,17 @@ POST /api/authenticity-check    — Body: { text } → Response: AIRiskAssessmen
 
 ### PART D: Validation Tests
 
-Create these test files following existing patterns (see `tests/verify-ap-stats.ts` for no-API-key pattern, `tests/test-full-pipeline-e2e-output.ts` for API-key pattern):
+Create these test files following existing patterns (see `tests/harness/verify-ap-stats.ts` for no-API-key pattern, `tests/portfolio/test-full-pipeline-e2e-output.ts` for API-key pattern):
 
-1. **`tests/test-model-id-consistency.ts`** (no API key) — grep-based CI guard
-2. **`tests/test-voice-profile-unit.ts`** (no API key) — test getPromptSummary(), 3 converters with mock data
-3. **`tests/test-voice-preservation.ts`** (no API key for pure function tests, API key for LLM tests) — summary captures voice, converters work
-4. **`tests/test-prompt-caching-validation.ts`** (needs API key) — run callClaude twice, verify cache hits + cost reduction
-5. **`tests/test-voice-profile-accuracy.ts`** (needs API key) — 5 diverse samples, buildFromSample(), verify reasonable profiles
-6. **`tests/test-voice-cross-workshop.ts`** (needs API key) — same profile fed to all 3 workshops, voice metrics within 20%
-7. **`tests/test-inline-editing-e2e.ts`** (needs API key) — all 15 commands on 5 passages each, verify JSON schema, dual alternatives, teaching notes
-8. **`tests/test-ai-risk-scorer.ts`** (no API key) — 10 AI texts vs 10 human texts, mean gap > 30
-9. **`tests/test-style-consistency.ts`** (no API key) — quickVoiceCheck catches 8/10 planted violations, < 10% false positive
+1. **`tests/infra/test-model-id-consistency.ts`** (no API key) — grep-based CI guard
+2. **`tests/essay-intelligence/test-voice-profile-unit.ts`** (no API key) — test getPromptSummary(), 3 converters with mock data
+3. **`tests/essay-intelligence/test-voice-preservation.ts`** (no API key for pure function tests, API key for LLM tests) — summary captures voice, converters work
+4. **`tests/infra/test-prompt-caching-validation.ts`** (needs API key) — run callClaude twice, verify cache hits + cost reduction
+5. **`tests/essay-intelligence/test-voice-profile-accuracy.ts`** (needs API key) — 5 diverse samples, buildFromSample(), verify reasonable profiles
+6. **`tests/essay-intelligence/test-voice-cross-workshop.ts`** (needs API key) — same profile fed to all 3 workshops, voice metrics within 20%
+7. **`tests/essay-intelligence/test-inline-editing-e2e.ts`** (needs API key) — all 15 commands on 5 passages each, verify JSON schema, dual alternatives, teaching notes
+8. **`tests/essay-intelligence/test-ai-risk-scorer.ts`** (no API key) — 10 AI texts vs 10 human texts, mean gap > 30
+9. **`tests/essay-intelligence/test-style-consistency.ts`** (no API key) — quickVoiceCheck catches 8/10 planted violations, < 10% false positive
 
 ---
 
@@ -346,17 +346,17 @@ Create these test files following existing patterns (see `tests/verify-ap-stats.
   - `POST /api/inline-edit/suggest` (requireAuth)
   - `POST /api/authenticity-check` (requireAuth)
 **Creates these test files** (all NEW):
-- `tests/test-model-id-consistency.ts` (no API key)
-- `tests/test-voice-profile-unit.ts` (no API key)
-- `tests/test-voice-preservation.ts` (mostly no API key)
-- `tests/test-prompt-caching-validation.ts` (needs API key)
-- `tests/test-voice-profile-accuracy.ts` (needs API key)
-- `tests/test-voice-cross-workshop.ts` (needs API key)
-- `tests/test-inline-editing-e2e.ts` (needs API key)
-- `tests/test-ai-risk-scorer.ts` (no API key)
-- `tests/test-style-consistency.ts` (no API key)
+- `tests/infra/test-model-id-consistency.ts` (no API key)
+- `tests/essay-intelligence/test-voice-profile-unit.ts` (no API key)
+- `tests/essay-intelligence/test-voice-preservation.ts` (mostly no API key)
+- `tests/infra/test-prompt-caching-validation.ts` (needs API key)
+- `tests/essay-intelligence/test-voice-profile-accuracy.ts` (needs API key)
+- `tests/essay-intelligence/test-voice-cross-workshop.ts` (needs API key)
+- `tests/essay-intelligence/test-inline-editing-e2e.ts` (needs API key)
+- `tests/essay-intelligence/test-ai-risk-scorer.ts` (no API key)
+- `tests/essay-intelligence/test-style-consistency.ts` (no API key)
 
-**Test patterns**: Read `tests/verify-ap-stats.ts` for no-API-key pattern, `tests/test-full-pipeline-e2e-output.ts` for API-key pattern. Use console.log output, pass/fail counts, summary at end.
+**Test patterns**: Read `tests/harness/verify-ap-stats.ts` for no-API-key pattern, `tests/portfolio/test-full-pipeline-e2e-output.ts` for API-key pattern. Use console.log output, pass/fail counts, summary at end.
 **Done when**: All endpoints respond correctly, all test files exist and pass basic syntax check, no-API-key tests pass
 
 ---
@@ -384,19 +384,19 @@ ls src/services/authenticity/aiRiskScorer.ts
 ls supabase/migrations/20260220100000_add_voice_profiles_fk.sql
 
 # 5. No-API-key tests
-npx tsx tests/test-model-id-consistency.ts
-npx tsx tests/test-voice-profile-unit.ts
-npx tsx tests/test-voice-preservation.ts
-npx tsx tests/test-ai-risk-scorer.ts
-npx tsx tests/test-style-consistency.ts
-npx tsx tests/verify-ap-stats.ts
-npx tsx tests/test-major-resolution-comprehensive.ts
+npx tsx tests/infra/test-model-id-consistency.ts
+npx tsx tests/essay-intelligence/test-voice-profile-unit.ts
+npx tsx tests/essay-intelligence/test-voice-preservation.ts
+npx tsx tests/essay-intelligence/test-ai-risk-scorer.ts
+npx tsx tests/essay-intelligence/test-style-consistency.ts
+npx tsx tests/harness/verify-ap-stats.ts
+npx tsx tests/academic/test-major-resolution-comprehensive.ts
 
 # 6. API-key tests (if available)
-ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/test-prompt-caching-validation.ts
-ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/test-voice-profile-accuracy.ts
-ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/test-voice-cross-workshop.ts
-ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/test-inline-editing-e2e.ts
+ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/infra/test-prompt-caching-validation.ts
+ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/essay-intelligence/test-voice-profile-accuracy.ts
+ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/essay-intelligence/test-voice-cross-workshop.ts
+ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/essay-intelligence/test-inline-editing-e2e.ts
 ```
 
 ## PROGRESS TRACKER UPDATE

@@ -197,7 +197,7 @@ required.
 - L4b preserve-the-move directive (crystallizer.ts)
 - H-2 cost-row fix (analysisOrchestrator.ts:841 — removed double-count)
 - Dump renderer (Signature Move callout + null teaching block)
-- End-to-end calibration harness (`tests/test-signature-move-validation.ts`)
+- End-to-end calibration harness (`tests/essay-intelligence/test-signature-move-validation.ts`)
 
 Total in-PR test count: **649 vitest tests passing** (was 638, +11 new).
 Tsc: 22 pre-existing errors in `src/integrations/supabase/types.ts`

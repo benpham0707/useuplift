@@ -135,11 +135,11 @@ Tue called out Focus Mode as "huge core of our cost efficiency and depth and qua
 - **Quality impact: surgical L5 budget targeting** — directs L5's annotation effort at the highest-ranked improvements rather than uniform sweep
 
 **Why it's off in production:**
-- Per S4: only `tests/test-port-g2-focus-mode.ts` ever sets it. No production env-set sites.
+- Per S4: only `tests/essay-intelligence/test-port-g2-focus-mode.ts` ever sets it. No production env-set sites.
 - Probable cause: calibration-blocked (Port G2 calibration may be incomplete)
 
 **Phase 8 protocol for Focus Mode (FIRST flag activated):**
-1. Read `tests/test-port-g2-focus-mode.ts` end-to-end. Understand calibration intent.
+1. Read `tests/essay-intelligence/test-port-g2-focus-mode.ts` end-to-end. Understand calibration intent.
 2. Read `preCallEnrichment.ts` and `deepAnnotationService.ts:795` flag site.
 3. Determine: is calibration genuinely incomplete, or just-not-flipped?
 4. If calibration-incomplete: spec the calibration steps, ask Tue for ≤$1.50 of calibration spend.
@@ -417,7 +417,7 @@ Sub-phase 0a.4 — Production lint promotion:
 **Scope (in D5 sequence):**
 
 8.1 — Focus Mode activation (FIRST — Tue's priority):
-  - Read `tests/test-port-g2-focus-mode.ts` to understand calibration intent
+  - Read `tests/essay-intelligence/test-port-g2-focus-mode.ts` to understand calibration intent
   - Read `preCallEnrichment.ts` + `deepAnnotationService.ts:795`
   - Determine calibration status (incomplete vs just-not-flipped)
   - If calibration-incomplete: spec calibration steps, ask Tue for ≤$1.50 calibration spend

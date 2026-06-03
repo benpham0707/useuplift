@@ -122,7 +122,7 @@ system: [
 - **Issue**: Zero of the 4 Phase 0/1A validation tests were created. The success criteria doc has pseudocode specs for each.
 - **Files to create**:
 
-1. **`tests/test-prompt-caching-validation.ts`** — Verify prompt caching reduces cost
+1. **`tests/infra/test-prompt-caching-validation.ts`** — Verify prompt caching reduces cost
    - Run a Sonnet call with `cacheSystemPrompt: true` twice with the same system prompt
    - First call: expect `cache_creation_input_tokens > 0`
    - Second call: expect `cache_read_input_tokens > 0`
@@ -130,34 +130,34 @@ system: [
    - Use `callClaude()` from `src/lib/llm/claude.ts`
    - Needs ANTHROPIC_API_KEY
 
-2. **`tests/test-voice-profile-accuracy.ts`** — Verify voice profiling quality
+2. **`tests/essay-intelligence/test-voice-profile-accuracy.ts`** — Verify voice profiling quality
    - Create 5 diverse writing samples (formal academic, casual personal, energetic activity description, reflective essay, creative narrative)
    - For each: call `voiceProfileService.buildFromSample()`
    - Verify: register detection is reasonable (e.g., casual text → not 'formal'), vocabulary level matches (sophisticated text → 'sophisticated'), sentence length is roughly correct
    - Pass if: 4/5 samples produce reasonable profiles
    - Needs ANTHROPIC_API_KEY
 
-3. **`tests/test-voice-preservation.ts`** — Verify prompt summary captures voice
+3. **`tests/essay-intelligence/test-voice-preservation.ts`** — Verify prompt summary captures voice
    - Build a profile from a sample, then call `getPromptSummary()`
    - Verify: summary includes register, vocabulary level, formality, signature words
    - Verify: summary is < 600 tokens (compact enough for prompt injection)
    - This is a pure function test — does NOT need API key if you pass in a pre-built profile
    - Also test: `fromCommonAppFingerprint`, `fromActivityChatFingerprint`, `fromPIQFingerprint` — pass mock data, verify output shape
 
-4. **`tests/test-model-id-consistency.ts`** — Automated guard against stale model IDs
+4. **`tests/infra/test-model-id-consistency.ts`** — Automated guard against stale model IDs
    - Grep `src/` and `supabase/` for `20250514` — must return 0 results
    - Grep for `20250929` — must return > 0 results (Sonnet exists)
    - Grep for `20251001` — must return > 0 results (Haiku exists)
    - This is a CI-guard test — does NOT need API key
    - Use `child_process.execSync` to run grep commands
 
-- **Test patterns**: Follow existing test patterns in the project. Use `console.log` for output. Track pass/fail counts. Print summary at end. See `tests/verify-ap-stats.ts` for a good template of a no-API-key test, and `tests/test-full-pipeline-e2e-output.ts` for an API-key test pattern.
+- **Test patterns**: Follow existing test patterns in the project. Use `console.log` for output. Track pass/fail counts. Print summary at end. See `tests/harness/verify-ap-stats.ts` for a good template of a no-API-key test, and `tests/portfolio/test-full-pipeline-e2e-output.ts` for an API-key test pattern.
 - **Complexity**: Medium (each test ~80-150 lines)
 
 ### P2 — Important (2 items)
 
 #### P2-1: VoiceProfileService unit tests
-- **File**: `tests/test-voice-profile-unit.ts` (new)
+- **File**: `tests/essay-intelligence/test-voice-profile-unit.ts` (new)
 - **Test these pure functions** (no API key needed):
   - `getPromptSummary()` — pass a mock StudentVoiceProfile, verify output contains key fields, verify length is reasonable
   - `fromCommonAppFingerprint()` — pass mock VoiceFingerprint, verify register/linguistics/authenticPhrases mapping
@@ -250,13 +250,13 @@ Spin up a swarm with these 3 named agents working in parallel:
 ### Agent: "test-builder" (general-purpose)
 **Focus**: P1-5 + P2-1 — Create all 5 test files
 **Owns these files** (all NEW):
-- `tests/test-prompt-caching-validation.ts`
-- `tests/test-voice-profile-accuracy.ts`
-- `tests/test-voice-preservation.ts`
-- `tests/test-model-id-consistency.ts`
-- `tests/test-voice-profile-unit.ts`
+- `tests/infra/test-prompt-caching-validation.ts`
+- `tests/essay-intelligence/test-voice-profile-accuracy.ts`
+- `tests/essay-intelligence/test-voice-preservation.ts`
+- `tests/infra/test-model-id-consistency.ts`
+- `tests/essay-intelligence/test-voice-profile-unit.ts`
 
-**Test pattern reference**: Read `tests/verify-ap-stats.ts` for the no-API-key test pattern, and `tests/test-full-pipeline-e2e-output.ts` for the API-key test pattern. Follow the same style: console.log output, pass/fail counts, summary at end.
+**Test pattern reference**: Read `tests/harness/verify-ap-stats.ts` for the no-API-key test pattern, and `tests/portfolio/test-full-pipeline-e2e-output.ts` for the API-key test pattern. Follow the same style: console.log output, pass/fail counts, summary at end.
 
 **For voice profile tests**: Import from `src/services/voiceProfile` — the service is already built and exports `voiceProfileService` singleton + types.
 
@@ -284,15 +284,15 @@ grep -r "20250514" src/ supabase/ --include="*.ts" | wc -l
 grep -r "cache_control" supabase/functions/ --include="*.ts" | wc -l
 
 # 4. Run no-API-key tests
-npx tsx tests/test-model-id-consistency.ts
-npx tsx tests/test-voice-preservation.ts
-npx tsx tests/test-voice-profile-unit.ts
-npx tsx tests/verify-ap-stats.ts
-npx tsx tests/test-major-resolution-comprehensive.ts
+npx tsx tests/infra/test-model-id-consistency.ts
+npx tsx tests/essay-intelligence/test-voice-preservation.ts
+npx tsx tests/essay-intelligence/test-voice-profile-unit.ts
+npx tsx tests/harness/verify-ap-stats.ts
+npx tsx tests/academic/test-major-resolution-comprehensive.ts
 
 # 5. Run API-key tests (if API key available)
-ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/test-prompt-caching-validation.ts
-ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/test-voice-profile-accuracy.ts
+ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/infra/test-prompt-caching-validation.ts
+ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/essay-intelligence/test-voice-profile-accuracy.ts
 ```
 
 All must pass before this iteration sprint is considered complete. After verification, update the Progress Tracker Section 10 with final results and change the gates from ⚠️ to ✅.

@@ -326,7 +326,7 @@ class FindingStore {
 | `src/services/essayIntelligence/analysis/holisticSynthesis.ts` | MODIFY | L3.75 validates finding maturity, may propose maturity changes |
 | `src/services/essayIntelligence/analysis/deepAnnotationService.ts` | MODIFY | Generates annotations from findings, not observation arrays |
 | `src/services/essayIntelligence/profileManager/essayProfileManager.ts` | MODIFY | Integrates FindingStore |
-| `tests/test-finding-lifecycle.ts` | CREATE | Finding lifecycle integration tests |
+| `tests/essay-intelligence/test-finding-lifecycle.ts` | CREATE | Finding lifecycle integration tests |
 
 ---
 
