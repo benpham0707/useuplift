@@ -1,6 +1,6 @@
 # Database Architecture (Updated)
 
-> New section for PLAN.md. Replaces Key Design Decision #10 ("JSONB document, not normalized tables").
+> New section for docs/specs/PLAN.md. Replaces Key Design Decision #10 ("JSONB document, not normalized tables").
 > Incorporates 19-table modular schema, concurrency model, and migration strategy.
 
 ---
@@ -115,7 +115,7 @@ CREATE TYPE holistic_section_type AS ENUM (
 | `essay_profile_id` | UUID, FK → `essay_profiles` | Parent reference |
 | `essay_id` | UUID, FK → `essays` | Denormalized for direct essay-scoped queries |
 | `section_type` | `holistic_section_type` (enum: 10 values) | See enum above |
-| `content` | JSONB | Full typed content per PLAN.md structures |
+| `content` | JSONB | Full typed content per docs/specs/PLAN.md structures |
 | `token_estimate` | INTEGER | For Profile Router budgeting (~3.2 chars/token for structured text, per M6) |
 | `last_updated_layer` | INTEGER | Which layer last wrote this section |
 | `updated_at` | TIMESTAMPTZ | |

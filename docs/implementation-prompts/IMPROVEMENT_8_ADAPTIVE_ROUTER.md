@@ -44,7 +44,7 @@ Cluster B (#2 Scoring Validation + #9 Continuous Phase + #4 Contradiction Mining
 
 You are upgrading the Profile Router (`src/services/essayIntelligence/profileManager/profileRouter.ts`) from a rigid 13-rule switch statement to an adaptive context assembly system. The current router maps each `RoutingRule` to a hand-coded function that assembles profile sections with fixed logic (specific fields, fixed priority tiers, hardcoded proximity windows). This works, but it cannot adapt to what the LLM actually needs for a specific analysis task.
 
-The V2 evolution (PLAN2.md) introduces new context consumers that don't fit the 13-rule model:
+The V2 evolution (docs/specs/PLAN2.md) introduces new context consumers that don't fit the 13-rule model:
 - **Deep dive prompts** (~20 specialized prompts, each with different context needs)
 - **Growth cycle iterations** (context needs change across iterations)
 - **Re-reads** (full context for one paragraph)
@@ -57,7 +57,7 @@ The upgrade adds a **Declared Context System** alongside the existing 13 rules. 
 - `src/services/essayIntelligence/analysis/holisticSynthesis.ts` -- a consumer of router context
 - `src/services/essayIntelligence/analysis/analysisOrchestrator.ts` -- pipeline coordinator
 - `src/services/essayIntelligence/profileTypes.ts` -- V2 type definitions
-- `PLAN2.md` -- authoritative spec for V2 evolution
+- `docs/specs/PLAN2.md` -- authoritative spec for V2 evolution
 
 ---
 

@@ -14,15 +14,20 @@ A markdown file may live at the **repo root** only if it is one of:
 |------|--------------------------|
 | `README.md` | Standard repo entry point |
 | `CLAUDE.md` | Auto-loaded dev standards (source of truth) |
-| `PLAN.md`, `PLAN2.md` | Authoritative specs, referenced by `src/` and the memory system |
+| `GEMINI.md` | Auto-loaded by the Gemini CLI from the working dir |
+| `COORDINATION.md` | Live cross-agent session scratchpad (read/written per `GEMINI.md`) |
 | `BUILD_COST_LEDGER.md` | **Read/written at runtime** by `buildCostLedger.ts` (`cwd()/BUILD_COST_LEDGER.md`) — moving it breaks cost tracking |
-| `FORGE_PLAN_{ARTIFACTS,SCOPE1,SCOPE2,SCOPE3,UNIFIED}.md` | Cited as spec anchors inside `src/services/essayIntelligence/` |
-
-**Anything else — design docs, audits, summaries, handoff prompts, "X_COMPLETE"
-status files, college overlays — does NOT belong at root.** It goes under `docs/`.
 
 **Litmus test before creating a root-level `.md`:** *Is this file imported,
 read at runtime, or auto-loaded by tooling?* If no → it goes in `docs/`.
+
+> **Spec docs live in `docs/specs/`, not root.** `PLAN.md`, `PLAN2.md`, and the
+> `FORGE_PLAN_{ARTIFACTS,SCOPE1,SCOPE2,SCOPE3,UNIFIED}.md` artifacts were relocated
+> there (2026-06-02) — they're cited only in `src/` *comments* (no runtime read), so
+> they don't need to sit at root. Reference them as `docs/specs/<NAME>.md`.
+
+**Anything else — design docs, audits, summaries, handoff prompts, "X_COMPLETE"
+status files, college overlays — does NOT belong at root.** It goes under `docs/`.
 
 ---
 

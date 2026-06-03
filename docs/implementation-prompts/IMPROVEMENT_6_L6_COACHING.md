@@ -18,7 +18,7 @@ This improvement replaces all planned deterministic cognitive/teaching systems w
 - `src/services/essayIntelligence/analysis/analysisOrchestrator.ts` — integration if coaching triggers re-analysis
 
 **Files to read first:**
-- `PLAN2.md` — V2 evolution plan (L6 is "ENHANCED INTEGRATION"), Implementation Status sections at bottom
+- `docs/specs/PLAN2.md` — V2 evolution plan (L6 is "ENHANCED INTEGRATION"), Implementation Status sections at bottom
 - `src/services/essayIntelligence/coaching/coachingService.ts` — current 5-stage pipeline
 - `src/services/essayIntelligence/profileTypes.ts` — current types
 - `src/services/essayIntelligence/analysis/holisticSynthesis.ts` — how synthesis iteration works (for coaching-triggered re-analysis)

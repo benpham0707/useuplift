@@ -16,7 +16,7 @@ The current implementation in `src/services/essayIntelligence/analysis/deepAnnot
 - `src/services/essayIntelligence/analysis/analysisOrchestrator.ts` — integration changes
 
 **Files to read first (for context):**
-- `PLAN2.md` — V2 evolution plan (L5 is "MODERATE UPGRADE"), Implementation Status sections at bottom
+- `docs/specs/PLAN2.md` — V2 evolution plan (L5 is "MODERATE UPGRADE"), Implementation Status sections at bottom
 - `src/services/essayIntelligence/profileTypes.ts` — current types
 - `src/services/essayIntelligence/analysis/analysisOrchestrator.ts` — how L5 is called
 - `src/services/essayIntelligence/findings/findingStore.ts` — Finding lifecycle API (Cluster A)

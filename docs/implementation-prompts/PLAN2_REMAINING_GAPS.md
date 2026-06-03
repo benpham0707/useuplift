@@ -1,6 +1,6 @@
 # PLAN2 Remaining Gaps: Essay Understanding + Persistent Questions + Maturity Analysis
 
-> **Implementation prompt for three additive features that complete the "Understanding Revolution" vision from PLAN2.md without breaking existing infrastructure.**
+> **Implementation prompt for three additive features that complete the "Understanding Revolution" vision from docs/specs/PLAN2.md without breaking existing infrastructure.**
 
 ---
 

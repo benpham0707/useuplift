@@ -1,6 +1,6 @@
 # Quality Gap 1 — Signature Move Identification (REVISED v2)
 
-> Filed under `docs/` to avoid stomping the authoritative `PLAN.md` (Essay Intelligence System, 6157 lines).
+> Filed under `docs/` to avoid stomping the authoritative `docs/specs/PLAN.md` (Essay Intelligence System, 6157 lines).
 > Scope: closes Gap 1 from the output-quality handoff (60→85 cycle). Single capability, single PR.
 >
 > **v2 changelog**: Reworked after deep audit found 4 high-severity issues in v1:

@@ -14,7 +14,7 @@
  * Both classes are serializable: `toString()` and the `toDiagnostic()` object
  * are safe to feed to `console.error`, log aggregation, and UI surfaces.
  *
- * Reference: FORGE_PLAN_ARTIFACTS.md Section 1 (Doctrine Operationalization).
+ * Reference: docs/specs/FORGE_PLAN_ARTIFACTS.md Section 1 (Doctrine Operationalization).
  */
 
 /**

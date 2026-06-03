@@ -1,6 +1,6 @@
 # Layer-by-Layer Specifications: L3.75, L4, L5, L6 (Updated)
 
-> These specifications replace the corresponding sections in PLAN.md (lines 1236-1590).
+> These specifications replace the corresponding sections in docs/specs/PLAN.md (lines 1236-1590).
 > They incorporate all decisions from the gap analysis, North Star design, type system design, and quality review findings.
 
 ---

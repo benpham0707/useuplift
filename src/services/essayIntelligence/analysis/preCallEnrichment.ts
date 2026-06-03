@@ -21,7 +21,7 @@
  * The enrichment.promptBlock is injected into the paragraph prompt
  * immediately before the GENERATION INSTRUCTIONS section.
  *
- * Scope 1 GAP-6 / GAP-7 / GAP-8. Reference: FORGE_PLAN_SCOPE1.md Phase 3.
+ * Scope 1 GAP-6 / GAP-7 / GAP-8. Reference: docs/specs/FORGE_PLAN_SCOPE1.md Phase 3.
  */
 
 import type { ParagraphProfile } from '../profileTypes';

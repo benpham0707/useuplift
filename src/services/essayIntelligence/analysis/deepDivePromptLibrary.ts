@@ -15,7 +15,7 @@
  * - Template placeholders: {essayText}, {question}, {synthesis}, {readingStrategy},
  *   {paragraphContext}, {findingContext}, {connectionContext}
  *
- * Spec: PLAN2.md (V2 growth engine), docs/plan-sections/02-layer-specs.md
+ * Spec: docs/specs/PLAN2.md (V2 growth engine), docs/plan-sections/02-layer-specs.md
  * Types: src/services/essayIntelligence/profileTypes.ts (DeepDivePromptTemplate)
  */
 
