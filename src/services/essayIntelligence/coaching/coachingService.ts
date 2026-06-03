@@ -22,7 +22,7 @@
  * Models: Haiku for Stage 1 classification, Sonnet for Stage 3 + Stage 4 deepening.
  * Caching: cacheSystemPrompt=true on all Sonnet calls.
  *
- * Spec: PLAN.md Phase 1 (1K coaching service), MEMORY.md (L6 coaching section)
+ * Spec: docs/specs/PLAN.md Phase 1 (1K coaching service), MEMORY.md (L6 coaching section)
  */
 
 import type {
@@ -918,7 +918,7 @@ export class CoachingService {
     // failed migration (no source data to reshape into the candidate store).
     // This is NOT a silent fallback — it surfaces an explicit error that the
     // UI should handle by offering the user a "Refresh analysis" action.
-    // See FORGE_PLAN_ARTIFACTS.md Section 2, FORGE_PLAN_UNIFIED.md doctrine.
+    // See docs/specs/FORGE_PLAN_ARTIFACTS.md Section 2, docs/specs/FORGE_PLAN_UNIFIED.md doctrine.
     if (profile.index?.requiresReanalysis) {
       throw CoachingBlockedError.requiresReanalysis();
     }

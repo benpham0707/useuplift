@@ -2142,7 +2142,7 @@ export interface ProfileIndex {
    * the one-shot migration in `profileMigration.ts` found no source data to
    * reshape into the new candidate store. Callers (coaching service, UI) should
    * surface an explicit re-analysis prompt rather than silently proceeding with
-   * degraded behavior. See FORGE_PLAN_ARTIFACTS.md Section 2.
+   * degraded behavior. See docs/specs/FORGE_PLAN_ARTIFACTS.md Section 2.
    *
    * Set by: `EssayProfileCoordinator.fromCheckpoint()` when it catches
    *   `PipelineError.noMigrationSource` from the migration function.
@@ -2346,8 +2346,8 @@ export interface StructuredStudentContext {
 // can reference them; Phase 4 implements the runtime store class against
 // these types; later phases add the lifecycle transitions and read paths.
 //
-// See FORGE_PLAN_UNIFIED.md "Shared types" for the canonical definitions
-// and FORGE_PLAN_SCOPE2.md for the lifecycle rules.
+// See docs/specs/FORGE_PLAN_UNIFIED.md "Shared types" for the canonical definitions
+// and docs/specs/FORGE_PLAN_SCOPE2.md for the lifecycle rules.
 // ============================================================================
 
 /**

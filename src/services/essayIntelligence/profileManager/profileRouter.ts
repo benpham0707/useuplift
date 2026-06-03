@@ -14,7 +14,7 @@
  *              re-analysis pipeline, focused analysis pipeline.
  *
  * Spec: docs/plan-sections/04-profile-manager.md (Section 4-5)
- *       PLAN.md lines 3170-3212 (routing rules table)
+ *       docs/specs/PLAN.md lines 3170-3212 (routing rules table)
  */
 
 import type {

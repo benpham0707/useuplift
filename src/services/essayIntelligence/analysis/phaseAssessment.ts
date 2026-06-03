@@ -12,7 +12,7 @@
  * - Phase transition detection when priorPhase is available
  * - legacyReadiness computed deterministically from level for backward compat
  *
- * Spec: Improvement 9 in PLAN.md
+ * Spec: Improvement 9 in docs/specs/PLAN.md
  */
 
 import type {
