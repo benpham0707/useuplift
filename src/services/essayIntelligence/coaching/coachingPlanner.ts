@@ -108,8 +108,7 @@ export function inferPrincipleCategory(item: ImprovementEntry): PrincipleCategor
     return TECHNIQUE_TO_PRINCIPLE[item.technique];
   }
   // Source-based fallback — L4 priorities that target paragraph 0 with
-  // no technique are structural/thematic; AO red flags are admissions.
-  if (item.source === 'ao_first_read') return 'admissions_framing';
+  // no technique are structural/thematic; red flags are character presence.
   if (item.source === 'red_flag') return 'character_presence';
   if (item.paragraph === -1) return 'thematic_coherence';
   return DEFAULT_PRINCIPLE;

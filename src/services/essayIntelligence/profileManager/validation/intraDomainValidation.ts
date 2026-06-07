@@ -427,21 +427,35 @@ function normalizeForSubstring(text: string): string {
 /**
  * Validate a SignatureMove candidate against essay paragraph texts.
  *
- * Referential-integrity check only (rule 6). Drops the field to null on any
- * failure with a diagnostic log. NEVER fabricates a replacement.
+ * Referential-integrity check only (rule 6). Per-instance: an instance that
+ * fails grounding is DROPPED (with a diagnostic), not fatal to the whole move —
+ * one off-by-one paragraph index or a hallucinated quote should not discard a
+ * move that is otherwise well-grounded across its other instances. The move is
+ * returned (with `instances` filtered to the grounded set) as long as at least
+ * one instance survives. NEVER fabricates: surviving instances are the LLM's
+ * own, unaltered.
  *
- * Failure modes that trigger drop-to-null:
+ * Returns null ONLY when:
+ * - the candidate is null/undefined, or
+ * - it has no instances, or
+ * - EVERY instance fails grounding (a move that can point to nothing in the
+ *   essay is asserting a pattern it cannot evidence — null is the honest result).
+ *
+ * Per-instance failure modes (drop that instance):
  * - sentence_quote with quotedText not a substring of cited paragraph
  * - any paragraph index out of range
  * - cross_paragraph_pattern with fewer than 2 paragraph entries
+ *
+ * (Cardinality / "a signature recurs" quality lives in the prompt; this
+ * validator's job is referential integrity with graceful degradation.)
  *
  * @param candidate - LLM-emitted SignatureMove or null
  * @param paragraphTexts - The essay's paragraphs in order (zero-indexed array
  *                        position = paragraph.index). The full text of each
  *                        paragraph is what `sentence_quote.quotedText` must be
  *                        a substring of.
- * @param diagnostic - Optional callback for diagnostic logging on rejection
- * @returns The candidate if valid, or null if any check fails
+ * @param diagnostic - Optional callback invoked once per dropped instance
+ * @returns The candidate with grounded instances, or null if none survive
  */
 export function validateSignatureMoveAgainstParagraphs(
   candidate: SignatureMove | null | undefined,
@@ -452,7 +466,7 @@ export function validateSignatureMoveAgainstParagraphs(
 
   const log = (msg: string): void => {
     if (diagnostic) diagnostic(msg);
-    else console.warn(`[SignatureMove validator] dropping to null: ${msg}`);
+    else console.warn(`[SignatureMove validator] dropping instance: ${msg}`);
   };
 
   const inRange = (idx: number): boolean =>
@@ -463,11 +477,13 @@ export function validateSignatureMoveAgainstParagraphs(
     return null;
   }
 
+  const validInstances: SignatureMoveInstance[] = [];
+
   for (let i = 0; i < candidate.instances.length; i++) {
     const instance = candidate.instances[i] as SignatureMoveInstance;
     if (!instance || typeof instance !== 'object') {
       log(`instance[${i}] is not an object`);
-      return null;
+      continue;
     }
 
     switch (instance.kind) {
@@ -475,18 +491,18 @@ export function validateSignatureMoveAgainstParagraphs(
         const para = instance.location?.paragraph;
         if (typeof para !== 'number' || !inRange(para)) {
           log(`instance[${i}] sentence_quote paragraph index ${para} out of range [0, ${paragraphTexts.length})`);
-          return null;
+          continue;
         }
         const quotedText = instance.quotedText;
         if (typeof quotedText !== 'string' || quotedText.length === 0) {
           log(`instance[${i}] sentence_quote has empty quotedText`);
-          return null;
+          continue;
         }
         const haystack = normalizeForSubstring(paragraphTexts[para]);
         const needle = normalizeForSubstring(quotedText);
         if (!haystack.includes(needle)) {
           log(`instance[${i}] sentence_quote quotedText not a substring of P${para}: "${quotedText.slice(0, 60)}…"`);
-          return null;
+          continue;
         }
         break;
       }
@@ -494,7 +510,7 @@ export function validateSignatureMoveAgainstParagraphs(
         const para = instance.paragraph;
         if (typeof para !== 'number' || !inRange(para)) {
           log(`instance[${i}] paragraph_compression paragraph index ${para} out of range [0, ${paragraphTexts.length})`);
-          return null;
+          continue;
         }
         break;
       }
@@ -502,23 +518,36 @@ export function validateSignatureMoveAgainstParagraphs(
         const paragraphs = instance.paragraphs;
         if (!Array.isArray(paragraphs) || paragraphs.length < 2) {
           log(`instance[${i}] cross_paragraph_pattern has fewer than 2 paragraphs`);
-          return null;
+          continue;
         }
+        let allInRange = true;
         for (const p of paragraphs) {
           if (!inRange(p)) {
             log(`instance[${i}] cross_paragraph_pattern paragraph index ${p} out of range [0, ${paragraphTexts.length})`);
-            return null;
+            allInRange = false;
+            break;
           }
         }
+        if (!allInRange) continue;
         break;
       }
       default: {
         const exhaustive: never = instance;
         log(`instance[${i}] unknown kind: ${JSON.stringify(exhaustive)}`);
-        return null;
+        continue;
       }
     }
+
+    validInstances.push(instance);
   }
 
-  return candidate;
+  // Null ONLY when nothing survives — a move that can point to nothing grounded
+  // in the essay asserts a pattern it cannot evidence. Otherwise return the move
+  // with its instances filtered to the grounded set (drop-instance, not
+  // drop-move). Surviving instances are unaltered — no fabrication.
+  if (validInstances.length === 0) {
+    return null;
+  }
+
+  return { ...candidate, instances: validInstances };
 }

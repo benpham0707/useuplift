@@ -34,6 +34,17 @@ import TestTeachingUnitSimple from "./pages/TestTeachingUnitSimple";
 const WorkshopDemo = lazy(() => import("./pages/WorkshopDemo"));
 const VaporChatDemoPage = lazy(() => import("./pages/VaporChatDemo"));
 const AnnotationV2Demo = lazy(() => import("./pages/AnnotationV2Demo"));
+const AnnotationV2EditorFoundationDemo = lazy(() => import("./pages/AnnotationV2Editor_Foundation_Demo"));
+const AnnotationV2LoadingDemo = lazy(() => import("./pages/AnnotationV2Loading_Demo"));
+const AnnotationV2PanelShellDemo = lazy(() => import("./pages/AnnotationV2Panel_Shell_Demo"));
+const AnnotationV2BloomDemo = lazy(() => import("./pages/AnnotationV2Bloom_Demo"));
+const AnnotationV2InsightDemo = lazy(() => import("./pages/AnnotationV2Insight_Demo"));
+const AnnotationV2ClickDemo = lazy(() => import("./pages/AnnotationV2Click_Demo"));
+const AnnotationV2ListDemo = lazy(() => import("./pages/AnnotationV2List_Demo"));
+const AnnotationV2RewriteDemo = lazy(() => import("./pages/AnnotationV2Rewrite_Demo"));
+const AnnotationV2NavDemo = lazy(() => import("./pages/AnnotationV2Nav_Demo"));
+const AnnotationV2OrientationDemo = lazy(() => import("./pages/AnnotationV2Orientation_Demo"));
+const AnnotationV2LibraryDemo = lazy(() => import("./pages/AnnotationV2Library_Demo"));
 const ActivityWorkshop = lazy(() => import("./pages/ActivityWorkshop"));
 import Pricing from "./pages/Pricing";
 const PIQWorkshop = lazy(() => import("./pages/PIQWorkshop"));
@@ -73,6 +84,102 @@ const AuthFreeRoutes = () => (
           </div>
         }
       />
+      <Route
+        path="/annotation-v2-demo"
+        element={
+          <Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading workshop...</div>}>
+            <AnnotationV2Demo />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/annotation-v2-demo/foundation"
+        element={
+          <Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading editor foundation...</div>}>
+            <AnnotationV2EditorFoundationDemo />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/annotation-v2-demo/loading"
+        element={
+          <Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading analysis harness...</div>}>
+            <AnnotationV2LoadingDemo />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/annotation-v2-demo/panel"
+        element={
+          <Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading panel shell...</div>}>
+            <AnnotationV2PanelShellDemo />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/annotation-v2-demo/bloom"
+        element={
+          <Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading bloom choreography...</div>}>
+            <AnnotationV2BloomDemo />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/annotation-v2-demo/insight"
+        element={
+          <Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading insight card...</div>}>
+            <AnnotationV2InsightDemo />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/annotation-v2-demo/click"
+        element={
+          <Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading click harness...</div>}>
+            <AnnotationV2ClickDemo />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/annotation-v2-demo/list"
+        element={
+          <Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading list view...</div>}>
+            <AnnotationV2ListDemo />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/annotation-v2-demo/rewrite"
+        element={
+          <Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading rewrite card...</div>}>
+            <AnnotationV2RewriteDemo />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/annotation-v2-demo/nav"
+        element={
+          <Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading navigation harness...</div>}>
+            <AnnotationV2NavDemo />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/annotation-v2-demo/orientation"
+        element={
+          <Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading orientation harness...</div>}>
+            <AnnotationV2OrientationDemo />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/annotation-v2-demo/library"
+        element={
+          <Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading library...</div>}>
+            <AnnotationV2LibraryDemo />
+          </Suspense>
+        }
+      />
     </Routes>
   </BrowserRouter>
 );
@@ -103,9 +210,8 @@ const AppRoutes = () => (
       <Route path="/test-teaching-unit" element={<TestTeachingUnit />} />
       <Route path="/test-simple" element={<TestTeachingUnitSimple />} />
       <Route path="/vapor-demo" element={<VaporChatDemoPage />} />
-      {/* /chat-demo is rendered via AuthFreeRoutes above — outside ClerkProvider */}
+      {/* /chat-demo and /annotation-v2-demo render via AuthFreeRoutes — outside ClerkProvider */}
       <Route path="/workshop-demo" element={<WorkshopDemo />} />
-      <Route path="/annotation-v2-demo" element={<Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading workshop...</div>}><AnnotationV2Demo /></Suspense>} />
       <Route path="/activity-workshop/demo" element={<ActivityWorkshop />} />
       <Route path="/activity-workshop/:sessionId" element={<ActivityWorkshop />} />
 
@@ -161,8 +267,12 @@ const App = () => {
 
   // Pure UI demo routes bypass the Clerk wrapper entirely so a Clerk CDN
   // failure can't blank them out. Must be checked BEFORE the Clerk key
-  // guard below — /chat-demo should render even if Clerk config is missing.
-  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/chat-demo')) {
+  // guard below — these should render even if Clerk config is missing.
+  if (
+    typeof window !== 'undefined' &&
+    (window.location.pathname.startsWith('/chat-demo') ||
+      window.location.pathname.startsWith('/annotation-v2-demo'))
+  ) {
     return (
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>

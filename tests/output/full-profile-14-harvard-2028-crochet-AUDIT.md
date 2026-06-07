@@ -337,4 +337,4 @@ The plan deliberately ships them as parallel lenses (synthesis vs cataloging). F
 
 **Cost summary:** 1 × Crochet end-to-end at **$1.6909, 19m 39s**. Within Tue's "ideally $1.50, max $2" target. SignatureMove micro-call itself: **$0.0837** (~5% of total) — exactly the $0.05–$0.10 plan estimate.
 
-**Calibration verdict (carrying from `docs/QUALITY_GAP1_CALIBRATION.md`):** 8/8 structural pass criteria PASS on first try; Signature Move output qualitatively matches the human counselor review's "compressed-heritage architecture" framing with a novel three-part compound (disproportion → stakes-load → inversion) that goes beyond the prompt's worked example.
+**Calibration verdict (carrying from `docs/archived/completion-snapshots/QUALITY_GAP1_CALIBRATION.md`):** 8/8 structural pass criteria PASS on first try; Signature Move output qualitatively matches the human counselor review's "compressed-heritage architecture" framing with a novel three-part compound (disproportion → stakes-load → inversion) that goes beyond the prompt's worked example.

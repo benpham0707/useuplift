@@ -420,11 +420,26 @@ describe('assembleRewriteInputs — gap construction', () => {
     expect(input.gaps).toHaveLength(3);
   });
 
-  it('uses consolidatedFrom[0] as the gap id when present', () => {
+  it('derives the gap id from consolidatedFrom[0] plus the priority index (unique per priority)', () => {
     const profile = makeCrochetLikeProfile();
     const input = assembleRewriteInputs(profile);
-    expect(input.gaps[0].id).toBe('CAND_L3_P2S4_xyz');
-    expect(input.gaps[1].id).toBe('CAND_L4_P4S1_def');
+    // The priority-index suffix guarantees uniqueness even when two priorities
+    // cite the same lead candidate (see the collision regression test below).
+    expect(input.gaps[0].id).toBe('CAND_L3_P2S4_xyz_p0');
+    expect(input.gaps[1].id).toBe('CAND_L4_P4S1_def_p1');
+  });
+
+  it('produces UNIQUE gap ids when two priorities share the same lead candidate', () => {
+    // Regression: observed on crochet — two P5/objects priorities both led with the
+    // same consolidatedFrom[0], collapsing to one gap id, so the L5 LLM addressed
+    // only one and silently dropped the other priority's rewrites.
+    const profile = makeCrochetLikeProfile();
+    const priorities = profile.scoreMatrix!.coachingMap!.priorities;
+    // Force a shared lead candidate across two priorities.
+    priorities[1].consolidatedFrom = [...(priorities[0].consolidatedFrom ?? [])];
+    const input = assembleRewriteInputs(profile);
+    const ids = input.gaps.map((g) => g.id);
+    expect(new Set(ids).size).toBe(ids.length); // all unique
   });
 
   it('falls back to synthetic gap id when consolidatedFrom is missing', () => {

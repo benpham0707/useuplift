@@ -6,9 +6,8 @@
  * findings, before sidecars — it's the lead-with calibration anchor.
  *
  * Sources from `profile.executiveBrief` (Stage 2.A) when present, falling
- * back to `aoFirstRead.committeeOneLiner` + improvement phase when the
- * Brief is unavailable. Returns the empty string when nothing's available
- * — no fake snapshot, no guessing.
+ * back to the improvement phase when the Brief is unavailable. Returns the
+ * empty string when nothing's available — no fake snapshot, no guessing.
  *
  * Design rationale: the original ROUND_7 P2-8 finding (prompt overload)
  * proposed reordering essay-text-before-verdicts. HEAD verification
@@ -40,8 +39,8 @@ export function isDiagnosticSnapshotEnabled(): boolean {
  * Build the Diagnostic Snapshot block for L6 user-prompt injection.
  *
  * Returns the empty string when the flag is off OR when no source data is
- * available (no Brief, no committee one-liner, no phase). Empty string is
- * the explicit "no snapshot this turn" signal — callers concatenate with
+ * available (no Brief, no phase). Empty string is the explicit "no snapshot
+ * this turn" signal — callers concatenate with
  * `${snapshot ? snapshot + '\n\n' : ''}`.
  *
  * Sub-decisions locked 2026-05-27:
@@ -49,18 +48,16 @@ export function isDiagnosticSnapshotEnabled(): boolean {
  *      improvementQueue section).
  *   2. Top 3 directives only (headline framing; full 5 in dump).
  *   3. Phase level + focusAreas (skip reasoning — downstream-derivable).
- *   4. Include committeeOneLiner (anchors "what this essay IS").
- *   5. Partial-emit when only some fields available.
+ *   4. Partial-emit when only some fields available.
  */
 export function buildDiagnosticSnapshot(profile: Readonly<EssayProfile>): string {
   if (!isDiagnosticSnapshotEnabled()) return '';
 
   const brief = profile.executiveBrief ?? null;
-  const committeeOneLiner = profile.aoFirstRead?.committeeOneLiner ?? null;
   const phase = profile.index?.improvementPhase ?? null;
 
   // Hard sanity-default: when nothing's available, emit nothing.
-  if (!brief && !committeeOneLiner && !phase) return '';
+  if (!brief && !phase) return '';
 
   const lines: string[] = ['=== DIAGNOSTIC SNAPSHOT (lead with this) ==='];
 
@@ -77,10 +74,6 @@ export function buildDiagnosticSnapshot(profile: Readonly<EssayProfile>): string
         lines.push(`  ${i + 1}. ${d.action} — ${d.rationale}`);
       }
     }
-  }
-
-  if (committeeOneLiner && committeeOneLiner.trim().length > 0) {
-    lines.push(`COMMITTEE ONE-LINER: ${committeeOneLiner}`);
   }
 
   if (phase) {

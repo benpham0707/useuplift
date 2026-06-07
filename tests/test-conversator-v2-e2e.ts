@@ -334,18 +334,6 @@ async function main(): Promise<void> {
     }
   }
 
-  // AO First Read (GAP-4)
-  if (profile.aoFirstRead) {
-    output.push('\nAO FIRST READ (gut reaction):');
-    output.push(`  Hook moment: ${profile.aoFirstRead.hookMoment ?? '(none)'}`);
-    output.push(`  Committee one-liner: ${profile.aoFirstRead.committeeOneLiner}`);
-    output.push(`  Distinctiveness: ${profile.aoFirstRead.distinctivenessSignal ?? '(none)'}`);
-    output.push(`  Put-down risk: ${profile.aoFirstRead.putDownRisk}`);
-    output.push(`  Gut reaction: ${profile.aoFirstRead.gutReaction}`);
-  } else {
-    output.push('\nAO FIRST READ: (not available)');
-  }
-
   // Person Portrait (GAP-5)
   if (profile.characterRevelation?.writerPortrait) {
     output.push(`\nPERSON PORTRAIT: ${profile.characterRevelation.writerPortrait}`);
@@ -852,15 +840,6 @@ async function main(): Promise<void> {
     `  [${rolesAssigned >= 3 ? 'x' : ' '}] A3: Structural roles assigned — ${rolesAssigned} paragraphs have roles (min 3 expected)`,
   );
 
-  // A4. AO First Read produced with all fields
-  const aoComplete = !!(profile.aoFirstRead?.gutReaction &&
-    profile.aoFirstRead?.committeeOneLiner &&
-    profile.aoFirstRead?.putDownRisk);
-  output.push(
-    `  [${aoComplete ? 'x' : ' '}] A4: AO First Read complete — gutReaction=${!!profile.aoFirstRead?.gutReaction}, ` +
-    `oneLiner=${!!profile.aoFirstRead?.committeeOneLiner}, putDownRisk=${profile.aoFirstRead?.putDownRisk ?? 'missing'}`,
-  );
-
   // A5. Character revelation is human (person portrait, not writing description)
   const analysisPortrait = profile.characterRevelation?.writerPortrait ?? '';
   const analysisPortraitIsHuman = analysisPortrait.length > 50 &&
@@ -1140,13 +1119,7 @@ async function main(): Promise<void> {
     `  [${turn10NamesInsight ? 'x' : ' '}] Breakthrough handling — Turn 10: named insight=${turn10NamesInsight}, short response=${turn10Short} (${turn10Response.length} chars)`,
   );
 
-  // 13. AO First Read produced
-  const aoFirstReadExists = !!profile.aoFirstRead?.gutReaction;
-  output.push(
-    `  [${aoFirstReadExists ? 'x' : ' '}] AO First Read produced — gutReaction present: ${aoFirstReadExists}`,
-  );
-
-  // 14. Person portrait is human, not writing description
+  // 13. Person portrait is human, not writing description
   const writerPortrait = profile.characterRevelation?.writerPortrait ?? '';
   const portraitIsHuman = !writerPortrait.toLowerCase().includes('writer') &&
     !writerPortrait.toLowerCase().includes('author') &&
@@ -1302,7 +1275,7 @@ async function main(): Promise<void> {
   output.push(separator('SCORECARD'));
 
   // Count passing checks
-  const analysisChecks = [allLayersComplete, hasNorthStar, rolesAssigned >= 3, aoComplete,
+  const analysisChecks = [allLayersComplete, hasNorthStar, rolesAssigned >= 3,
     analysisPortraitIsHuman, activeFindings.length >= 5, phaseDetected, analysisArchetypeDetected,
     analysisObsInRange, voicePopulated, emotionPopulated, hasParagraphScope];
   const analysisPass = analysisChecks.filter(Boolean).length;
@@ -1314,7 +1287,7 @@ async function main(): Promise<void> {
   output.push(`ANALYSIS & PROFILING: ${analysisPass}/${analysisChecks.length} checks passed`);
   output.push(`PROFILE→COACHING INTEGRATION: ${integrationPass}/${integrationChecks.length} checks passed`);
   output.push(`V2 COACHING FEATURES: (27 checks — see above)`);
-  output.push(`TOTAL: ${analysisPass + integrationPass}/17 analysis+integration checks`);
+  output.push(`TOTAL: ${analysisPass + integrationPass}/${analysisChecks.length + integrationChecks.length} analysis+integration checks`);
 
   output.push(`\nSYSTEM COST: $${(pipelineResult.costSummary.totalCost + editCost + totalCoachingCost).toFixed(4)}`);
   output.push(`SYSTEM TIME: ${totalWallTime}ms (${(totalWallTime / 1000).toFixed(1)}s)`);

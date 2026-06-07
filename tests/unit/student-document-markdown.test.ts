@@ -14,14 +14,6 @@ import type { StudentAnalysisDocument } from '../../src/services/essayIntelligen
 
 function buildSyntheticDoc(): StudentAnalysisDocument {
   return {
-    committeeOneLiner: 'A student writing a crochet-as-care essay — diligent, careful, not yet vivid.',
-    aoReaction: {
-      gutReaction: 'Steady writer, modest stakes. I want to keep reading but not because anything has hooked me yet.',
-      putDownRisk: 'moderate',
-      hookMoment: 'The grandmother\'s hands appear in P3.',
-      archetype: 'inheritance-of-craft',
-      archetypeFrequency: 'AOs read dozens of essays like this every cycle.',
-    },
     annotatedEssay: {
       paragraphs: [
         {
@@ -95,17 +87,18 @@ describe('renderStudentDocumentMarkdown — section coverage', () => {
   it('renders every section header', () => {
     const md = renderStudentDocumentMarkdown(buildSyntheticDoc());
     expect(md).toContain('# Student Analysis — architecture phase');
-    expect(md).toContain('## 1. Committee one-liner');
-    expect(md).toContain('## 2. AO reaction');
-    expect(md).toContain('## 3. Annotated essay (2 annotations)');
-    expect(md).toContain('## 4. Revision priorities');
-    expect(md).toContain('## 5. Structural map');
-    expect(md).toContain('## 6. Overall assessment');
+    expect(md).toContain('## 1. Annotated essay (2 annotations)');
+    expect(md).toContain('## 2. Revision priorities');
+    expect(md).toContain('## 3. Structural map');
+    expect(md).toContain('## 4. Overall assessment');
   });
 
-  it('surfaces the committee one-liner as a blockquote', () => {
+  it('does not surface a committee one-liner or AO reaction section', () => {
     const md = renderStudentDocumentMarkdown(buildSyntheticDoc());
-    expect(md).toContain('> A student writing a crochet-as-care essay');
+    expect(md).not.toContain('Committee one-liner');
+    expect(md).not.toContain('AO reaction');
+    expect(md).not.toContain('Gut reaction');
+    expect(md).not.toContain('Put-down risk');
   });
 
   it('renders inline annotations with nature glyph + priority ref', () => {

@@ -2481,18 +2481,12 @@ ${stalenessNote}`;
     const improvementQueueSection = this.buildImprovementQueueSection(profile, sessionMemory);
 
     // ── Phase 3: edge-protocol directives ──
-    // Three bounded edge behaviors, each conditionally emits a prompt
+    // Two bounded edge behaviors, each conditionally emits a prompt
     // directive. All guards are pure and unit-tested in
     // tests/unit/test-edge-protocol.ts — the regression surface is small.
-    //   3.1 killer diagnostic — turn 1 only, uses AO first-read data
     //   3.2 calibrated pushback — first deflection, max once per session
     //   3.3 blindSpot surfacing — emotional opening + ready hypothesis, max once
     let edgeProtocolSection = '';
-    const turnNumberForEdge = (sessionMemory.turnCount ?? 0) + 1;
-    edgeProtocolSection += edgeProtocol.killerDiagnosticDirective(
-      turnNumberForEdge,
-      profile.aoFirstRead,
-    );
     if (edgeProtocol.shouldAllowPushback(sessionMemory)) {
       edgeProtocolSection += edgeProtocol.pushbackDirective();
     }
@@ -2656,8 +2650,8 @@ ${stalenessNote}`;
 
     // ── Stage 2.G: Diagnostic Snapshot (Item 4 rescope per plan §12) ──────
     // Lead the user prompt with a ~220-token calibrated frame sourcing the
-    // Executive Brief (Item 3) when present. Falls back to committeeOneLiner
-    // + phase when Brief is null. Empty string when nothing's available.
+    // Executive Brief (Item 3) when present. Falls back to improvement phase
+    // when Brief is null. Empty string when nothing's available.
     // Flag-gated; null when ENABLE_DIAGNOSTIC_SNAPSHOT is off.
     const { buildDiagnosticSnapshot } = await import('./diagnosticSnapshot');
     const diagnosticSnapshotSection = buildDiagnosticSnapshot(profile);
@@ -2803,15 +2797,7 @@ Respond to the student's message. Apply all constraints from your role identity.
       if (roles) parts.push(`STRUCTURAL ROLES:\n${roles}`);
     }
 
-    // AO perspective (from AO First Read + admissions positioning — grounds coaching in admissions reality)
-    if (profile.aoFirstRead) {
-      const ao = profile.aoFirstRead;
-      parts.push(
-        `AO PERSPECTIVE: ${ao.gutReaction}` +
-        (ao.putDownRisk === 'high' ? `\nPUT-DOWN RISK: HIGH — the essay needs to differentiate in the first 2 sentences.` : '') +
-        (ao.committeeOneLiner ? `\nCOMMITTEE ONE-LINER: "${ao.committeeOneLiner}" — is this how the student wants to be remembered?` : '')
-      );
-    }
+    // AO perspective (from admissions positioning — grounds coaching in admissions reality)
     if (profile.admissionsPositioning?.archetypeContext) {
       const ac = profile.admissionsPositioning.archetypeContext;
       if (ac.poolDensity === 'saturated' || ac.poolDensity === 'common') {
@@ -2881,12 +2867,6 @@ Respond to the student's message. Apply all constraints from your role identity.
       parts.push(
         `STUDENT HAS ALREADY SEEN:\n` +
         `The student read the full analysis before this conversation. They know:\n` +
-        (profile.aoFirstRead?.committeeOneLiner
-          ? `- Committee one-liner: "${profile.aoFirstRead.committeeOneLiner}"\n`
-          : '') +
-        (profile.aoFirstRead?.putDownRisk
-          ? `- Put-down risk: ${profile.aoFirstRead.putDownRisk}\n`
-          : '') +
         `- Improvement phase: ${profile.index.improvementPhase?.level ?? 'foundation'}\n` +
         revPriorities +
         `\nCOACHING RULE: Reference priorities by number ("Let's work on Priority #1"). ` +

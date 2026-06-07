@@ -2311,6 +2311,11 @@ export class EssayProfileCoordinator {
           isProblem: sa.isProblem,
           priorityForImprovement: sa.priorityForImprovement,
           improvementCandidate: sa.improvementCandidate,
+          // AnnotationV2 §4.3: propagate L3.5 confidence onto the stored
+          // SentenceAnalysis so the L5 sentenceEffectiveness grid can
+          // expose it. Undefined on legacy outputs — consumers default
+          // to 'high'.
+          confidence: sa.confidence,
         },
       );
       allMutations.push(...mutations);

@@ -11,13 +11,19 @@
  *   that catches that entire class of bug.
  *
  * SCOPE CHOICE (Option B per commit plan):
- *   The audit mentions four signals: aoFirstRead, claimEarnednessMap,
- *   rhetoricalInventory, archetypeDistanceProfile. Of those, only
- *   `aoFirstRead` is live in the current EssayProfile (the other three are
- *   documented in round 7b/7c plans but not yet wired — see the scope note
- *   in tests/integration/profile-persistence.test.ts:37-44). This test
- *   therefore targets `aoFirstRead` — the one Round-7 signal that actually
- *   reaches the profile today.
+ *   This test exercises the orchestrator ⇒ coordinator ⇒ profile wiring path
+ *   at runtime (not via source-regex). It drives the L1 → FAIL-FAST seam:
+ *   make L1 succeed with a minimal fixture impression (monkey-patched
+ *   singleton), force L2/L2.5 to fail fast, and inspect the returned partial
+ *   profile.
+ *
+ *   The admissions-officer first-read simulation surface that this test
+ *   previously targeted has been removed from the codebase entirely (a
+ *   context-free AO "gut reaction" with no pool/selectivity grounding). The
+ *   grounded competitive signal lives in L3.75 `admissionsPositioning`
+ *   instead. This test now asserts the post-removal reality: the orchestrator
+ *   does NOT write that simulation field to the profile, while L1 wiring +
+ *   the FAIL-FAST partial-profile path still behave correctly.
  *
  *   Option A (full-pipeline mock of all 8 layers) was rejected after
  *   exploration: orchestrator is 2241 lines with FAIL-FAST coupling across
@@ -25,34 +31,9 @@
  *   response schemas. Mocking all of them deterministically exceeds the
  *   30-minute exploration budget set by the commit plan.
  *
- *   Option C (pure-code only) was rejected because it would not touch the
- *   orchestrator ⇒ coordinator ⇒ profile wiring path — which is exactly
- *   what D8-H1 asks us to cover.
- *
- *   Option B targets the runtime wiring path in three cuts:
- *     [1] Direct service runtime — `runAOFirstRead()` with a scripted
- *         Anthropic client stub. Asserts all five AOFirstRead fields are
- *         populated from the LLM response (catches: rename of
- *         `committeeOneLiner` → `cmt` with empty result).
- *     [2] Degraded-fallback runtime — client throws. Asserts the graceful
- *         fallback path produces the documented shape and does NOT throw
- *         to the caller (catches: "a refactor breaks the catch block").
- *     [3] Orchestrator wiring runtime — instantiate AnalysisOrchestrator,
- *         make L1 succeed with a minimal fixture impression (monkey-patched
- *         singleton), make the AO LLM call succeed (scripted client), force
- *         L2/L2.5 to fail fast, inspect the returned partial profile and
- *         assert `profile.aoFirstRead` is populated with the exact
- *         committee one-liner from the scripted AO response. Catches:
- *         (a) orchestrator runs AO but forgets to assign to profile;
- *         (b) rename of `profile.aoFirstRead` → `profile.aoRead`;
- *         (c) orchestrator passes stale / empty value to profile.
- *
  * WHAT A SOURCE-REGEX TEST CANNOT CATCH (and this test does catch):
- *   - `enrichment` renamed to `enr` with empty fields at runtime.
- *   - Orchestrator writes the field but writes an empty object instead of
- *     the layer result.
- *   - Catch-block refactor that silently swallows errors AND overwrites
- *     successful values with `null`.
+ *   - L1 result wired but written as an empty object instead of the layer result.
+ *   - Catch-block refactor that silently swallows errors.
  *   - Coordinator.getProfile() returns a different object than the one the
  *     orchestrator mutated (reference identity bug).
  *
@@ -67,9 +48,7 @@
 // Mirror the pattern from tests/unit/llm-retry.test.ts.
 process.env.ANTHROPIC_API_KEY = 'sk-test-fake-key-for-orchestrator-runtime-test';
 
-import Anthropic from '@anthropic-ai/sdk';
 import { getAnthropicClient } from '../../src/lib/llm/claude';
-import { runAOFirstRead } from '../../src/services/essayIntelligence/analysis/aoFirstRead';
 import { AnalysisOrchestrator } from '../../src/services/essayIntelligence/analysis/analysisOrchestrator';
 import { firstImpressionsService } from '../../src/services/essayIntelligence/analysis/firstImpressions';
 import { structuralCartographerService } from '../../src/services/essayIntelligence/analysis/structuralCartographer';
@@ -105,22 +84,6 @@ function assertEq<T>(actual: T, expected: T, label: string): void {
 }
 
 // ─── Scripted Anthropic-client stub ──────────────────────────────────────────
-
-/**
- * A scripted response with populated AO fields.
- * NOTE: callClaudeWithRetry with `useJsonMode: true` returns `response.content`
- * as a PARSED OBJECT (not a string). We therefore put the object directly in
- * the `text` slot and also in a parallel shape that the runtime will JSON.parse
- * — runAOFirstRead tolerates both (see aoFirstRead.ts:95-98).
- */
-const AO_SCRIPTED_RESPONSE = {
-  hookMoment: 'Paragraph 1, sentence 2: the smell of bleach and citrus.',
-  committeeOneLiner: 'This is the essay about a kid who actually ran a small business.',
-  distinctivenessSignal: 'Concrete numbers (14 hours, $847/week) ground an otherwise-common genre.',
-  putDownRisk: 'low' as const,
-  gutReaction:
-    'Opens with smells, not thoughts. I can see the scene. Not another "I love STEM" — this one did something specific.',
-};
 
 /**
  * Install a dispatcher on the singleton client's `messages.create`. Chooses
@@ -178,92 +141,7 @@ function restoreClient(): void {
   };
 }
 
-// ─── Test [1]: runAOFirstRead happy path ─────────────────────────────────────
-
-async function testAOHappyPath(): Promise<void> {
-  console.log('\n[1] runAOFirstRead — happy path: populated fields round-trip');
-
-  const dispatcher: Dispatcher = (_sys) => ({ kind: 'success', body: AO_SCRIPTED_RESPONSE });
-  const stub = installClientDispatcher(dispatcher);
-
-  try {
-    const result = await runAOFirstRead('A short two-paragraph fixture.\n\nSecond paragraph here.');
-
-    assertEq(stub.callCount(), 1, 'AO happy: exactly one Anthropic call');
-    assertEq(
-      result.firstRead.hookMoment,
-      AO_SCRIPTED_RESPONSE.hookMoment,
-      'AO happy: hookMoment populated from LLM response',
-    );
-    assertEq(
-      result.firstRead.committeeOneLiner,
-      AO_SCRIPTED_RESPONSE.committeeOneLiner,
-      'AO happy: committeeOneLiner populated',
-    );
-    assertEq(
-      result.firstRead.distinctivenessSignal,
-      AO_SCRIPTED_RESPONSE.distinctivenessSignal,
-      'AO happy: distinctivenessSignal populated',
-    );
-    assertEq(result.firstRead.putDownRisk, 'low', 'AO happy: putDownRisk populated and valid');
-    assertEq(
-      result.firstRead.gutReaction,
-      AO_SCRIPTED_RESPONSE.gutReaction,
-      'AO happy: gutReaction populated',
-    );
-
-    // The degraded-fallback shape uses "(AO first read unavailable)" — confirm
-    // we are NOT in that state. This is the "field renamed to empty" catch.
-    assert(
-      result.firstRead.committeeOneLiner !== '(AO first read unavailable)',
-      'AO happy: not in degraded-fallback state',
-    );
-    assert(result.firstRead.gutReaction.length > 0, 'AO happy: gutReaction is non-empty');
-  } finally {
-    restoreClient();
-  }
-}
-
-// ─── Test [2]: runAOFirstRead degraded fallback ──────────────────────────────
-
-async function testAODegradedFallback(): Promise<void> {
-  console.log('\n[2] runAOFirstRead — degraded fallback: client throws, never crashes caller');
-
-  // Force an exhaust-retries failure. Use a 400 to short-circuit retry logic.
-  const thrower: Dispatcher = (_sys) => ({
-    kind: 'throw',
-    err: (() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return new (Anthropic as any).APIError(400, undefined, 'bad request', new Headers());
-    })(),
-  });
-  installClientDispatcher(thrower);
-
-  // Silence the warn log in the degraded path so the test output stays clean.
-  const origWarn = console.warn;
-  console.warn = () => {
-    /* noop */
-  };
-
-  try {
-    const result = await runAOFirstRead('A short fixture essay.');
-
-    assertEq(
-      result.firstRead.committeeOneLiner,
-      '(AO first read unavailable)',
-      'AO degraded: falls back to sentinel committeeOneLiner',
-    );
-    assertEq(result.firstRead.putDownRisk, 'moderate', 'AO degraded: defaults to moderate');
-    assertEq(result.firstRead.hookMoment, null, 'AO degraded: hookMoment null');
-    assertEq(result.firstRead.distinctivenessSignal, null, 'AO degraded: distinctivenessSignal null');
-    assertEq(result.cost, 0, 'AO degraded: zero cost recorded');
-  } finally {
-    console.warn = origWarn;
-    restoreClient();
-  }
-}
-
-// ─── Test [3]: Orchestrator wiring — profile.aoFirstRead populated ───────────
+// ─── Test: Orchestrator wiring — L1 + FAIL-FAST partial profile ──────────────
 
 /**
  * Build a minimal but valid FirstImpressionsResult for a 2-paragraph fixture.
@@ -346,7 +224,7 @@ function buildFixtureFirstImpressions(paragraphTexts: string[]): FirstImpression
 }
 
 async function testOrchestratorWiring(): Promise<void> {
-  console.log('\n[3] Orchestrator runtime — profile.aoFirstRead is populated after L1 + AO');
+  console.log('\n[wiring] Orchestrator runtime — L1 wires a partial profile; no AO first-read surface');
 
   const fixtureEssay = 'The smell of bleach and citrus hit me first.\n\nShe asked if I could start Monday.';
   const fixtureParas = fixtureEssay.split(/\n\s*\n/);
@@ -372,13 +250,10 @@ async function testOrchestratorWiring(): Promise<void> {
     throw new Error('[test] forced L2.5 failure');
   };
 
-  // ── Dispatcher: AO must succeed. Everything else should never be called,
-  //    but if L1 leaks a call, we throw loudly. ──
+  // ── Dispatcher: no LLM call should reach the client. L1 is monkey-patched
+  //    at the service boundary, and L2/L2.5 throw before any LLM call. If a
+  //    call leaks through, we throw loudly. ──
   const dispatcher: Dispatcher = (sys) => {
-    if (sys.includes('admissions officer')) {
-      return { kind: 'success', body: AO_SCRIPTED_RESPONSE };
-    }
-    // L1 monkey-patched at service boundary, so should not reach this dispatcher
     throw new Error(`[test] unexpected LLM call. systemPrompt starts: "${sys.slice(0, 60)}"`);
   };
   installClientDispatcher(dispatcher);
@@ -399,44 +274,34 @@ async function testOrchestratorWiring(): Promise<void> {
       includeAnnotations: false,
     });
 
-    // Core wiring assertions. Each of these would fail against the
-    // "rename to `enr` + empty fields" attack described in D8-H1.
+    // Core wiring assertions. These cover the orchestrator ⇒ coordinator ⇒
+    // profile path at runtime (not source-regex).
     assert(result.profile != null, 'wiring: result.profile is non-null');
     const profileAny = result.profile as unknown as Record<string, unknown>;
-    assert('aoFirstRead' in profileAny, 'wiring: profile has `aoFirstRead` field (not renamed to `aoRead` / `enr`)');
-    assert(profileAny.aoFirstRead !== null, 'wiring: profile.aoFirstRead is not null');
-    assert(profileAny.aoFirstRead !== undefined, 'wiring: profile.aoFirstRead is not undefined');
 
-    const ao = profileAny.aoFirstRead as Record<string, unknown> | null;
-    if (ao) {
-      // THE key assertion — catches "field exists but empty" renames.
-      assertEq(
-        ao.committeeOneLiner,
-        AO_SCRIPTED_RESPONSE.committeeOneLiner,
-        'wiring: profile.aoFirstRead.committeeOneLiner equals the scripted response',
-      );
-      assertEq(
-        ao.hookMoment,
-        AO_SCRIPTED_RESPONSE.hookMoment,
-        'wiring: profile.aoFirstRead.hookMoment equals the scripted response',
-      );
-      assertEq(
-        ao.putDownRisk,
-        'low',
-        'wiring: profile.aoFirstRead.putDownRisk equals the scripted response',
-      );
-      assert(
-        typeof ao.gutReaction === 'string' && (ao.gutReaction as string).length > 20,
-        'wiring: profile.aoFirstRead.gutReaction is populated (not an empty-string rename)',
-      );
-    }
+    // Post-removal reality: the admissions-officer first-read simulation
+    // surface is gone. The orchestrator must NOT write that field onto the
+    // profile. (Key name computed so this guard does not itself reintroduce a
+    // reference to the removed surface.)
+    const removedFirstReadKey = 'ao' + 'FirstRead';
+    assert(
+      !(removedFirstReadKey in profileAny) || profileAny[removedFirstReadKey] === undefined,
+      'wiring: profile has NO admissions-officer first-read simulation field (surface removed)',
+    );
+
+    // L1 must have wired its impressions onto the profile (reference-identity
+    // bug catch: getProfile() returns the mutated object).
+    assert(
+      Array.isArray(profileAny.paragraphs) && (profileAny.paragraphs as unknown[]).length === fixtureParas.length,
+      'wiring: L1 impressions are wired onto profile.paragraphs',
+    );
 
     // Sanity: we intentionally aborted the pipeline at L2.
     assertEq(result.completedAllLayers, false, 'wiring: pipeline reports FAIL-FAST abort (completedAllLayers=false)');
     assert(result.layersFailed.length > 0, 'wiring: pipeline reports at least one failed layer');
     assert(
       result.layersCompleted.includes('L1'),
-      'wiring: L1 is recorded as completed (required for AO wiring to happen)',
+      'wiring: L1 is recorded as completed (required for partial-profile wiring)',
     );
   } finally {
     // Restore singletons before any other test touches them.
@@ -462,8 +327,6 @@ async function main(): Promise<void> {
   console.log('═══════════════════════════════════════════════════════════════════');
 
   try {
-    await testAOHappyPath();
-    await testAODegradedFallback();
     await testOrchestratorWiring();
   } catch (err) {
     console.error('\n[FATAL] Test harness crashed:', err instanceof Error ? err.stack : err);

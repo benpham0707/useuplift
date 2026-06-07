@@ -68,6 +68,7 @@ import type {
   EssayUnderstanding,
   SignatureMove,
   SignatureMoveInstance,
+  SignatureMoveNullReason,
 } from '../profileTypes';
 import { validateSignatureMoveAgainstParagraphs } from '../profileManager/validation/intraDomainValidation';
 import { FindingStore } from '../findings/findingStore';
@@ -101,8 +102,13 @@ const SYNTHESIS_TEMPERATURE = 0.4;
 // sensory/emotional experiences, not dead metaphors) + person portrait "lunch" framing
 // + observation economy all produce more concise, higher-quality output. The LLM should
 // focus on the most valuable insights, not fill a large token budget with filler.
-/** Phase A (voice+earned-ness) — concise voice map + earned-ness with strict mechanism quality */
-const SYNTHESIS_MAX_TOKENS_PHASE_A = 8000;
+/** Phase A (voice+earned-ness) — concise voice map + earned-ness with strict mechanism quality.
+ *  Raised 8000 → 9500 (2026-06): the mechanism-forcing rewrites of voiceIdentity.signature,
+ *  distinctivePatterns, the vocab/rhythm/tonal baselines, and the 2-sentence
+ *  authenticityAssessment each emit a bit more per field; headroom prevents the
+ *  enrichment from truncating the trailing fields. max_tokens only caps — unused
+ *  budget costs nothing. */
+const SYNTHESIS_MAX_TOKENS_PHASE_A = 9500;
 /**
  * Phase B (theme+narrative+character+craft+admissions+entanglements) — 6 sections.
  * Raised from 7000 → 10000 → 14000 after confirmed truncation on dense essays
@@ -114,8 +120,17 @@ const SYNTHESIS_MAX_TOKENS_PHASE_A = 8000;
  *
  * Per the original tuning principle: silently empty sections = worse than a
  * hard fail. Raise the cap rather than weaken the parse contract.
+ *
+ * Raised 14000 → 17000 (2026-06): the 1B/1C rewrites add output to exactly the
+ * fields that historically truncated first — admissionsPositioning
+ * (institutionalFit/memorability/portfolioPosition now force a contrast/ranking),
+ * characterRevelation.intellectualFingerprint, craftAssessment.sentencePatterns,
+ * plus the new required CULTURAL/DOMAIN DECODE routed into subtext +
+ * valuesRevealed. admissionsPositioning sits late in the schema (it was the
+ * omitted section in the prior truncation), so the added depth needs headroom
+ * before it. max_tokens only caps; unused budget is free.
  */
-const SYNTHESIS_MAX_TOKENS_PHASE_B = 14000;
+const SYNTHESIS_MAX_TOKENS_PHASE_B = 17000;
 /** 5 minutes per phase — each phase generates ~8K tokens, well within this limit */
 const SYNTHESIS_TIMEOUT_MS = 300_000;
 /** W5.3: Delta synthesis needs ~4K tokens (only 1-3 sections) */
@@ -322,6 +337,18 @@ CLEAN (descriptive framing):
   voiceIdentity.signature: "The writer uses second-person address in reflective passages and switches to fragmented, staccato sentences during action sequences. The vocabulary draws from two registers: clinical medical terminology and informal family speech."
   emotionalTopography.arcTrajectory: "Emotion moves from controlled restraint (P1-P2) through escalating tension (P3-P4, marked by shorter sentences and present tense) to an unguarded disclosure in P5S4, followed by reflective distance in the closing."
 
+=== PLAIN DESCRIPTIVE VOICE (these prose strings are read by a 17-year-old) ===
+
+Write every prose field (\`signature\`, \`arcTrajectory\`, \`primaryStrategy\`, \`writerPortrait\`, \`craftSignatures\`, observation strings, etc.) in plain, concrete language a student would recognize — NOT literary-criticism register. You are still DESCRIBING (the WHAT-IS rule above fully holds); just describe in human words.
+
+- BANNED critic-jargon (rewrite plainer if you reach for these): "commands a voice", "oscillates", "documentary precision", "ceremonial", "positioning statement", "register" (as a noun for the student), "deploys", "modulates", "interplay", "liminal", "the prose", "evokes", "underscores", "a meditation on". If a sentence sounds like a thesis abstract, it's wrong here.
+- Anchor EVERY observation in the student's actual words — quote the line ("the wink — 'Don't get the wrong idea, now' —"), don't just name the category.
+- Say what the writing DOES in concrete terms — what the reader sees or feels — not its abstract label ("the sentences stretch out and turn factual" beats "the register shifts to documentary precision").
+- Keep the ESSAY'S WRITER as the third-person subject ("The writer…", "the voice…"). Do NOT use second-person "you" — these strings are also fed to the analysis layer as context, where "you" is ambiguous. (The student-facing second-person reframe is a downstream step, not this one.)
+
+CLEAN-AND-PLAIN (what to aim for):
+  voiceIdentity.signature: "The writer opens with a wink — 'Don't get the wrong idea, now' — then drops to a single-word punchline: 'I crochet.' When the family's war history arrives the sentences stretch out and turn factual (dates, a colonel's rank), and by the closing they line up into matched triplets ('mother and daughter, past and present, tradition and innovation')."
+
 GENERAL STANDARDS:
 - Be specific. Use paragraph and sentence numbers. Quote text where it grounds your observation.
 - The walk's holistic evolution is a STARTING POINT. Confirm what's accurate, deepen what's shallow, correct what's wrong.
@@ -344,9 +371,9 @@ Return a single JSON object with EXACTLY these 4 top-level keys:
 
 {
   "voiceIdentity": {
-    "signature": "<one-paragraph description of the writer's voice — be specific and vivid, not generic>",
+    "signature": "<2-4 sentences. Name this writer's voice by its MECHANISM, not adjectives. Identify the ONE thing this voice does that a generic strong essayist would not — and quote the words that do it. Often it lives at the sentence level: a within-sentence register collision, a deflective aside that pre-empts a misread, an anticlimactic reveal. Do NOT trace register changes ('intimate, then documentary, then ceremonial') — a tour of where the register moves is not a signature. Plain language a student would recognize (no 'oscillates', 'commands a voice', 'documentary precision').>",
     "register": "<primary register: conversational, academic, lyrical, etc.>",
-    "distinctivePatterns": ["<pattern 1>", "<pattern 2>", "..."],
+    "distinctivePatterns": ["<Each entry names the pattern AND what it DOES in the reader's experience (or what it reveals the writer trusts the reader to do) — never the bare technique name. Quote the words. 'The aside \"Don't get the wrong idea, now\" bets the reader will take a joke a beat before the serious subject lands' beats 'second-person address.' A label that could attach to any essay ('uses fragments for emphasis') is not distinctive — cut it.>"],
     "evolution": "<how voice evolves through the essay — narrative of voice movement>",
     "authenticVsPerformed": [
       {
@@ -369,7 +396,7 @@ Return a single JSON object with EXACTLY these 4 top-level keys:
       ]
     },
     "vocabularyFingerprint": {
-      "baseline": "<dominant vocabulary character>",
+      "baseline": "<Name the dominant vocabulary character AND the key domain COLLISION: which two vocabulary domains share a paragraph or sentence, and what the writer gains by colliding them (e.g., magical-craft vocabulary metabolizing war vocabulary so trauma reads without melodrama). A flat list of domains is inert — the insight is in which ones touch.>",
       "observations": [<same structure as register observations, dimensions: ["vocabulary"]>],
       "domains": [
         {
@@ -380,7 +407,7 @@ Return a single JSON object with EXACTLY these 4 top-level keys:
       ]
     },
     "sentenceRhythm": {
-      "baseline": "<dominant sentence rhythm/cadence>",
+      "baseline": "<The writer's DEFAULT sentence shape AND the specific event that makes them break it. FORBIDDEN: 'varied', 'mixed', 'a mix of long and short' — those fit any competent prose and give a downstream consumer nothing. Name the unit they return to and the trigger that snaps it (e.g., 'long descriptive accumulation that drops to a 2-3 word fragment at moments of revelation or defeat').>",
       "observations": [<same structure, dimensions: ["rhythm"]>]
     },
     "perspectiveDistance": {
@@ -388,7 +415,7 @@ Return a single JSON object with EXACTLY these 4 top-level keys:
       "observations": [<same structure, dimensions: ["perspective"]>]
     },
     "tonalDisposition": {
-      "baseline": "<dominant tonal coloring>",
+      "baseline": "<Name the PRIMARY tone (the one carrying the most weight), what it does structurally, and where it YIELDS or disappears — the handoff is the insight (e.g., 'wry humor is load-bearing: it earns the reader's trust before the war pivot, then drops out entirely at the ceremonial close'). Not a flat coloring word.>",
       "observations": [<same structure, dimensions: ["tonal_disposition"]>],
       "dominantQualities": ["<TonalQuality values: humor, irony, earnestness, irreverence, solemnity, self_awareness, detachment, tenderness, defiance>"]
     },
@@ -443,7 +470,7 @@ Return a single JSON object with EXACTLY these 4 top-level keys:
         "detail": "<what is shown or told and how>"
       }
     ],
-    "authenticityAssessment": "<ONE sentence (≤40 words): how emotion is conveyed (sensory detail / abstraction / dialogue / action) OR what replaces it if largely absent. Map what IS there, not what should be.>"
+    "authenticityAssessment": "<1-2 sentences. First: how emotion is conveyed (sensory detail / abstraction / dialogue / action) or what replaces it if largely absent. Then name the ONE place where stated emotion ('I am proud', 'I felt') stands in for shown feeling — or state plainly that none does. Describe what IS there; the felt-vs-stated contrast is the load-bearing observation, so do not let brevity drop it.>"
   },
 
   "momentEarnednessMap": {
@@ -526,7 +553,7 @@ voiceMap observations cap:
 
 emotionalTopography caps:
 - showVsTell MUST emit at most 4 entries. Pick the 4 moments that best represent the essay's show/tell pattern — do NOT enumerate every sentence.
-- authenticityAssessment MUST be ONE sentence, ≤40 words. It is a headline, not a description.`;
+- authenticityAssessment MUST be at most 2 sentences (~60 words). Lead with how emotion is conveyed; the second sentence names where stated emotion substitutes for shown feeling (or states none does). Tight — but never so tight it drops the felt-vs-stated contrast, which is the field's load-bearing observation.`;
 
 /**
  * Phase B system prompt — Theme, Narrative, Character, Craft, Admissions
@@ -591,7 +618,7 @@ RIGHT: 'The person who stays late not because they have to but because they got 
     "valuesRevealed": ["<values SHOWN not told — what does this person care about?>"],
     "revealedQualities": ["<qualities the writer reveals through ACTION in the essay — 'takes on adult responsibility without being asked', 'notices physical details others miss', 'processes difficulty through lists and counting'. NOT writerly qualities like 'precise' or 'image-driven'>"],
     "growthArc": "<growth arc detected in the essay>",
-    "intellectualFingerprint": "<how this person thinks — their cognitive style, shown through the essay's structure and choices>",
+    "intellectualFingerprint": "<This person's DEFAULT cognitive move — what they reach for when making meaning or resolving uncertainty: inward (introspection), outward (borrowed frames / authorities / cultural references), system/structure, sensory-concrete, or other people. Name the ONE default and cite the 2-3 places it fires. Do NOT relist the essay's metaphors or pacing (that is craft, covered in craftAssessment) and do NOT open with 'Thinks through…', 'Comfortable with…', or 'Moves between…'. The fingerprint is HOW they think, not WHAT techniques the essay contains.>",
     "blindSpots": ["<what they might not see about themselves or their essay>"]
   },
 
@@ -618,17 +645,17 @@ RIGHT: 'The person who stays late not because they have to but because they got 
       }
     ],
     "imageSystem": "<describe the image/metaphor system — what images appear, how they recur or transform, what connections exist between them>",
-    "sentencePatterns": "<describe sentence-level patterns observed — rhythm, length variation, opening patterns, structural tendencies>",
+    "sentencePatterns": "<Describe sentence-level patterns by what each DOES to the reading experience, not by naming the device. For the most telling pattern, point to the ONE sentence whose rhythm enacts the paragraph's intent (the fragment that lands the reveal; the long accumulation that buries — or earns — a point). FORBIDDEN: 'creates variety', 'maintains forward momentum', or any benefit assertable about any well-edited essay. An inventory of opening structures is not a pattern — name what the rhythm is FOR.>",
     "wordPatterns": "<describe word-level patterns — recurring words, register tendencies, vocabulary choices>"
   },
 
   "admissionsPositioning": {
     "tellabilitySummary": "<30-second AO description — what would an admissions officer say this essay IS ABOUT to a colleague?>",
     "distinctivenessFactors": ["<what makes this essay non-interchangeable — specific to THIS essay's execution>"],
-    "institutionalFit": "<what kinds of institutions this essay signals fit for — based on content and values shown>",
+    "institutionalFit": "<Name a CONTRAST, not a values list: what kind of program is this a STRONGER signal for vs. a WEAKER signal for, and why. FORBIDDEN: 'institutions that value [theme restated]' — that fits any thematically-similar essay and names nothing that wouldn't value it. Anchor the read in the essay's actual evidence (e.g., 'reads stronger for a humanities/area-studies context than a quant-heavy one — the intellectual signal, the Agnesi naming, is decorative, not demonstrated'). If your fit statement could be pasted onto another essay, it has failed.>",
     "redFlags": ["<anything an admissions reader would notice or question — describe WHAT it is, not whether it is a problem>"],
-    "memorability": "<what elements of this essay would persist in a reader's memory after reading 50 essays — describe the elements, not their quality>",
-    "portfolioPosition": "<what role this essay occupies within a broader portfolio — what dimension of the applicant it surfaces>",
+    "memorability": "<Name the ONE element most likely to survive in memory after 50 essays, then 1-2 runners-up — ranked. Forcing a single winner is the test: if everything is 'memorable', nothing is. Describe the elements concretely (the named object, the specific image), not their quality.>",
+    "portfolioPosition": "<What does THIS essay prove that a transcript and activities list structurally CANNOT — and the ONE adjacent quality it conspicuously fails to evidence, leaving a gap a second essay would need to fill. FORBIDDEN: 'occupies the [theme] dimension' — that just relabels the theme. Name the proof and the gap concretely (e.g., 'proves sustained solo craft and intellectual playfulness; shows nothing of how they work WITH others — collaboration is the unfilled adjacent slot').>",
     "aoTakeaway": "<what an admissions officer would conclude about this student after reading the complete essay>",
     "archetypeContext": {
       "archetype": "<name the essay archetype an AO would mentally file this under — e.g., 'sports injury comeback', 'immigrant identity through food', 'music as life metaphor', 'service trip revelation', 'death of grandparent', 'overcoming disability', 'coding project as passion', 'family sacrifice narrative'. Be honest about the archetype even if the essay is good. Every essay has one.>",
@@ -716,6 +743,10 @@ IMPORTANT: "newFindings" and "findingEvolutions" are OPTIONAL. Omit them entirel
   * SOLO CREDIT FOR LIKELY TEAMWORK: Does the essay claim sole credit ("I developed", "I created") for something that likely involved collaboration (hackathon project, club achievement, team competition)? Flag: "Solo credit language for likely collaborative work: [specific claim]."
   These three patterns are what elite counselors catch in the first 30 seconds. They are structural, not craft issues.
 - characterRevelation.blindSpots: Describe WHAT is absent from the self-presentation. Do NOT say this is a problem.
+- CULTURAL / DOMAIN DECODE (required — surface in thematicArchitecture.subtext, and where it bears on the writer in characterRevelation.valuesRevealed / intellectualFingerprint): the essay almost certainly contains culturally-, ritually-, or domain-specific language whose meaning a generic reader would miss. DECODE it — quote the surface words, then state the encoded meaning:
+  * Cultural / heritage register: virtue vocabulary, kinship terms, religious or ceremonial language. (e.g., "patience, decorum, and poise" channels Confucian-era female-virtue vocabulary; chrysanthemums read as funerary flowers in a Vietnamese frame while roses read Western, so the pairing itself encodes a cross-cultural inheritance.)
+  * Domain / insider register: the technical or subcultural terms that mark a real insider — debate's "dropped disad" / "link turn", a lab's "contaminated plate", a musician's specific interval. Decode what the word KNOWS, not merely that it appears.
+  This is DESCRIPTION (surface the encoded meaning), not evaluation. If the essay genuinely carries no culturally- or domain-loaded language, say so explicitly — never invent a decode.
 
 ENTANGLEMENTS:
 - Find moments where dimensions INTERSECT — where the voice shift IS the thematic pivot, where the emotional peak IS the character revelation.
@@ -2621,6 +2652,7 @@ export class HolisticSynthesisService {
     }
 
     let signatureMove: SignatureMove | null = null;
+    let signatureMoveNullReason: SignatureMoveNullReason | null = 'parse_error';
     let signatureMoveCost = 0;
     let signatureMoveTokenUsage = {
       inputTokens: 0,
@@ -2630,9 +2662,13 @@ export class HolisticSynthesisService {
     };
     if (signatureMoveSettled.status === 'fulfilled') {
       signatureMove = signatureMoveSettled.value.signatureMove;
+      signatureMoveNullReason = signatureMoveSettled.value.signatureMoveNullReason;
       signatureMoveCost = signatureMoveSettled.value.cost;
       signatureMoveTokenUsage = signatureMoveSettled.value.tokenUsage;
     } else {
+      // The whole micro-call rejected (network/timeout after retries) — a
+      // pipeline failure, not a "this essay has no move" verdict.
+      signatureMoveNullReason = 'parse_error';
       console.warn(
         `[HolisticSynthesis] Iteration ${input.iterationNumber} — SignatureMove FAILED (non-fatal, falling to null): ` +
           (signatureMoveSettled.reason instanceof Error
@@ -2641,12 +2677,13 @@ export class HolisticSynthesisService {
       );
     }
 
-    // Fold the validated SignatureMove into craftAssessment so the existing
-    // HolisticMutator (which wholesale-replaces craftAssessment from
-    // synthesis.craftAssessment) carries it through to the persisted profile
-    // without any mutator-level code change.
+    // Fold the validated SignatureMove (and the honest null-reason) into
+    // craftAssessment so the existing HolisticMutator (which wholesale-replaces
+    // craftAssessment from synthesis.craftAssessment) carries both through to the
+    // persisted profile without any mutator-level code change.
     if (synthesis.craftAssessment) {
       synthesis.craftAssessment.signatureMove = signatureMove;
+      synthesis.craftAssessment.signatureMoveNullReason = signatureMoveNullReason;
     }
 
     // ── Aggregate costs ──
@@ -2899,6 +2936,8 @@ export class HolisticSynthesisService {
     readingStrategy: ReadingStrategy,
   ): Promise<{
     signatureMove: SignatureMove | null;
+    /** Why signatureMove is null (for honest telemetry + rendering); null when populated. */
+    signatureMoveNullReason: SignatureMoveNullReason | null;
     cost: number;
     tokenUsage: {
       inputTokens: number;
@@ -2945,28 +2984,69 @@ export class HolisticSynthesisService {
       cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
     };
 
+    // Distinguish the THREE reasons a move can come back null — the system must
+    // never conflate "the essay genuinely has no single move" (a real verdict)
+    // with "the pipeline failed to produce/ground one" (a gap). Conflating them
+    // is what let the dump fabricate a flattering "distributed craft" story.
     let signatureMove: SignatureMove | null = null;
+    let nullReason: SignatureMoveNullReason = 'llm_null';
+    const validatorDiagnostics: string[] = [];
     try {
       const parsed = parseLlmJsonOutput(response.content, 'L3.75 SignatureMove');
-      const candidate = coerceSignatureMove(parsed.signatureMove);
-      signatureMove = validateSignatureMoveAgainstParagraphs(candidate, paragraphTexts);
+      const rawMove = (parsed as { signatureMove?: unknown }).signatureMove;
+      if (rawMove === null || rawMove === undefined) {
+        // The model judged this essay has no single dominant move — a real
+        // signal about the essay, not a failure.
+        nullReason = 'llm_null';
+      } else {
+        const candidate = coerceSignatureMove(rawMove);
+        if (candidate === null) {
+          // The model tried to name a move but the shape was unusable.
+          nullReason = 'malformed';
+        } else {
+          signatureMove = validateSignatureMoveAgainstParagraphs(
+            candidate,
+            paragraphTexts,
+            (m) => validatorDiagnostics.push(m),
+          );
+          // Well-formed candidate; if STILL null, every cited instance failed
+          // grounding — a pipeline outcome, not a verdict on the essay's craft.
+          nullReason = signatureMove === null ? 'validator_rejected' : 'llm_null';
+        }
+      }
     } catch (error) {
       console.warn(
         `[HolisticSynthesis] SignatureMove parse failed (non-fatal, dropping to null): ` +
           (error instanceof Error ? error.message : String(error)),
       );
       signatureMove = null;
+      nullReason = 'parse_error';
     }
+
+    const signatureMoveNullReason: SignatureMoveNullReason | null =
+      signatureMove === null ? nullReason : null;
 
     console.log(
       `[HolisticSynthesis] SignatureMove complete — ` +
-        `${signatureMove === null ? 'null (no single defining move identified)' : `populated, ${signatureMove.instances.length} instances`}, ` +
+        `${
+          signatureMove === null
+            ? `null (reason=${nullReason}${
+                validatorDiagnostics.length > 0
+                  ? `; ${validatorDiagnostics.length} instance(s) rejected: ${validatorDiagnostics.join(' | ')}`
+                  : ''
+              })`
+            : `populated, ${signatureMove.instances.length} instances${
+                validatorDiagnostics.length > 0
+                  ? ` (${validatorDiagnostics.length} ungrounded instance(s) dropped)`
+                  : ''
+              }`
+        }, ` +
         `${response.usage.output_tokens} output tokens, ` +
         `$${cost.toFixed(4)} cost, ` +
         `${timingMs}ms, stopReason: ${response.stopReason}`,
     );
 
-    return { signatureMove, cost, tokenUsage, timingMs };
+    return { signatureMove, signatureMoveNullReason, cost, tokenUsage, timingMs };
   }
 
   // ── Meta output parser ──

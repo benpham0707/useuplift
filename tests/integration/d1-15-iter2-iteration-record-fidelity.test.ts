@@ -34,8 +34,8 @@
 //   (firstImpressions, structuralCartographer, scoutPass, sequentialDeepWalk,
 //   holisticSynthesis, analysisPass, crystallizer, deepAnnotationService)
 //   each with their full type contracts. The L2-abort seam is upstream of
-//   most of those, requires only L1 success + AO First Read mock + L2 throw,
-//   and exercises the SAME commitIterationRecord helper. It's the smallest
+//   most of those, requires only L1 success + L2 throw, and exercises the
+//   SAME commitIterationRecord helper. It's the smallest
 //   mock surface that proves the contract (per Tue's "investigate, don't
 //   gold-plate" directive).
 //
@@ -48,8 +48,6 @@
 // What we mock at the LLM boundary (zero API spend per Phase 1 charter):
 //   - firstImpressionsService.analyze — returns valid stub impressions for
 //     the fixture essay (4 paragraphs from harvard-mites-2029) with cost=$0.05
-//   - runAOFirstRead — throws (covers the realistic "AO failed" branch +
-//     keeps the mock surface minimal; non-fatal per orchestrator design)
 //   - structuralCartographerService.analyze — emits an iteration telemetry
 //     event for iter=2 (so events[] flushing is testable), then throws
 //     (drives the L2 abort path)
@@ -89,16 +87,6 @@ vi.mock('../../src/services/essayIntelligence/analysis/firstImpressions', async 
   };
 });
 
-vi.mock('../../src/services/essayIntelligence/analysis/aoFirstRead', async () => {
-  const actual = await vi.importActual<
-    typeof import('../../src/services/essayIntelligence/analysis/aoFirstRead')
-  >('../../src/services/essayIntelligence/analysis/aoFirstRead');
-  return {
-    ...actual,
-    runAOFirstRead: vi.fn(),
-  };
-});
-
 vi.mock('../../src/services/essayIntelligence/analysis/structuralCartographer', async () => {
   const actual = await vi.importActual<
     typeof import('../../src/services/essayIntelligence/analysis/structuralCartographer')
@@ -124,7 +112,6 @@ vi.mock('../../src/services/essayIntelligence/analysis/scoutPass', async () => {
 });
 
 import { firstImpressionsService } from '../../src/services/essayIntelligence/analysis/firstImpressions';
-import { runAOFirstRead } from '../../src/services/essayIntelligence/analysis/aoFirstRead';
 import { structuralCartographerService } from '../../src/services/essayIntelligence/analysis/structuralCartographer';
 import { scoutPassService } from '../../src/services/essayIntelligence/analysis/scoutPass';
 
@@ -149,7 +136,6 @@ import type {
 import type { FirstImpressionsResult } from '../../src/services/essayIntelligence/analysis/firstImpressions';
 
 const mockL1 = vi.mocked(firstImpressionsService.analyze);
-const mockAO = vi.mocked(runAOFirstRead);
 const mockL2 = vi.mocked(structuralCartographerService.analyze);
 const mockL25 = vi.mocked(scoutPassService.analyze);
 
@@ -362,15 +348,11 @@ beforeEach(() => {
   __resetTaughtMoveBufferForTesting();
   __resetTelemetryForTesting();
   mockL1.mockReset();
-  mockAO.mockReset();
   mockL2.mockReset();
   mockL25.mockReset();
 
   // Default mock surface — every test inherits these unless it overrides.
   mockL1.mockResolvedValue(buildStubL1Result());
-  // AO fails non-fatally (covers the realistic branch; orchestrator emits a
-  // structured iteration=-1 telemetry event but keeps going).
-  mockAO.mockRejectedValue(new Error('AO First Read stub: non-fatal failure'));
 
   // L2 mock: emit a real iteration-2 telemetry event BEFORE throwing, so
   // commitIterationRecord's flushEventsForIteration(input.essayId, iter=2)
@@ -505,8 +487,8 @@ describe('Item 5 — iter-2 IterationRecord fidelity (E2E orchestrator drive)', 
     it('comprehensiveBaselineCost equals costSummary.totalCost (sum of all recorded layers)', async () => {
       const { record } = await driveIter2();
       // Per analysisOrchestrator.ts:2129 — comprehensiveBaselineCost is
-      // populated from costSummary.totalCost. With L1=0.05 and AO failed
-      // (no record), totalCost=0.05.
+      // populated from costSummary.totalCost. With only L1=0.05 recorded
+      // before the L2 abort, totalCost=0.05.
       expect(record.comprehensiveBaselineCost).toBeCloseTo(0.05, 6);
     });
 
@@ -580,17 +562,6 @@ describe('Item 5 — iter-2 IterationRecord fidelity (E2E orchestrator drive)', 
       expect(l2Event).toBeDefined();
       expect(l2Event?.iteration).toBe(2);
       expect(l2Event?.status).toBe('failed');
-    });
-
-    it('events[] omits the AO-First-Read iteration=-1 event (flushed for iter=2 only)', async () => {
-      const { record } = await driveIter2();
-      // The orchestrator emits an iteration=-1 sentinel event when AO First
-      // Read fails (analysisOrchestrator.ts:499). That event lives in a
-      // DIFFERENT buffer key (essayId, -1) and should NOT appear on iter-2's
-      // record. Pins the buffer-key isolation contract.
-      const events = record.events ?? [];
-      const aoEvent = events.find((e) => e.step === 'AOFirstRead');
-      expect(aoEvent).toBeUndefined();
     });
 
     it('every event in record.events[] has iteration === 2 (filtered by iteration key)', async () => {

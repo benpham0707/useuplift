@@ -45,10 +45,23 @@ import type {
 } from '../profileTypes';
 import type { L5Annotation } from './deepAnnotationService';
 import { parseMEMGap } from './parseMEMGap';
+import { L5_GENERATIVE_DOOR_DIRECTIVE } from './l5RewriteDirectives';
 
 const SONNET = 'claude-sonnet-4-5-20250929';
-const REWRITE_MAX_TOKENS = 6000;
-const REWRITE_TIMEOUT_MS = 90_000;
+// 2026-05-30: raised 6000→9000. First real execution (the path had never run —
+// orchestrator integration deferred, build item 9) truncated at 6000: only 3 of 5
+// growth annotations emitted, preservationAnnotations[] + reframeAnnotation (emitted
+// AFTER growth in the JSON) dropped entirely, jsonrepair-salvaged. The module's own
+// design note anticipated ~8K output tokens for multi-draft variants, but the
+// mentor-grade L5_GENERATIVE_DOOR_DIRECTIVE makes each gap's 3 drafts richer
+// (~2.1K tokens/gap observed). 4 gaps + 4 preservation + reframe = 9,589 tokens, so
+// a 5-gap essay needs ~11.5K. Budget 13000 to fit 5 gaps × 3 drafts + preservation +
+// reframe with margin (6000→9000→11000 all truncated the trailing reframe).
+const REWRITE_MAX_TOKENS = 13000;
+// 2026-05-30: raised 90s→300s. 90s was never validated (path never ran) and timed
+// out on every retry on first execution. An 11000-token Sonnet call generates for
+// ~250s; 300s gives margin. Rises WITH the token ceiling (they move together).
+const REWRITE_TIMEOUT_MS = 300_000;
 const REWRITE_TEMPERATURE = 0.3;
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -676,9 +689,16 @@ export function assembleRewriteInputs(
       essayMaxWords,
     );
 
+    // Gap id must be UNIQUE per priority. consolidatedFrom[0] alone is NOT unique:
+    // two priorities can cite the same lead candidate (observed on crochet — two
+    // P5/objects priorities both led with CAND_L3_75_P0_9784b8e9), which collapses
+    // them to one gap id and makes the LLM address only one, silently dropping the
+    // other priority's rewrites. Append the priority index to guarantee uniqueness
+    // while keeping the candidate id legible. priorDrafts.gapId matching is a soft
+    // text hint (not a hard join), so the format change degrades gracefully.
     const id =
       priority.consolidatedFrom && priority.consolidatedFrom.length > 0
-        ? priority.consolidatedFrom[0]
+        ? `${priority.consolidatedFrom[0]}_p${idx}`
         : `gap_p${anchorParagraphIdx}_${idx}`;
 
     return {
@@ -815,7 +835,7 @@ For each gap, produce EXACTLY 3 draft variants at different intensity levels:
   - "insight": philosophical/reflective turn, no new scene
 
 For each draft, you MUST also produce:
-  - voicePreservationNotes: explicit citation of which styleProfile fields you used
+  - voicePreservationNotes: STUDENT-FACING (rendered as "What this keeps of your voice"). COMPACT — ≤2 sentences, ≤40 words. Name, in words the student recognizes, which of THEIR OWN moves you kept — quote their actual phrasing, not the system's field names. SAY: "keeps your 'Don't get the wrong idea, now' aside and the cornflower-blue palette from Agnes." DO NOT SAY: "uses distinctivePatterns[0] and vocabularyDomains[2]." Never expose styleProfile field names to the student. Pick the 1-2 most telling moves; don't catalogue every one.
   - antiPattern: a generic version + why it fails (whyItFails)
   - wordEconomyCut: suggestion if the draft is additive AND the essay would exceed essayMaxWords; null otherwise
   - voiceCheck: which distinctive patterns + vocabulary domains you used
@@ -841,6 +861,12 @@ DRAFT GENERATION RULES (the bar):
   9. ANTI-PATTERN HONESTY — your antiPattern.text field must be a real version someone might write, not a strawman. Test: a competent but generic college essayist would write something like the antiPattern. Explain in antiPattern.whyItFails what specifically would be lost or generic.
 
   10. NO META-LANGUAGE — drafts contain prose only. Do not write "this sentence bridges..." or "here I show..." inside the draft.text. Meta-commentary lives in voicePreservationNotes, not in text.
+
+${L5_GENERATIVE_DOOR_DIRECTIVE}
+
+  HOW THE DOOR MAPS TO THE THREE INTENSITY LEVELS:
+  - "minimal" (one bridging sentence) and the paste-able draft.text everywhere: stays factually true to what the student wrote — this is the anti-fabrication side. Voice-matched, concrete, but no invented facts.
+  - "scene" and "insight" drafts: these are where the door opens widest. The scene may render vivid POSSIBILITY (introduced as invitation — "picture the afternoon it finally worked: maybe the hook stops snagging, maybe…") so the student sees what the moment could hold and wants to write their real version. Still no asserted invented fact — the vividness is offered, not imposed.
 
 WORD BUDGET:
   - Each gap carries a wordBudget with paragraphCurrentWords, essayCurrentWords, essayMaxWords, and targetDelta {min, max}.
@@ -899,7 +925,7 @@ OUTPUT FORMAT — single JSON object matching this exact skeleton (no markdown, 
           "text": "string (the proposed text, no meta)",
           "intensityLevel": "minimal" | "scene" | "insight",
           "wordDelta": 30,
-          "voicePreservationNotes": "string (cite which patterns/domains used)",
+          "voicePreservationNotes": "string — student-facing; name their own moves in their words (quote their phrasing), NOT styleProfile field names",
           "addressesGapMechanism": "sensory_grounding" | "...",
           "antiPattern": { "text": "string", "whyItFails": "string" },
           "wordEconomyCut": null | { "location": { "paragraph": 0, "sentence": 0 }, "quote": "string", "wordsRemoved": 8, "reason": "string" },

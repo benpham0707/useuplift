@@ -38,7 +38,6 @@
 
 import type {
   CoachingSessionMemory,
-  AOFirstRead,
   StudentTheory,
 } from '../profileTypes';
 
@@ -134,55 +133,6 @@ export function detectForbiddenVocabulary(response: string): ForbiddenMatch[] {
     }
   }
   return matches;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 3.1 KILLER DIAGNOSTIC — T1 opening mandate
-// ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * Return a prompt directive that, if `ao` is populated and this is turn 1,
- * requires the coach to open the response by naming the archetypal pattern.
- *
- * The V2 system has all the material already (committeeOneLiner, gutReaction,
- * putDownRisk) — we just mandate it surfaces verbatim rather than getting
- * buried three paragraphs into the response. Empty string means "don't fire"
- * (turn > 1, or no AO data available).
- *
- * @param turnNumber 1-based turn number (memory.turnCount + 1)
- * @param ao         profile.aoFirstRead, possibly null
- */
-export function killerDiagnosticDirective(
-  turnNumber: number,
-  ao: AOFirstRead | null | undefined,
-): string {
-  if (turnNumber !== 1) return '';
-  if (!ao) return '';
-  const oneLiner = ao.committeeOneLiner;
-  const archetype = ao.gutReaction;
-  if (!oneLiner && !archetype) return '';
-
-  const lines: string[] = ['\n\n=== TURN 1 OPENING DIRECTIVE (killer diagnostic) ==='];
-  lines.push(
-    'Open your response within the first 50 words with a diagnostic-confidence framing. ' +
-      'This is the single most important move of the first turn — do NOT bury it.',
-  );
-  if (oneLiner) {
-    lines.push(`- AO committee one-liner: "${oneLiner}"`);
-  }
-  if (archetype) {
-    // Trim to first 2 sentences — the archetype framing is usually in the first few lines of gutReaction
-    const trimmed = archetype.split(/(?<=[.?!])\s/).slice(0, 3).join(' ');
-    lines.push(`- Archetype framing: ${trimmed}`);
-  }
-  if (ao.putDownRisk === 'high') {
-    lines.push('- Put-down risk is HIGH — the student needs to hear the convergence-zone read explicitly.');
-  }
-  lines.push(
-    'Use language like "I\'ve read this pattern N times" or "This is Music Essay #14" when naming the archetype. ' +
-      'That diagnostic-confidence move is what makes the first turn land as senior-AO coaching rather than a craft workshop.',
-  );
-  return lines.join('\n');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

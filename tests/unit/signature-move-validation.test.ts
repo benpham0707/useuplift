@@ -1,9 +1,11 @@
 // ============================================================================
 // SIGNATURE MOVE VALIDATOR — unit tests (Quality Gap 1)
 // ============================================================================
-// Substring + paragraph-index referential-integrity validator. The validator
-// drops the field to null on any failure (no fabrication, no fallback) per
-// CLAUDE.md and the LLM-first design rules.
+// Substring + paragraph-index referential-integrity validator. Invalid
+// instances are DROPPED per-instance (no fabrication, no fallback); the move
+// survives as long as >=1 instance is grounded, and goes null only when NONE
+// survive — per CLAUDE.md and the LLM-first design rules. One off-by-one index
+// or a single hallucinated quote must not discard an otherwise-grounded move.
 
 import { describe, it, expect } from 'vitest';
 
@@ -58,6 +60,65 @@ describe('validateSignatureMoveAgainstParagraphs', () => {
     expect(result).not.toBeNull();
     expect(result?.oneSentenceName).toBe(baseValid.oneSentenceName);
     expect(result?.instances.length).toBe(3);
+  });
+
+  it('drops only the ungrounded instance and keeps the move when others are grounded', () => {
+    const partlyDrifted: SignatureMove = {
+      ...baseValid,
+      instances: [
+        // grounded
+        {
+          kind: 'sentence_quote',
+          location: { paragraph: 0, sentence: 0 },
+          quotedText: 'My nightstand is home to a small menagerie of critters',
+          whatThisInstanceShows: 'taxidermy misdirection setup',
+        },
+        // ungrounded — quote not present in P1 (e.g. an LLM hallucination)
+        {
+          kind: 'sentence_quote',
+          location: { paragraph: 1, sentence: 0 },
+          quotedText: 'this phrase does not appear anywhere in paragraph one',
+          whatThisInstanceShows: 'hallucinated quote',
+        },
+        // grounded
+        {
+          kind: 'paragraph_compression',
+          paragraph: 1,
+          whatThisInstanceShows: 'P1 compresses family history',
+        },
+      ],
+    };
+    const messages: string[] = [];
+    const result = validateSignatureMoveAgainstParagraphs(
+      partlyDrifted,
+      PARAGRAPHS,
+      (m) => messages.push(m),
+    );
+    // The move SURVIVES — one bad instance must not nuke an otherwise-grounded move.
+    expect(result).not.toBeNull();
+    // Filtered to the two grounded instances; the bad one is gone.
+    expect(result?.instances.length).toBe(2);
+    // The move's prose is preserved unaltered (no fabrication).
+    expect(result?.oneSentenceName).toBe(baseValid.oneSentenceName);
+    // Exactly one diagnostic, for the single dropped instance.
+    expect(messages.length).toBe(1);
+    expect(messages[0]).toMatch(/not a substring/);
+  });
+
+  it('goes null only when EVERY instance fails grounding', () => {
+    const allBad: SignatureMove = {
+      ...baseValid,
+      instances: [
+        {
+          kind: 'sentence_quote',
+          location: { paragraph: 0, sentence: 0 },
+          quotedText: 'nope, not present in paragraph zero',
+          whatThisInstanceShows: 'bad quote',
+        },
+        { kind: 'paragraph_compression', paragraph: 99, whatThisInstanceShows: 'out of range' },
+      ],
+    };
+    expect(validateSignatureMoveAgainstParagraphs(allBad, PARAGRAPHS)).toBeNull();
   });
 
   it('drops to null when a sentence_quote quotedText is not in the cited paragraph', () => {

@@ -128,9 +128,9 @@ export default defineConfig({
       'tests/unit/l5-topn-ranker.test.ts',
       // Phase 2 (2026-05-14) — student-doc markdown projection smoke test.
       // Validates renderStudentDocumentMarkdown covers every StudentAnalysisDocument
-      // section (committee one-liner, AO reaction, annotated essay, revision
-      // priorities, structural map, overall assessment) + edge cases (empty
-      // priorities, no inline annotations). Pure function; no LLM.
+      // section (annotated essay, revision priorities, structural map, overall
+      // assessment) + edge cases (empty priorities, no inline annotations).
+      // Pure function; no LLM.
       'tests/unit/student-document-markdown.test.ts',
       // Phase 3 (2026-05-19) — L4 composite call prompt + parsing tests.
       // Validates buildSystemPromptL4Composite preserves every load-bearing
@@ -147,6 +147,50 @@ export default defineConfig({
       // dynamic context with compact JSON. Zero LLM cost.
       // Design: docs/pipeline-evolution/04-pipeline-architecture/L4/L4_CACHE_UNIFICATION_DESIGN.md
       'tests/unit/l4-unified-cache.test.ts',
+      // Phase 3 (2026-05-21) — L4 unified-cache prefix-mutation guard.
+      // Integration-style: runs the real crystallize() with L4_UNIFIED_CACHE=true
+      // and a mocked LLM, captures all 3 call sites, and asserts the cached
+      // prefix (systemPrompt + userPromptBlocks[0]) is byte-identical across
+      // Mode A/B/C. Tripwire for the silent-failure class where a future
+      // change mutates profile/profileContext between calls and the prefix
+      // cache stops firing with zero unit-test failure. Zero LLM cost.
+      // Design: docs/pipeline-evolution/04-pipeline-architecture/L4/L4_CACHE_UNIFICATION_DESIGN.md
+      'tests/unit/l4-unified-cache-mutation-guard.test.ts',
+      // Essay-level rewrite generator (2026-05-24) — parser for the MEM gap
+      // strings emitted by L3.75. Pure deterministic helper; zero LLM cost.
+      // Covers canonical Crochet format, all 7 EarningMechanismType values,
+      // whitespace/case tolerance, separator variants (em-dash, en-dash,
+      // hyphen-minus rejection), unclassified fallbacks, and edge cases.
+      'tests/unit/parse-mem-gap.test.ts',
+      // Essay-level rewrite generator (2026-05-24) — pure helpers consumed by
+      // assembleRewriteInputs() in a follow-on PR. Zero LLM cost.
+      // - computeWordBudget: Q3 length-aware + tier-capped formula across all
+      //   3 impact tiers × short/normal/long paragraphs + edge cases.
+      // - findCandidateAnchors: Q1 hybrid MEM-moment lookup. Tests use real
+      //   Crochet-shaped priority + MEM fixtures.
+      'tests/unit/compute-word-budget.test.ts',
+      'tests/unit/find-candidate-anchors.test.ts',
+      // assembleRewriteInputs (2026-05-24) — pure orchestrator that walks an
+      // EssayProfile and produces GenerateEssayLevelRewritesInput. Synthetic
+      // Crochet-shaped profile fixture; covers prerequisite gating, gap
+      // construction, word budget, styleProfile + preservation + context
+      // assembly, prior-drafts pass-through.
+      'tests/unit/assemble-rewrite-inputs.test.ts',
+      // rewrite-prompts (2026-05-24) — system prompt + cached prefix + per-call
+      // tail builders for generateEssayLevelRewrites. Cache-key invariants,
+      // load-bearing rules (all 10 draft rules + Q-decision enforcement clauses
+      // + JSON skeleton + self-check), shared prefix rendering, feature flag.
+      'tests/unit/rewrite-prompts.test.ts',
+      // generateEssayLevelRewrites method (2026-05-24) — mocked-LLM integration
+      // test. Single Sonnet call shape (cacheBreakpoint on prefix, JSON mode,
+      // low temperature). Output parsing into typed annotations including Q5
+      // back-compat (rewriteExample mirror) and Q6c fallback (zero drafts →
+      // awareness-mode). Defensive parsing on malformed output.
+      'tests/unit/generate-essay-level-rewrites.test.ts',
+      // rewrite-validators (2026-05-24) — three post-call validators enforce
+      // locked Q6b (preserve-span overlap), Q1.5/Q5 (voice fingerprint), Q3
+      // (word budget + essay ceiling) on every emitted draft.
+      'tests/unit/rewrite-validators.test.ts',
     ],
     // Node environment — these are unit tests of business logic, not
     // browser components.

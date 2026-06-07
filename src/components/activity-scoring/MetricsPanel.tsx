@@ -9,7 +9,7 @@
  */
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Zap, PenTool, ArrowLeft, X, ChevronRight } from 'lucide-react';
+import { ArrowLeft, X, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ParagraphText } from '@/components/portfolio/activity-workshop/RichText';
 import { StatTabs, type StatTabType } from './StatTabs';
@@ -44,11 +44,6 @@ function getScoreTheme(score: number, maxScore: number) {
   if (ratio >= 0.4) return { gradient: 'from-amber-400 to-orange-500', glowHex: '#f59e0b', textClass: 'text-amber-500 dark:text-amber-400' };
   return { gradient: 'from-red-500 to-rose-600', glowHex: '#ef4444', textClass: 'text-red-500 dark:text-red-400' };
 }
-
-const CATEGORY_COLOR = {
-  activity: 'hsl(250,70%,60%)',
-  narrative: 'hsl(185,80%,55%)',
-} as const;
 
 // ============================================================================
 // STAT BAR — shared between grid and detail views
@@ -162,7 +157,7 @@ function DetailOverlay({
         initial={{ opacity: 0, y: -6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1, duration: 0.2, ease: 'easeOut' }}
-        className="flex items-center justify-between mb-12 flex-shrink-0"
+        className="flex items-center justify-between mb-6 flex-shrink-0"
       >
         <button
           type="button"
@@ -183,18 +178,6 @@ function DetailOverlay({
 
       {/* Content */}
       <div className="flex flex-col flex-1 max-w-2xl mx-auto w-full">
-        {/* Category badge */}
-        <motion.div
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.08, duration: 0.2, ease: 'easeOut' }}
-          className="mb-8 inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-foreground/5 border border-foreground/10 text-[10px] font-extrabold uppercase tracking-[0.2em] w-fit"
-          style={{ color: CATEGORY_COLOR[stat.category] }}
-        >
-          {stat.category === 'activity' ? <Zap className="w-3.5 h-3.5" /> : <PenTool className="w-3.5 h-3.5" />}
-          {stat.category === 'activity' ? 'Activity Metric' : 'Narrative Metric'}
-        </motion.div>
-
         {/* Enlarged stat bar with badges */}
         <motion.div
           initial={{ opacity: 0, y: 6 }}
@@ -329,18 +312,18 @@ export const MetricsPanel: React.FC<MetricsPanelProps> = ({
             </motion.div>
           ) : null}
         </AnimatePresence>
-
-        {/* ── Detail overlay ── */}
-        <AnimatePresence>
-          {selectedStat && (
-            <DetailOverlay
-              key={selectedStat.id}
-              stat={selectedStat}
-              onClose={handleClose}
-            />
-          )}
-        </AnimatePresence>
       </div>
+
+      {/* ── Detail overlay — covers the entire panel, not just the inner content area ── */}
+      <AnimatePresence>
+        {selectedStat && (
+          <DetailOverlay
+            key={selectedStat.id}
+            stat={selectedStat}
+            onClose={handleClose}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

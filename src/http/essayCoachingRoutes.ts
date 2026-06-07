@@ -9,9 +9,12 @@
  * Cross-essay intelligence: builds student digest from all analyzed essays.
  *
  * ROUTES:
- * POST /essay-coaching/start    — Analyze essay + start coaching session
- * POST /essay-coaching/respond  — Process a coaching turn
- * POST /essay-coaching/edit     — Process an essay edit (triggers reanalysis)
+ * POST /essay-coaching/start     — Analyze essay + start coaching session (returns the
+ *                                  full student analysis document + opening coaching turn)
+ * POST /essay-coaching/analysis  — Re-fetch the student analysis document (cache read,
+ *                                  no pipeline run, no credit debit)
+ * POST /essay-coaching/respond   — Process a coaching turn
+ * POST /essay-coaching/edit      — Process an essay edit (triggers reanalysis)
  */
 
 import { Router, Request, Response } from 'express';
@@ -26,6 +29,7 @@ import type {
   StudentTheory,
 } from '@/services/essayIntelligence/profileTypes';
 import { buildEditProcessResponse } from './editProcessResponse';
+import { renderAnalysisForStudent } from '@/services/essayIntelligence/presentation';
 import {
   CREDIT_COSTS,
   atomicDebit,
@@ -501,10 +505,23 @@ essayCoachingRouter.post('/essay-coaching/start', requireAuth, async (req: Reque
       });
     }
 
+    // Structured student-facing analysis document (annotated essay, revision
+    // priorities, structural map, overall assessment). This is the FULL surface —
+    // before this, /start returned only the conversational coaching turn and the
+    // structured analysis was generated then dropped. Rendered resiliently: a
+    // composer error must never block the coaching session from starting.
+    let studentDocument: ReturnType<typeof renderAnalysisForStudent> | null = null;
+    try {
+      studentDocument = renderAnalysisForStudent(profile);
+    } catch (renderErr) {
+      console.error('[essay-coaching/start] Student document render failed (non-fatal):', renderErr);
+    }
+
     return res.json({
       success: true,
       data: {
         sessionKey, pipelinePhase, pipelineCost, cacheHit,
+        studentDocument,
         coachingResponse: coachingResult.response,
         coachingCost: coachingResult.totalCost,
         sessionMemory: coachingResult.sessionMemory,
@@ -517,6 +534,52 @@ essayCoachingRouter.post('/essay-coaching/start', requireAuth, async (req: Reque
   } catch (error: unknown) {
     console.error('[essay-coaching/start] Error:', error);
     return res.status(500).json({ success: false, error: error instanceof Error ? error.message : 'Failed to start coaching session' });
+  }
+});
+
+// ============================================================================
+// POST /essay-coaching/analysis
+// ============================================================================
+// Returns the structured student-facing analysis document for an already-analyzed
+// essay version (cache hit on the essay-text hash). READ-ONLY: it never runs the
+// pipeline and never debits credits — analysis happens in /start. Use this to
+// re-fetch the document on page reload, tab switch, or after navigating back,
+// without paying for re-analysis. Returns 404 (code: not_analyzed) when the
+// current essay text hasn't been analyzed yet, so the client knows to call /start.
+essayCoachingRouter.post('/essay-coaching/analysis', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = getAuthUserId(req, res);
+    if (!userId) return;
+    const { essayId, essayText } = req.body;
+    if (!essayId || !essayText) {
+      return res.status(400).json({ success: false, code: 'invalid_input', error: 'essayId and essayText are required' });
+    }
+
+    const { SupabaseCheckpointStore, hashEssayText } = await import('@/services/essayIntelligence/profileManager/supabaseCheckpointStore');
+    const checkpointStore = new SupabaseCheckpointStore(userId);
+    const profile = await checkpointStore.loadIfHashMatches(essayId, hashEssayText(essayText));
+
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        code: 'not_analyzed',
+        error: 'No analysis found for this essay version. Call /essay-coaching/start to analyze it first.',
+      });
+    }
+
+    const studentDocument = renderAnalysisForStudent(profile);
+    return res.json({
+      success: true,
+      data: {
+        studentDocument,
+        cacheHit: true,
+        pipelinePhase: (profile.index as { improvementPhase?: { level?: string } })?.improvementPhase?.level ?? 'unknown',
+      },
+    });
+  } catch (error: unknown) {
+    const classified = classifyError(error);
+    console.error('[essay-coaching/analysis] Error:', error);
+    return res.status(classified.status).json({ success: false, code: classified.code, error: classified.message });
   }
 });
 

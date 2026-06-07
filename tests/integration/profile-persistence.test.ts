@@ -11,8 +11,7 @@
  *      on every save).
  *   3. `SupabaseCheckpointStore.load()` returns the persisted profile.
  *   4. `fromCheckpoint(profile, essayId, store)` round-trips Round-7
- *      signals (revisionHistory, revisionIntelligence, voiceEvolution,
- *      aoFirstRead).
+ *      signals (revisionHistory, revisionIntelligence, voiceEvolution).
  *   5. The save path now THROWS on failure (previous silent-catch removed)
  *      and the coordinator surfaces the error to the caller.
  *
@@ -35,12 +34,11 @@
  * Cleanup: `finally` block deletes essay_understanding + essays rows.
  *
  * NOTE on scope: the Round-7 signals `claimEarnednessMap`,
- * `rhetoricalInventory`, `archetypeDistanceProfile`, and
- * `aoFirstRead.archetypePositioning` referenced in the audit do NOT exist
- * as live EssayProfile fields yet (they're documented in comments and in
- * the P1-Coord PR scope). This test covers the four signals that ARE
- * persisted today: revisionHistory, revisionIntelligence, voiceEvolution,
- * aoFirstRead. When the remaining fields land, extend this test to cover
+ * `rhetoricalInventory`, and `archetypeDistanceProfile` referenced in the
+ * audit do NOT exist as live EssayProfile fields yet (they're documented in
+ * comments and in the P1-Coord PR scope). This test covers the three signals
+ * that ARE persisted today: revisionHistory, revisionIntelligence,
+ * voiceEvolution. When the remaining fields land, extend this test to cover
  * them.
  */
 
@@ -176,15 +174,6 @@ async function run(): Promise<void> {
     summaryForCoach: 'Voice markers rotated intentionally; register held.',
   };
 
-  const fixtureAoFirstRead = {
-    hookMoment: 'Paragraph 1, sentence 2: the image of the broken metronome.',
-    committeeOneLiner: "This is the essay about finding rhythm in a cracked instrument.",
-    distinctivenessSignal: 'Unusual framing of a common music-class moment.',
-    putDownRisk: 'low' as const,
-    gutReaction:
-      'Opens with a concrete scene. I can see it. Voice is controlled without being clinical. Keep reading.',
-  };
-
   let cleanupDone = false;
   const cleanup = async () => {
     if (cleanupDone) return;
@@ -265,14 +254,13 @@ async function run(): Promise<void> {
       checkpointStore: store,
     });
 
-    // Seed the four live Round-7 signals. These fields are optional on the
+    // Seed the three live Round-7 signals. These fields are optional on the
     // live profile, so we cast through unknown to set them directly — the
     // coordinator doesn't expose mutators for them yet (P1-Coord scope).
     const profileRef = coordinator.getProfile() as unknown as Record<string, unknown>;
     profileRef.revisionHistory = fixtureRevisionHistory;
     profileRef.revisionIntelligence = fixtureRevisionIntelligence;
     profileRef.voiceEvolution = fixtureVoiceEvolution;
-    profileRef.aoFirstRead = fixtureAoFirstRead;
 
     await coordinator.checkpoint('conversation_save' as any);
 
@@ -295,7 +283,7 @@ async function run(): Promise<void> {
     }
 
     // ─── Test 2: load() returns the persisted profile ──────────────────────
-    console.log('\n[Test 2] load() returns persisted profile with all 4 signals');
+    console.log('\n[Test 2] load() returns persisted profile with all 3 signals');
     const loaded = await store.load(essayId);
     assert(loaded != null, 'store.load(essayId) returns non-null profile');
 
@@ -304,7 +292,6 @@ async function run(): Promise<void> {
       assertDeepEq(loadedAny.revisionHistory, fixtureRevisionHistory, 'revisionHistory round-trips');
       assertDeepEq(loadedAny.revisionIntelligence, fixtureRevisionIntelligence, 'revisionIntelligence round-trips');
       assertDeepEq(loadedAny.voiceEvolution, fixtureVoiceEvolution, 'voiceEvolution round-trips');
-      assertDeepEq(loadedAny.aoFirstRead, fixtureAoFirstRead, 'aoFirstRead round-trips');
     }
 
     // ─── Test 3: fromCheckpoint() rebuilds coordinator; second checkpoint works ─
@@ -337,7 +324,6 @@ async function run(): Promise<void> {
       assertDeepEq(reloadedAny.revisionHistory, fixtureRevisionHistory, 'revisionHistory survives restart');
       assertDeepEq(reloadedAny.revisionIntelligence, fixtureRevisionIntelligence, 'revisionIntelligence survives restart');
       assertDeepEq(reloadedAny.voiceEvolution, fixtureVoiceEvolution, 'voiceEvolution survives restart');
-      assertDeepEq(reloadedAny.aoFirstRead, fixtureAoFirstRead, 'aoFirstRead survives restart');
 
       // Re-construct coordinator — should not throw
       let rebuildThrew = false;

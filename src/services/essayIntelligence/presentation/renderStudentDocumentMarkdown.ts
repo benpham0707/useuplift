@@ -24,38 +24,15 @@ export function renderStudentDocumentMarkdown(doc: StudentAnalysisDocument): str
   out.push(`> Generated ${doc.meta.generatedAt}. ${doc.meta.paragraphCount} paragraphs, ${doc.meta.essayWordCount} words. Confidence: ${doc.meta.analysisConfidence}.`);
   out.push('');
 
-  // ── §1 Committee one-liner ──
-  out.push('## 1. Committee one-liner');
-  out.push('');
-  out.push(`> ${doc.committeeOneLiner}`);
-  out.push('');
-
-  // ── §2 AO reaction ──
-  out.push('## 2. AO reaction');
-  out.push('');
-  out.push(`**Gut reaction**: ${doc.aoReaction.gutReaction}`);
-  out.push('');
-  out.push(`**Put-down risk**: \`${doc.aoReaction.putDownRisk}\``);
-  out.push('');
-  if (doc.aoReaction.hookMoment) {
-    out.push(`**Hook moment**: ${doc.aoReaction.hookMoment}`);
-    out.push('');
-  }
-  out.push(`**Archetype**: ${doc.aoReaction.archetype}`);
-  if (doc.aoReaction.archetypeFrequency) {
-    out.push(`${doc.aoReaction.archetypeFrequency}`);
-  }
-  out.push('');
-
-  // ── §3 Annotated essay ──
-  out.push(`## 3. Annotated essay (${doc.annotatedEssay.annotationCount} annotations)`);
+  // ── §1 Annotated essay ──
+  out.push(`## 1. Annotated essay (${doc.annotatedEssay.annotationCount} annotations)`);
   out.push('');
   for (const para of doc.annotatedEssay.paragraphs) {
     out.push(renderParagraphMarkdown(para));
   }
 
-  // ── §4 Revision priorities ──
-  out.push('## 4. Revision priorities');
+  // ── §2 Revision priorities ──
+  out.push('## 2. Revision priorities');
   out.push('');
   if (doc.revisionPriorities.length === 0) {
     out.push('_No revision priorities yet._');
@@ -66,8 +43,8 @@ export function renderStudentDocumentMarkdown(doc: StudentAnalysisDocument): str
     }
   }
 
-  // ── §5 Structural map ──
-  out.push('## 5. Structural map');
+  // ── §3 Structural map ──
+  out.push('## 3. Structural map');
   out.push('');
   out.push('| P | Role | Effectiveness | Weight |');
   out.push('|---|---|---|---|');
@@ -76,8 +53,8 @@ export function renderStudentDocumentMarkdown(doc: StudentAnalysisDocument): str
   }
   out.push('');
 
-  // ── §6 Overall assessment ──
-  out.push('## 6. Overall assessment');
+  // ── §4 Overall assessment ──
+  out.push('## 4. Overall assessment');
   out.push('');
   out.push(`**Phase**: ${doc.overallAssessment.phase}`);
   out.push('');
@@ -113,6 +90,7 @@ function renderParagraphMarkdown(para: AnnotatedParagraph): string {
     const tag = a.nature === 'strength' ? '✓' : '△';
     const ref = a.priorityRef !== null ? ` _(→ priority ${a.priorityRef})_` : '';
     lines.push(`- ${tag} **${truncate(a.spanText, 80)}** — ${a.observation}${ref}`);
+    if (a.detail) lines.push(`    ${a.detail}`);
   }
   lines.push('');
   return lines.join('\n');
