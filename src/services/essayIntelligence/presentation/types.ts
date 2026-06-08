@@ -13,22 +13,16 @@ import type { ImprovementPhaseLevel, ConfidenceLevel } from '../profileTypes';
 // ============================================================================
 
 export interface StudentAnalysisDocument {
-  /** Section 1: The committee one-liner — the AO's snap summary */
-  committeeOneLiner: string;
-
-  /** Section 2: The honest AO reaction */
-  aoReaction: AOReactionSection;
-
-  /** Section 3: Essay text with inline annotations */
+  /** Section 1: Essay text with inline annotations */
   annotatedEssay: AnnotatedEssaySection;
 
-  /** Section 4: Revision priorities — ordered by impact */
+  /** Section 2: Revision priorities — ordered by impact */
   revisionPriorities: RevisionPriority[];
 
-  /** Section 5: Structural map — what each paragraph does */
+  /** Section 3: Structural map — what each paragraph does */
   structuralMap: StructuralMapEntry[];
 
-  /** Section 6: Overall assessment */
+  /** Section 4: Overall assessment */
   overallAssessment: OverallAssessmentSection;
 
   /** Metadata */
@@ -45,19 +39,6 @@ export interface StudentAnalysisDocument {
 // SECTION TYPES
 // ============================================================================
 
-export interface AOReactionSection {
-  /** The AO's internal monologue */
-  gutReaction: string;
-  /** Risk the reader stops after P1 */
-  putDownRisk: 'high' | 'moderate' | 'low';
-  /** What (if anything) makes the AO keep reading */
-  hookMoment: string | null;
-  /** Essay archetype */
-  archetype: string;
-  /** What pool density means in plain language */
-  archetypeFrequency: string;
-}
-
 export interface AnnotatedEssaySection {
   paragraphs: AnnotatedParagraph[];
   annotationCount: number;
@@ -73,11 +54,16 @@ export interface AnnotatedParagraph {
 export interface InlineAnnotation {
   /** The exact text span to highlight */
   spanText: string;
-  /** Brief observation — 1-2 sentences, student-facing */
+  /** Headline — the move (✓) or the issue (△), in a few words. Student-facing. */
   observation: string;
+  /** Optional elaboration: why it matters + the concrete fix. Carries the growth
+   *  edge's coaching so the annotation reads observation → why → fix, not a label. */
+  detail?: string;
   /** Strength or growth area */
   nature: 'strength' | 'growth';
-  /** Link to a revision priority */
+  /** Rank of the revision priority that addresses this in depth, if one covers
+   *  this paragraph — so the inline note links to the full coaching instead of
+   *  re-deriving it. null when no priority covers it. */
   priorityRef: number | null;
 }
 

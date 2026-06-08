@@ -1068,7 +1068,7 @@ export class ContextAssemblyService {
 }
 ```
 
-**`profileRouter.ts`** is the brain — ~250 lines, implements the routing table from PLAN.md section "Routing Rules by Call Type":
+**`profileRouter.ts`** is the brain — ~250 lines, implements the routing table from docs/specs/PLAN.md section "Routing Rules by Call Type":
 
 ```typescript
 export class ProfileRouter {
@@ -1416,7 +1416,7 @@ assembleContext(profile, task, options): PromptBlocks {
 
 1. **ProfileRenderer** core renderers (`renderSentence`, `renderParagraph`, `renderHolistic`, `renderConnections`, `renderIndex`) — these are the building blocks everything else depends on
 2. **Observation label generation** — integrated into `renderSentence` via options
-3. **ProfileRouter** section selection logic — implements the routing table from PLAN.md
+3. **ProfileRouter** section selection logic — implements the routing table from docs/specs/PLAN.md
 4. **ContextAssemblyService** — thin orchestrator that wires router + renderer
 5. **Layer-specific assembly methods** — `assembleForUnderstandingWalk`, `assembleForAnalysisPass`, etc.
 6. **Multi-block caching support** in `callClaude` — extend to accept `SystemBlock[]`

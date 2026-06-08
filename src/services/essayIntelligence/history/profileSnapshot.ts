@@ -107,13 +107,8 @@ export interface ProfileSnapshot {
   /**
    * 0–1 normalization of `admissionsPositioning.archetypeContext.poolDensity`.
    * Mapping: saturated=1.0, common=0.75, moderate=0.5, uncommon=0.25,
-   * rare=0.1. 0 when no archetypeContext is present.
-   *
-   * (Note: the Phase 1 spec referred to this as
-   * `aoFirstRead.archetypeContext.saturationInPool` — that path does not
-   * exist in the live schema. The archetype fields actually live under
-   * `admissionsPositioning.archetypeContext` and use `poolDensity`. We
-   * translate here so Phase 2+ consumers see a stable 0–1 scalar.)
+   * rare=0.1. 0 when no archetypeContext is present. We translate here so
+   * Phase 2+ consumers see a stable 0–1 scalar.
    */
   archetypeSaturation: number;
   /**

@@ -1,6 +1,6 @@
 # Implement Conversator V2: Rich Context Coaching Pipeline
 
-You are the **Lead Engineer** for implementing the Conversator V2 system. You have the complete implementation blueprint at `FORGE_PLAN_CONVERSATOR_V2.md` and the design debates at `FORGE_DEBATES_V2.md`. Your job is to orchestrate a multi-wave agent swarm that implements all 6 items to the highest quality standard.
+You are the **Lead Engineer** for implementing the Conversator V2 system. You have the complete implementation blueprint at `docs/archived/forge/FORGE_PLAN_CONVERSATOR_V2.md` and the design debates at `docs/archived/forge/FORGE_DEBATES_V2.md`. Your job is to orchestrate a multi-wave agent swarm that implements all 6 items to the highest quality standard.
 
 ## EXECUTION MODEL
 
@@ -15,7 +15,7 @@ You run **7 waves** of parallel agent teams. Each wave has a specific purpose, a
 6. **Quality-Driven Refinement** (fix everything Waves 4+5 found)
 7. Final Verification (trace test, completeness, commit)
 
-**Before starting**: Read `FORGE_PLAN_CONVERSATOR_V2.md` completely. Read `FORGE_DEBATES_V2.md`. Read `CLAUDE.md` for development standards. Read the LLM-first design principles at `.claude/projects/*/memory/feedback_llm-first-design.md`. Understand the full vision before delegating anything.
+**Before starting**: Read `docs/archived/forge/FORGE_PLAN_CONVERSATOR_V2.md` completely. Read `docs/archived/forge/FORGE_DEBATES_V2.md`. Read `CLAUDE.md` for development standards. Read the LLM-first design principles at `.claude/projects/*/memory/feedback_llm-first-design.md`. Understand the full vision before delegating anything.
 
 ---
 
@@ -26,7 +26,7 @@ You run **7 waves** of parallel agent teams. Each wave has a specific purpose, a
 ### Agent 1A: SessionEvent Type + CoachingSessionMemory Extension
 **File**: `src/services/essayIntelligence/profileTypes.ts`
 **Task**:
-1. Read the FULL `FORGE_PLAN_CONVERSATOR_V2.md` Item 3 type definitions
+1. Read the FULL `docs/archived/forge/FORGE_PLAN_CONVERSATOR_V2.md` Item 3 type definitions
 2. Read the EXISTING `CoachingSessionMemory` interface (line ~2082) in `profileTypes.ts`
 3. Add the `SessionEvent` interface exactly as specified in the blueprint
 4. Extend `CoachingSessionMemory` with `events: SessionEvent[]` field
@@ -39,7 +39,7 @@ You run **7 waves** of parallel agent teams. Each wave has a specific purpose, a
 ### Agent 1B: EssayProfile Extension + Coordinator Method
 **Files**: `src/services/essayIntelligence/profileTypes.ts`, `src/services/essayIntelligence/profileManager/essayProfileManager.ts`
 **Task**:
-1. Read `FORGE_PLAN_CONVERSATOR_V2.md` Item 6 type definitions
+1. Read `docs/archived/forge/FORGE_PLAN_CONVERSATOR_V2.md` Item 6 type definitions
 2. Read the EXISTING `EssayProfile` interface in `profileTypes.ts`
 3. Add `studentDeclaredContext: string` field to `EssayProfile` (after `conversationInsights`, before metadata sections)
 4. Add `updateStudentDeclaredContext(context: string): void` method to `EssayProfileCoordinator` in `essayProfileManager.ts`
@@ -51,7 +51,7 @@ You run **7 waves** of parallel agent teams. Each wave has a specific purpose, a
 ### Agent 1C: System Prompt Constants (Craft Vocabulary + Pedagogical Rules)
 **File**: `src/services/essayIntelligence/coaching/coachingService.ts`
 **Task**:
-1. Read `FORGE_PLAN_CONVERSATOR_V2.md` Items 1 and 2 completely
+1. Read `docs/archived/forge/FORGE_PLAN_CONVERSATOR_V2.md` Items 1 and 2 completely
 2. Read the EXISTING `staticCoachingPhilosophy` in `coachingService.ts` (lines ~873-1019)
 3. Read how `phase` is accessed (line ~869: `const phase = profile.index.improvementPhase`)
 4. Add `getCraftVocabularyForPhase(phase: ImprovementPhaseLevel): string` function near line 57 (after existing constants), exactly as specified in blueprint Item 1
@@ -80,7 +80,7 @@ After all 3 agents complete:
 ### Agent 2A: Session Event — Update + Retrieval + Serialization
 **File**: `src/services/essayIntelligence/coaching/coachingService.ts`
 **Task**:
-1. Read `FORGE_PLAN_CONVERSATOR_V2.md` Item 3 completely — the `updateSessionMemory`, `retrieveRelevantEvents`, and `serializeEventsForPrompt` sections
+1. Read `docs/archived/forge/FORGE_PLAN_CONVERSATOR_V2.md` Item 3 completely — the `updateSessionMemory`, `retrieveRelevantEvents`, and `serializeEventsForPrompt` sections
 2. Read the EXISTING `updateSessionMemory` method (line ~2196) and `initializeSessionMemory` (line ~2171)
 3. Rewrite `updateSessionMemory` to produce `SessionEvent` entries as specified in the blueprint. KEEP the deprecated array pushes for backward compatibility during transition.
 4. Rewrite `initializeSessionMemory` to include `events: []`
@@ -95,7 +95,7 @@ After all 3 agents complete:
 ### Agent 2B: Scoped Finding Selection
 **File**: `src/services/essayIntelligence/coaching/coachingService.ts`
 **Task**:
-1. Read `FORGE_PLAN_CONVERSATOR_V2.md` Item 4 completely — the `buildFindingCoachingContext` rewrite
+1. Read `docs/archived/forge/FORGE_PLAN_CONVERSATOR_V2.md` Item 4 completely — the `buildFindingCoachingContext` rewrite
 2. Read the EXISTING `buildFindingCoachingContext` method (line ~2360)
 3. Read the `FindingStore` API — verify `getByScope(paragraphIndex)`, `getByDimension(dim)`, `getActiveSortedByCoachingValue()` exist
 4. Read `CrossDimensionEntanglement` type — verify it uses `location: ParagraphLocation` (SINGULAR, not `locations[]`)
@@ -114,7 +114,7 @@ After all 3 agents complete:
 ### Agent 2C: Edit Intelligence Builder
 **Files**: `src/services/essayIntelligence/analysis/reanalysisOrchestrator.ts` (or wherever the ReanalysisOrchestrator lives)
 **Task**:
-1. Read `FORGE_PLAN_CONVERSATOR_V2.md` Item 5 completely
+1. Read `docs/archived/forge/FORGE_PLAN_CONVERSATOR_V2.md` Item 5 completely
 2. Find the `ReanalysisOrchestrator` class — search for it, read its `processEdit` and `processCoachingTurn` methods
 3. Add `private lastEditUnderstanding: EditUnderstanding | null = null;` field
 4. In `processEdit` (or `processEditInternal`), after the edit understanding call succeeds, store: `this.lastEditUnderstanding = editOutput.understanding;`
@@ -127,7 +127,7 @@ After all 3 agents complete:
 ### Agent 2D: Declared Data — Insight Selection + Stage 4 Output Extension
 **File**: `src/services/essayIntelligence/coaching/coachingService.ts`
 **Task**:
-1. Read `FORGE_PLAN_CONVERSATOR_V2.md` Item 6 completely — Steps 2-5
+1. Read `docs/archived/forge/FORGE_PLAN_CONVERSATOR_V2.md` Item 6 completely — Steps 2-5
 2. Read the EXISTING `Stage4NewContextOutput` type (line ~192 or in the types)
 3. Extend `Stage4NewContextOutput` with `contextAccumulation: string` field
 4. Add `selectCoachingInsights(insights, budget)` private method — durability-aware selection
@@ -158,7 +158,7 @@ After all 4 agents complete:
 ### Agent 3A: Stage 3 Prompt Assembly — Inject All New Context Blocks
 **File**: `src/services/essayIntelligence/coaching/coachingService.ts`
 **Task**:
-1. Read `FORGE_PLAN_CONVERSATOR_V2.md` Items 3, 4, and 6 — the Stage 3 injection sections
+1. Read `docs/archived/forge/FORGE_PLAN_CONVERSATOR_V2.md` Items 3, 4, and 6 — the Stage 3 injection sections
 2. Read the EXISTING Stage 3 user prompt assembly in `runStage3CoachingResponse` (lines ~1111-1139)
 3. Make these changes to the Stage 3 user prompt:
 
@@ -188,7 +188,7 @@ After all 4 agents complete:
 ### Agent 3B: Pattern Detection — Event Emission + Journal
 **File**: `src/services/essayIntelligence/coaching/coachingService.ts`
 **Task**:
-1. Read `FORGE_PLAN_CONVERSATOR_V2.md` Item 3 — the Pattern Detection sections
+1. Read `docs/archived/forge/FORGE_PLAN_CONVERSATOR_V2.md` Item 3 — the Pattern Detection sections
 2. Read the EXISTING `detectPatternsLLM` method (line ~1801) — read the FULL system prompt and output schema
 3. Make these changes:
 
@@ -227,7 +227,7 @@ After all 4 agents complete:
 ### Agent 3C: Stage 1.5 + Stage 4 Prompt Updates
 **File**: `src/services/essayIntelligence/coaching/coachingService.ts`
 **Task**:
-1. Read `FORGE_PLAN_CONVERSATOR_V2.md` Items 3 and 6
+1. Read `docs/archived/forge/FORGE_PLAN_CONVERSATOR_V2.md` Items 3 and 6
 
 2. **Stage 1.5 update**: In `runStage1_5CognitiveAssessment` (line ~1960), find where session memory is serialized into the prompt (lines ~2003-2011). Replace the old array serialization with event-based context:
    ```

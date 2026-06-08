@@ -44,7 +44,7 @@
  * less precise coaching until they trigger a fresh re-analysis (which
  * replaces the entire candidate store with fresh L3/L3.5/L3.75 output).
  *
- * Reference: FORGE_PLAN_ARTIFACTS.md Section 2.
+ * Reference: docs/specs/FORGE_PLAN_ARTIFACTS.md Section 2.
  */
 
 import type {

@@ -4,11 +4,10 @@
  * This is the document the student sees BEFORE entering coaching conversations.
  * It transforms the internal EssayProfile into a structured, readable analysis
  * that answers the student's natural questions in order:
- *   1. "What would an AO think?" (committee one-liner + gut reaction)
- *   2. "What does my essay look like to an expert?" (annotated essay)
- *   3. "What should I fix first?" (revision priorities)
- *   4. "How does my essay work structurally?" (structural map)
- *   5. "Where am I overall?" (assessment + phase + strengths + portrait)
+ *   1. "What does my essay look like to an expert?" (annotated essay)
+ *   2. "What should I fix first?" (revision priorities)
+ *   3. "How does my essay work structurally?" (structural map)
+ *   4. "Where am I overall?" (assessment + phase + strengths + portrait)
  *
  * NO LLM calls. Pure transformation of existing profile data.
  * Same input → same output (deterministic).
@@ -17,7 +16,6 @@
 import type { EssayProfile, Finding } from '../profileTypes';
 import type {
   StudentAnalysisDocument,
-  AOReactionSection,
   AnnotatedEssaySection,
   AnnotatedParagraph,
   InlineAnnotation,
@@ -126,11 +124,14 @@ export function renderAnalysisForStudent(
 ): StudentAnalysisDocument {
   const maxPriorities = options.maxPriorities ?? 5;
 
+  // Priorities first — the annotated essay links each paragraph's growth note to
+  // the deep priority that covers it (emit-don't-transform: reference the
+  // counselor-grade coaching, don't re-derive a shallow copy of it inline).
+  const revisionPriorities = buildRevisionPriorities(profile, maxPriorities);
+
   return {
-    committeeOneLiner: buildCommitteeOneLiner(profile),
-    aoReaction: buildAOReaction(profile),
-    annotatedEssay: buildAnnotatedEssay(profile),
-    revisionPriorities: buildRevisionPriorities(profile, maxPriorities),
+    annotatedEssay: buildAnnotatedEssay(profile, revisionPriorities),
+    revisionPriorities,
     structuralMap: buildStructuralMap(profile),
     overallAssessment: buildOverallAssessment(profile),
     meta: {
@@ -147,67 +148,71 @@ export function renderAnalysisForStudent(
 // SECTION BUILDERS
 // ============================================================================
 
-function buildCommitteeOneLiner(profile: Readonly<EssayProfile>): string {
-  if (profile.aoFirstRead?.committeeOneLiner) {
-    return profile.aoFirstRead.committeeOneLiner;
-  }
-  // Fallback: construct from archetype
-  const archetype = profile.admissionsPositioning?.archetypeContext?.archetype;
-  if (archetype) return `Student writing a "${archetype}" essay`;
-  return 'Essay analysis complete — see details below';
-}
-
-function buildAOReaction(profile: Readonly<EssayProfile>): AOReactionSection {
-  const ao = profile.aoFirstRead;
-  const archCtx = profile.admissionsPositioning?.archetypeContext;
-
-  const poolDensityMap: Record<string, string> = {
-    saturated: 'AOs read dozens of essays like this every cycle.',
-    common: 'This essay type is common — AOs see many similar versions.',
-    moderate: 'This essay type appears regularly but isn\'t overwhelming.',
-    rare: 'This is an uncommon essay approach — the reader\'s attention is less fatigued.',
-  };
-
-  return {
-    gutReaction: ao?.gutReaction ?? 'No AO reaction available.',
-    putDownRisk: (ao?.putDownRisk as 'high' | 'moderate' | 'low') ?? 'moderate',
-    hookMoment: ao?.hookMoment ?? null,
-    archetype: archCtx?.archetype ?? 'unclassified',
-    archetypeFrequency: poolDensityMap[archCtx?.poolDensity ?? ''] ?? '',
-  };
-}
-
-function buildAnnotatedEssay(profile: Readonly<EssayProfile>): AnnotatedEssaySection {
+function buildAnnotatedEssay(
+  profile: Readonly<EssayProfile>,
+  priorities: readonly RevisionPriority[],
+): AnnotatedEssaySection {
   const paragraphs: AnnotatedParagraph[] = [];
+
+  // paragraph index → rank of the FIRST revision priority that covers it, so a
+  // paragraph's growth note can point the student to the full coaching block.
+  const priorityByPara = new Map<number, number>();
+  for (const p of priorities) {
+    for (const pi of p.paragraphs) {
+      if (!priorityByPara.has(pi)) priorityByPara.set(pi, p.rank);
+    }
+  }
 
   for (const para of profile.paragraphs) {
     const annotations: InlineAnnotation[] = [];
+    const seen = new Set<string>();
+    const add = (a: InlineAnnotation): void => {
+      const key = a.observation.trim().toLowerCase().slice(0, 100);
+      if (!a.observation.trim() || seen.has(key)) return;
+      seen.add(key);
+      annotations.push(a);
+    };
 
-    // Use findings scoped to this paragraph as inline annotations
-    const paraFindings = profile.findings.filter(f =>
-      f.status === 'active' &&
-      f.scope.type === 'paragraph' &&
-      f.scope.paragraph === para.index,
-    );
+    const pa = para.analysis;
+    // A multi-paragraph entry is annotated ONCE, at the first paragraph it spans
+    // (it's stored redundantly on every referenced paragraph's analysis).
+    const onFirstPara = (paras: number[] | undefined): boolean =>
+      !paras || paras.length === 0 ? true : Math.min(...paras) === para.index;
 
-    for (const finding of paraFindings.slice(0, 2)) {
-      // Try to extract a span from the finding's evidence
-      const spanText = finding.evidence?.[0]?.text?.slice(0, 60) ?? para.text.slice(0, 50);
-      annotations.push({
-        spanText,
-        observation: finding.claim,
-        nature: finding.coachingValue === 'contextual' ? 'strength' : 'growth',
-        priorityRef: null, // TODO: cross-reference with revision priorities
+    // (1) What's WORKING here, anchored to the text (✓). Per-paragraph strength
+    //     signatures — the writer's own moves worth naming and protecting.
+    for (const s of (pa?.strengthSignatures ?? []).filter(s => onFirstPara(s.paragraphs))) {
+      add({
+        spanText: clampToWord(s.evidence || para.text, 80),
+        observation: s.quality,
+        nature: 'strength',
+        priorityRef: null,
       });
     }
 
-    // Also add strength annotations from craft assessment
+    // (2) What to IMPROVE here, anchored, WITH the how (△). Per-paragraph growth
+    //     edges carry the actual coaching (quality + a specific description). This
+    //     is the highest-value content we generate per paragraph and it was never
+    //     surfaced in the annotated essay before — so a $2-3 analysis showed five
+    //     bare strength labels while ~15 grounded growth observations sat unused.
+    for (const ge of (pa?.growthEdges ?? []).filter(ge => onFirstPara(ge.paragraphs))) {
+      add({
+        spanText: firstQuotedSpan(ge.description) ?? clampToWord(para.text, 60),
+        observation: ge.quality,                       // the issue, in a few words
+        detail: ge.description || undefined,           // why it matters + the concrete fix
+        nature: 'growth',
+        priorityRef: priorityByPara.get(para.index) ?? null,
+      });
+    }
+
+    // Cross-paragraph craft strengths whose FIRST paragraph is this one (so an
+    // essay-spanning strength is annotated once, here, not repeated downstream).
     const craftStrengths = (profile.craftAssessment?.strengthSignatures ?? [])
-      .filter(s => s.paragraphs.includes(para.index));
-    for (const strength of craftStrengths.slice(0, 1)) {
-      annotations.push({
-        spanText: strength.evidence.slice(0, 60),
-        observation: `Strength: ${strength.quality}`,
+      .filter(s => s.paragraphs.length > 1 && Math.min(...s.paragraphs) === para.index);
+    for (const s of craftStrengths) {
+      add({
+        spanText: clampToWord(s.evidence || para.text, 80),
+        observation: s.quality,
         nature: 'strength',
         priorityRef: null,
       });
@@ -234,18 +239,30 @@ function buildRevisionPriorities(
 ): RevisionPriority[] {
   const priorities: RevisionPriority[] = [];
 
-  // Primary source: coachingMap priorities
+  // Primary source: coachingMap priorities.
+  //
+  // The student-facing coaching is `cp.priority` — a full counselor-grade mentor
+  // block (it carries both the "why" and a concrete, enacted "how", in plain
+  // voice). `cp.architecturalReason` is the INTERNAL why, written in system
+  // register ("North Star", "structural role", "95 structural score") — it is
+  // deliberately NOT shown to the student (internal-machinery ban). Paragraphs
+  // live on `cp.target.paragraphs`; `cp.expectedImpact` already matches the
+  // RevisionPriority impact union verbatim. (The prior code read `cp.action` /
+  // `cp.paragraphs` / mapped 'high'|'medium' — none of which exist on the type —
+  // so it silently dropped the deep coaching, showed the jargon reason for BOTH
+  // title and body, lost paragraphs, and always rendered "incremental".)
   const coachingPriorities = profile.scoreMatrix?.coachingMap?.priorities ?? [];
   for (const cp of coachingPriorities.slice(0, maxPriorities)) {
+    const body = cp.unlocksNext
+      ? `${cp.priority}\n\n**Once you do this:** ${cp.unlocksNext}`
+      : cp.priority;
     priorities.push({
       rank: priorities.length + 1,
-      title: cp.action ?? cp.architecturalReason ?? 'Revision needed',
-      whyItMatters: cp.architecturalReason ?? '',
-      paragraphs: cp.paragraphs ?? [],
-      craftTechnique: matchTechniqueForPriority(cp.action ?? '', profile),
-      impact: cp.expectedImpact === 'high' ? 'transformative'
-        : cp.expectedImpact === 'medium' ? 'significant'
-        : 'incremental',
+      title: cp.target?.description ?? 'Revision needed',
+      whyItMatters: body,
+      paragraphs: cp.target?.paragraphs ?? [],
+      craftTechnique: matchTechniqueForPriority(cp.priority ?? cp.target?.description ?? '', profile),
+      impact: cp.expectedImpact ?? 'incremental',
     });
   }
 
@@ -293,6 +310,34 @@ function matchTechniqueForPriority(action: string, _profile: Readonly<EssayProfi
   if (lower.includes('expand') || lower.includes('compress') || lower.includes('pacing')) return 'Expand Key Moments';
   if (lower.includes('voice') || lower.includes('register')) return 'Voice Consistency';
   return 'Craft Improvement';
+}
+
+/**
+ * Truncate to at most `max` characters WITHOUT cutting mid-word: trim back to
+ * the last whitespace boundary and append an ellipsis. Prevents student-facing
+ * spans like "...a small menagerie of crit".
+ */
+function clampToWord(text: string, max: number): string {
+  const t = text.trim();
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max);
+  const lastSpace = cut.lastIndexOf(' ');
+  const base = lastSpace > max * 0.5 ? cut.slice(0, lastSpace) : cut;
+  return base.replace(/[\s,;:.–—'"-]+$/, '') + '…';
+}
+
+/**
+ * Pull the first quoted fragment (the writer's own words) out of a growth-edge
+ * description so the annotation can anchor to a real span. Handles straight and
+ * curly quotes. Returns null when the description contains no quotation.
+ */
+function firstQuotedSpan(text: string): string | null {
+  // Require the opening quote to follow start/whitespace and the closing quote to
+  // precede whitespace/punctuation/end. This excludes mid-word apostrophes in
+  // contractions/possessives ("grandmother's", "narrator's"), which would
+  // otherwise be mistaken for quote delimiters and yield garbage spans.
+  const m = text.match(/(?:^|\s)['"‘“]([^'"‘’“”]{6,}?)['"’”](?=\s|[.,;:!?)]|$)/);
+  return m ? clampToWord(m[1], 80) : null;
 }
 
 function matchTechniqueForFinding(finding: Finding): string {
@@ -345,7 +390,10 @@ function buildOverallAssessment(profile: Readonly<EssayProfile>): OverallAssessm
   const strengths: string[] = [];
   const protectedStrengths = profile.scoreMatrix?.coachingMap?.protectedStrengths ?? [];
   for (const ps of protectedStrengths.slice(0, 3)) {
-    strengths.push(typeof ps === 'string' ? ps : (ps as any).strength ?? String(ps));
+    // protectedStrengths entries are { description, locations, whyProtect } —
+    // the field is `description`, NOT `strength`. The old `(ps as any).strength`
+    // never matched, so every strength rendered as the literal "[object Object]".
+    strengths.push(typeof ps === 'string' ? ps : ((ps as { description?: string }).description ?? String(ps)));
   }
   // Fallback: craft strengths
   if (strengths.length === 0) {

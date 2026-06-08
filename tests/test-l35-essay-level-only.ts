@@ -94,14 +94,6 @@ async function main(): Promise<void> {
     console.log('IMPROVEMENT PHASE: not set');
   }
 
-  // AO First Read
-  if (profile.aoFirstRead) {
-    console.log(`\nAO FIRST READ:`);
-    console.log(`  Put-down risk: ${profile.aoFirstRead.putDownRisk}`);
-    console.log(`  Committee one-liner: ${profile.aoFirstRead.committeeOneLiner}`);
-    console.log(`  Gut reaction: ${profile.aoFirstRead.gutReaction}`);
-  }
-
   // Archetype
   if (profile.admissionsPositioning?.archetypeContext) {
     console.log(`\nARCHETYPE: ${profile.admissionsPositioning.archetypeContext.archetype} (${profile.admissionsPositioning.archetypeContext.poolDensity})`);

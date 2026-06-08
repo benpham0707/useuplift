@@ -14,7 +14,7 @@
  *
  * Cost acceleration: Round 1 ~$0.75 → Round 5 ~$0.03 (focused pipeline = 10x cheaper)
  *
- * Spec: PLAN.md (Phase 1L — Focused Analysis Mode)
+ * Spec: docs/specs/PLAN.md (Phase 1L — Focused Analysis Mode)
  */
 
 import type {

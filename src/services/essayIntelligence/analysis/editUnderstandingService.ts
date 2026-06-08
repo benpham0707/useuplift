@@ -25,7 +25,7 @@
  *   - Haiku repair fallback if primary JSON parse fails
  *
  * Consumed by: focused analysis pipeline, EssayProfileCoordinator.applyEditUnderstanding()
- * Spec: PLAN.md (focused analysis mode, impact classification)
+ * Spec: docs/specs/PLAN.md (focused analysis mode, impact classification)
  */
 
 import type {

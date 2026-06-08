@@ -278,7 +278,7 @@ export interface SentenceProfile {
 // ---------------------------------------------------------------------------
 
 /**
- * The seven holistic lenses specified in PLAN.md §Essay Intelligence V2
+ * The seven holistic lenses specified in docs/specs/PLAN.md §Essay Intelligence V2
  * (L3.75). Each lens is a short prose paragraph rendered in the Profile
  * tab (Phase 8 §Profile card — implementation lives in ProfileCard.tsx
  * under Workstream F).

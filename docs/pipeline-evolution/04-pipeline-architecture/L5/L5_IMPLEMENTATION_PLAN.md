@@ -409,7 +409,7 @@ The graph is the spine. Detail follows.
 ### D-0.14 — Phase 0 cross-phase integrity audit
 
 - **Type:** Documentation deliverable + checklist run.
-- **File:** `docs/audit/phase-0-integrity-audit.md`.
+- **File:** `docs/archived/audit/phase-0-integrity-audit.md`.
 - **Depends on:** D-0.1 through D-0.13.
 - **Blocks:** D-0.15.
 - **Contract:** Re-read every governing doc that gates Phase 1; verify Phase 0's deliverables honor every type contract from `L5_ITERATION_LOOP_DESIGN.md` §7.1, every schema contract from `L5_E2E_INTEGRITY_AUDIT.md` §4.6, every audit row 251–270 in `L5_CONSUMPTION_AUDIT.md` §A3. Walk the dependency graph; check every Phase 0 → Phase 1 edge has a corresponding type or migration in place.

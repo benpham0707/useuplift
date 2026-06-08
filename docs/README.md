@@ -1,9 +1,9 @@
 # Uplift Documentation Index
 
 > Start here. **Rules for what goes where:** [REPO_ORGANIZATION.md](./REPO_ORGANIZATION.md).
-> Project root holds only live, load-bearing files (README, CLAUDE.md, PLAN.md,
-> PLAN2.md, BUILD_COST_LEDGER.md, the code-cited FORGE_PLAN_* specs). Everything
-> else lives under `docs/`.
+> Project root holds only live, load-bearing files (README, CLAUDE.md, GEMINI.md,
+> COORDINATION.md, BUILD_COST_LEDGER.md). The authoritative spec docs (PLAN, PLAN2,
+> FORGE_PLAN_*) live in [`docs/specs/`](./specs/); everything else lives under `docs/`.
 
 ## Live documentation
 

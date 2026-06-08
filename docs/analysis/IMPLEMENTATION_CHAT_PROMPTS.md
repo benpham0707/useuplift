@@ -309,12 +309,12 @@ Add to `src/http/routes.ts`:
 **Modifies**:
 - `src/http/routes.ts` — add endpoints: POST /api/inline-edit, POST /api/inline-edit/suggest-commands, POST /api/authenticity-check, GET /api/voice-profile, PUT /api/voice-profile
 **Creates test files**:
-- `tests/test-voice-profile-accuracy.ts` — 10 diverse samples, 80%+ agreement with human labels
-- `tests/test-voice-preservation.ts` — profiled vs non-profiled output comparison
-- `tests/test-voice-cross-workshop.ts` — same profile across all 3 workshops
-- `tests/test-inline-editing-e2e.ts` — all 15 commands on 5 test passages each
-- `tests/test-ai-risk-scorer.ts` — 10 AI essays vs 10 human essays
-- `tests/test-style-consistency.ts` — false positive/true positive rates
+- `tests/essay-intelligence/test-voice-profile-accuracy.ts` — 10 diverse samples, 80%+ agreement with human labels
+- `tests/essay-intelligence/test-voice-preservation.ts` — profiled vs non-profiled output comparison
+- `tests/essay-intelligence/test-voice-cross-workshop.ts` — same profile across all 3 workshops
+- `tests/essay-intelligence/test-inline-editing-e2e.ts` — all 15 commands on 5 test passages each
+- `tests/essay-intelligence/test-ai-risk-scorer.ts` — 10 AI essays vs 10 human essays
+- `tests/essay-intelligence/test-style-consistency.ts` — false positive/true positive rates
 **Reads**: SUCCESS_CRITERIA_AND_VALIDATION.md Sections 3 + 4 for exact pass/fail criteria
 **Tasks**: (1) Add all API endpoints with proper request validation, (2) Write all 6 test files with exact pass criteria from success doc, (3) Run tests and report results
 **Done when**: All endpoints respond correctly, test files exist and can be run (passing depends on other agents' work being complete)
@@ -477,9 +477,9 @@ Add to `src/http/routes.ts`:
 - `src/services/inlineEditor/inlineEditorService.ts` — add RAG transformation retrieval per editing command
 - `src/http/routes.ts` — add POST /api/story-mining/mine, POST /api/story-mining/deepen, POST /api/story-mining/rank
 **Creates test files**:
-- `tests/test-rag-retrieval-e2e.ts` — relevance in 8/10 queries, diversity, no language copying
-- `tests/test-rag-teaching-impact.ts` — A/B comparison: RAG-enhanced vs plain teaching
-- `tests/test-story-mining-e2e.ts` — 8 activity profiles, moment quality, ranking correlation
+- `tests/essay-intelligence/test-rag-retrieval-e2e.ts` — relevance in 8/10 queries, diversity, no language copying
+- `tests/infra/test-rag-teaching-impact.ts` — A/B comparison: RAG-enhanced vs plain teaching
+- `tests/essay-intelligence/test-story-mining-e2e.ts` — 8 activity profiles, moment quality, ranking correlation
 **Reads**: SUCCESS_CRITERIA_AND_VALIDATION.md Section 5 for exact pass/fail criteria
 **Tasks**: (1) Add RAG retrieval calls to all 3 workshop suggestion/teaching stages, (2) Add story mining API endpoints, (3) Write all 3 test files with exact criteria from success doc
 **Done when**: All workshops include RAG context in prompts, API endpoints respond correctly, test files exist and run
@@ -587,7 +587,7 @@ Add to `src/http/routes.ts`:
 Run `npx tsc --noEmit` across the full codebase and fix any issues.
 
 ### 7. E2E Test: Inline Editing
-Create `tests/test-inline-editing-e2e.ts`:
+Create `tests/essay-intelligence/test-inline-editing-e2e.ts`:
 - Test all 15 editing commands with sample text
 - Verify voice preservation (generate edits with voice profile, check consistency)
 - Verify response time < 3s for Haiku commands
@@ -601,14 +601,14 @@ Create `tests/test-voice-profile-e2e.ts`:
 - Verify cross-workshop consistency (same profile produces similar voice in all workshops)
 
 ### 9. E2E Test: RAG
-Create `tests/test-rag-retrieval-e2e.ts`:
+Create `tests/essay-intelligence/test-rag-retrieval-e2e.ts`:
 - Seed test data
 - Verify similarity search returns relevant results
 - Verify formatForPrompt produces usable output
 - Verify no language copying (abstracted patterns only)
 
 ### 10. E2E Test: Story Mining
-Create `tests/test-story-mining-e2e.ts`:
+Create `tests/essay-intelligence/test-story-mining-e2e.ts`:
 - Mine stories from sample activity profiles
 - Verify distinctiveness scoring
 - Verify prompt-fit ranking
@@ -646,16 +646,16 @@ Run cost comparison: same inputs through old pipeline vs new pipeline, verify co
 ### Agent: "test-runner" (general-purpose)
 **Focus**: Comprehensive E2E test suite + full regression
 **Creates these test files**:
-- `tests/test-analytics-tracking.ts` — verify all event types create DB rows, verify aggregation queries
-- `tests/test-version-comparison.ts` — verify score deltas match manual calculation (no API key needed)
+- `tests/infra/test-analytics-tracking.ts` — verify all event types create DB rows, verify aggregation queries
+- `tests/infra/test-version-comparison.ts` — verify score deltas match manual calculation (no API key needed)
 - `tests/test-cost-validation.ts` — run full pipeline, measure token cost, verify < $1.60 per student
 - `tests/run-writing-improvement-suite.ts` — master runner for ALL 14 test files with pass/fail summary
 **Runs all existing tests for regression**:
-- `tests/test-voice-profile-accuracy.ts` (from Chat 2)
-- `tests/test-inline-editing-e2e.ts` (from Chat 2)
-- `tests/test-ai-risk-scorer.ts` (from Chat 2)
-- `tests/test-rag-retrieval-e2e.ts` (from Chat 3)
-- `tests/test-story-mining-e2e.ts` (from Chat 3)
+- `tests/essay-intelligence/test-voice-profile-accuracy.ts` (from Chat 2)
+- `tests/essay-intelligence/test-inline-editing-e2e.ts` (from Chat 2)
+- `tests/essay-intelligence/test-ai-risk-scorer.ts` (from Chat 2)
+- `tests/essay-intelligence/test-rag-retrieval-e2e.ts` (from Chat 3)
+- `tests/essay-intelligence/test-story-mining-e2e.ts` (from Chat 3)
 - All pre-existing tests
 **Reads**: SUCCESS_CRITERIA_AND_VALIDATION.md Section 9 (full test suite list + run commands)
 **Tasks**: (1) Write 4 new test files, (2) Create master test runner, (3) Run full regression, (4) Report pass/fail for all 14 tests

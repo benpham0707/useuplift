@@ -780,6 +780,19 @@ export interface SentenceAnalysis {
    */
   piqDimensions?: Record<string, number> | null;
   piqDimensionsOpen?: string | null;
+
+  /**
+   * AnnotationV2 §4.3 6-tier visual: LLM-assessed confidence in the
+   * `effectiveness` score, propagated from L3.5's
+   * `AnalysisPassOutput.sentenceAnalyses[].confidence`. The L5 result
+   * envelope exposes `confidence.level` on each `sentenceEffectiveness`
+   * entry so the UI can dim the tier rendering when confidence is low.
+   *
+   * Optional for backward compat — analyses predating confidence
+   * propagation, and the focused-analysis synthetic path, leave it
+   * undefined; consumers default to 'high'.
+   */
+  confidence?: SentenceAnalysisConfidence;
 }
 
 /**
@@ -1303,6 +1316,20 @@ export interface CharacterRevelation {
 }
 
 /**
+ * Why a SignatureMove came back null — so renderers report the honest reason
+ * instead of assuming "distributed craft." 'llm_null' = the model genuinely
+ * judged no single dominant move (a real signal about the essay); 'malformed' /
+ * 'parse_error' = the LLM output was unusable (a pipeline failure, NOT a craft
+ * verdict); 'validator_rejected' = every cited instance failed grounding
+ * (referential-integrity). null/absent = the move is populated.
+ */
+export type SignatureMoveNullReason =
+  | 'llm_null'
+  | 'malformed'
+  | 'validator_rejected'
+  | 'parse_error';
+
+/**
  * SignatureMove — the ONE defining structural / voice / rhetorical move that
  * IS this writer's craft fingerprint. Distinct from `strengthSignatures`
  * (plural list of things the writer does well) and `voiceIdentity.signature`
@@ -1414,6 +1441,13 @@ export interface CraftAssessment {
    *  validated against essay text (substring + paragraph-index integrity)
    *  before being written. */
   signatureMove?: SignatureMove | null;
+  /** When `signatureMove` is null, WHY — see SignatureMoveNullReason. null/absent
+   *  when the move is populated. Lets renderers distinguish a genuine
+   *  distributed-craft essay ('llm_null') from a pipeline gap
+   *  ('malformed' | 'parse_error' | 'validator_rejected'), so the calibration
+   *  view never fabricates a flattering "distributed craft" verdict to mask a
+   *  system failure. */
+  signatureMoveNullReason?: SignatureMoveNullReason | null;
 }
 
 /**
@@ -2035,6 +2069,18 @@ export interface ImprovementPhase {
     priorLevel: ImprovementPhaseLevel;
     isGenuineShift: boolean;
     transitionReasoning: string;
+    /**
+     * AnnotationV2 §11.5 iteration loop: celebratory copy for the
+     * phase-up beat modal. A 15-40 word italic line referencing THIS
+     * essay's specific moves, emitted only when `isGenuineShift` is
+     * true and the LLM judged a specific move warrants celebration.
+     *
+     * Null when the shift is not genuine, when no move warrants a
+     * beat, or when the LLM declined (UI falls back to a static
+     * registry). See `L5AnnotationResult.phaseTransitionLine` for the
+     * consumer.
+     */
+    celebratoryLine: string | null;
   } | null;
 
   /**
@@ -2142,7 +2188,7 @@ export interface ProfileIndex {
    * the one-shot migration in `profileMigration.ts` found no source data to
    * reshape into the new candidate store. Callers (coaching service, UI) should
    * surface an explicit re-analysis prompt rather than silently proceeding with
-   * degraded behavior. See FORGE_PLAN_ARTIFACTS.md Section 2.
+   * degraded behavior. See docs/specs/FORGE_PLAN_ARTIFACTS.md Section 2.
    *
    * Set by: `EssayProfileCoordinator.fromCheckpoint()` when it catches
    *   `PipelineError.noMigrationSource` from the migration function.
@@ -2346,8 +2392,8 @@ export interface StructuredStudentContext {
 // can reference them; Phase 4 implements the runtime store class against
 // these types; later phases add the lifecycle transitions and read paths.
 //
-// See FORGE_PLAN_UNIFIED.md "Shared types" for the canonical definitions
-// and FORGE_PLAN_SCOPE2.md for the lifecycle rules.
+// See docs/specs/FORGE_PLAN_UNIFIED.md "Shared types" for the canonical definitions
+// and docs/specs/FORGE_PLAN_SCOPE2.md for the lifecycle rules.
 // ============================================================================
 
 /**
@@ -2465,12 +2511,6 @@ export interface EssayProfile {
   entanglements: CrossDimensionEntanglement[];
   /** AO pitch, distinctiveness, institutional fit, red flags, memorability */
   admissionsPositioning: AdmissionsPositioning;
-
-  // -- AO FIRST READ (GAP-4 — naive gut reaction under attention fatigue) --
-  /** The AO's gut reaction BEFORE deep analysis. Produced by Haiku parallel with L1.
-   *  Captures the "4pm, 29th essay" experience that L3.75 cannot replicate because
-   *  it already has deep understanding by the time it runs. Optional — null if call failed. */
-  aoFirstRead?: import('./analysis/aoFirstRead').AOFirstRead | null;
 
   // -- ESSAY UNDERSTANDING (Gap 1 — synthesized narrative prose) --
   /** The system's holistic understanding of the essay as a coherent narrative.
@@ -2609,6 +2649,17 @@ export interface EssayProfile {
    * history on write.
    */
   revisionHistory?: RevisionHistory;
+
+  /**
+   * Compact digest of drafts the L5 essay-level rewrite generator emitted on
+   * the LAST run. Read by the next re-analysis to pass `priorDrafts` to the
+   * generator so it can avoid verbatim repetition and build on what the
+   * student tried. Carries last run only (not full history). Optional for
+   * back-compat with profiles persisted before this field landed.
+   *
+   * See `PriorRewriteDigest` for shape + `wasApplied` inference semantics.
+   */
+  priorRewriteDigest?: PriorRewriteDigest[];
 
   /**
    * Phase 2a — Derived cross-session revision intelligence. Recomputed by
@@ -3554,7 +3605,7 @@ export interface ImprovementEntry {
   /** What to CUT to make room for the addition (word economy) */
   wordEconomyCut: string | null;
   /** Where this improvement came from */
-  source: 'l4_priority' | 'l35_finding' | 'l375_growth_edge' | 'l3_observation' | 'l5_annotation' | 'red_flag' | 'ao_first_read';
+  source: 'l4_priority' | 'l35_finding' | 'l375_growth_edge' | 'l3_observation' | 'l5_annotation' | 'red_flag';
   /** Reference ID (finding ID, annotation ID, etc.) */
   sourceRef: string | null;
   /** Priority (1 = highest, from analysis) */
@@ -5138,6 +5189,30 @@ export interface PriorAnnotationContext {
   }>;
 }
 
+/**
+ * Compact record of one rewrite draft the L5 essay-level generator emitted on a
+ * prior run. Persisted on EssayProfile (`priorRewriteDigest[]`) so the next
+ * re-analysis can avoid suggesting the same draft verbatim and can build on
+ * what the student tried.
+ *
+ * `wasApplied` is inferred at re-analysis time by substring-matching this
+ * `draftText` against the current essay text — no frontend signal required.
+ * (Decision: Q4 backend persistence; see analysis/rewriteGeneration.ts header
+ * for the full locked decision set.)
+ */
+export interface PriorRewriteDigest {
+  /** RewriteGap.id from the run that produced this draft. */
+  gapId: string;
+  /** The draft text the student saw. */
+  draftText: string;
+  /** Intensity level of the draft (mirrors RewriteDraft.intensityLevel). */
+  intensityLevel: 'minimal' | 'scene' | 'insight';
+  /** Inferred at re-analysis via substring match against current essay text. */
+  wasApplied: boolean;
+  /** Epoch ms when the draft was generated. */
+  generatedAt: number;
+}
+
 // ============================================================================
 // VERSION BRANCHING TYPES (Improvement #10 — Snapshot + Compare)
 // ============================================================================
@@ -5389,8 +5464,8 @@ export interface Delta {
 
   /**
    * Which layer emitted the source finding. Values match existing
-   * ImprovementEntry.source tags plus howler/ao_first_read identifiers:
-   *   'L3' | 'L3.75' | 'L3.5' | 'L4' | 'L5' | 'howler' | 'ao_first_read'
+   * ImprovementEntry.source tags plus the howler identifier:
+   *   'L3' | 'L3.75' | 'L3.5' | 'L4' | 'L5' | 'howler'
    * Typed as `string` to stay forward-compatible with new layers.
    */
   sourceLayer: string;

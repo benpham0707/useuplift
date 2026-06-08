@@ -156,7 +156,7 @@ For each LLM prompt you wrote, ask:
 
 2. **"What would this prompt produce for a GREAT essay vs a WEAK essay?"** The output should be qualitatively different — not just "higher scores" but fundamentally different insights. If the same template applies to both, the prompt isn't pushing deep enough.
 
-3. **"Does this prompt enable Level 5 understanding?"** Reference the Understanding Hierarchy from PLAN2.md:
+3. **"Does this prompt enable Level 5 understanding?"** Reference the Understanding Hierarchy from docs/specs/PLAN2.md:
    - Level 1: Technique identification ("this uses imagery")
    - Level 2: Contextual function ("these sensory registers construct a world of transactions")
    - Level 3: Architectural comprehension ("the clash between P1's epistemology and P3's IS the tension")
@@ -177,7 +177,7 @@ For any prompt that generates annotations, coaching responses, or feedback:
 
 ### 3C. Growth Engine Validity
 
-Does this cluster's implementation actually enable the growth engine from PLAN2.md?
+Does this cluster's implementation actually enable the growth engine from docs/specs/PLAN2.md?
 
 - Can findings accumulate maturity across growth cycles? (Cluster A)
 - Can scores differentiate meaningfully? Can phases detect per-dimension progress? (Cluster B)
@@ -188,9 +188,9 @@ If the growth engine can't function with what you built, that's a blocker — fi
 
 ---
 
-## PHASE 4: PLAN2.md CONSOLIDATION
+## PHASE 4: docs/specs/PLAN2.md CONSOLIDATION
 
-Brief and focused. Update PLAN2.md to reflect what was actually implemented:
+Brief and focused. Update docs/specs/PLAN2.md to reflect what was actually implemented:
 
 1. Replace type sketches with actual implemented types where they diverged
 2. Update architecture prose where the implementation taught you something the plan didn't anticipate
@@ -225,7 +225,7 @@ After Cluster A → Update: IMPROVEMENT_2, IMPROVEMENT_4, IMPROVEMENT_9 (next cl
 After Cluster B → Update: IMPROVEMENT_7, IMPROVEMENT_8
                   Quick-scan: IMPROVEMENT_5, 6, 10
 After Cluster C → Update: IMPROVEMENT_5, IMPROVEMENT_6, IMPROVEMENT_10
-After Cluster D → Final PLAN2.md consolidation only
+After Cluster D → Final docs/specs/PLAN2.md consolidation only
 ```
 
 For each prompt in the next cluster:
@@ -271,7 +271,7 @@ Now that you've implemented this cluster and see how it actually works in practi
 Don't produce a formatted report. Instead:
 
 1. **Fix everything that needs fixing** (rigidity violations, quality gaps, broken scenarios). Show what you fixed and why.
-2. **Update PLAN2.md** with actual implementation reality.
+2. **Update docs/specs/PLAN2.md** with actual implementation reality.
 3. **Update the next cluster's prompts** with substantive discoveries.
 4. **Share the 3-5 most important things you learned** that should shape how we approach the next cluster.
 5. **Give a clear GO/NO-GO** for the next cluster. If no-go, say exactly what's blocking.

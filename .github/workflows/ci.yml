@@ -22,7 +22,7 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
       - name: Descriptive-contract lint (L1/L3/L3.75 prompt purity)
-        run: npx tsx tests/test-descriptive-contract-lint.ts
+        run: npx tsx tests/essay-intelligence/test-descriptive-contract-lint.ts
       - name: Unit tests (tsx runner)
         run: npm test
       - name: Unit tests (vitest suites)

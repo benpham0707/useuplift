@@ -39,11 +39,16 @@ import { emitIterationEvent } from './iterationTelemetry';
 
 // ─── Constants ──────────────────────────────────────────────────────────
 
-/** Hard halt threshold. The next API call after cumulative reaches this throws. */
-export const HARD_CAP_USD = 9.0;
+/** Hard halt threshold. The next API call after cumulative reaches this throws.
+ *  Raised 9.0 → 15.0 (2026-06-06, by Tue): the original build cap is exhausted but
+ *  the pipeline is now in an ongoing verification/surfacing phase. The operative
+ *  discipline is NOT this all-time number — it is: keep EACH run ≤ ~$4, and do not
+ *  re-run back-to-back to fix small things one at a time (batch all fixes, verify
+ *  once). This ceiling is the coarse backstop; the per-run discipline is the guard. */
+export const HARD_CAP_USD = 15.0;
 
 /** Warn threshold. Logs a warning when cumulative crosses this. */
-export const WARN_THRESHOLD_USD = 7.0;
+export const WARN_THRESHOLD_USD = 13.0;
 
 /** Path to the markdown ledger at repo root. */
 export const LEDGER_PATH = resolve(process.cwd(), 'BUILD_COST_LEDGER.md');

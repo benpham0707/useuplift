@@ -260,7 +260,7 @@ With the LLM fallback to templates (no API in test env):
 To verify the system is working correctly, run:
 
 ```bash
-ANTHROPIC_API_KEY="sk-..." npx tsx tests/test-capability-conversation.ts
+ANTHROPIC_API_KEY="sk-..." npx tsx tests/academic/test-capability-conversation.ts
 ```
 
 With a valid API key, you'll see:

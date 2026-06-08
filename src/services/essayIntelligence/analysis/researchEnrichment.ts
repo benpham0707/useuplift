@@ -6,7 +6,7 @@
  * their first message. Pure synchronous lookups into a singleton — zero
  * LLM calls, <15ms total for a 10-item manifest.
  *
- * Design decisions (see FORGE_PLAN_SCOPE3.md for full rationale):
+ * Design decisions (see docs/specs/FORGE_PLAN_SCOPE3.md for full rationale):
  *   - Late-bound at coaching time, not at analysis time (collegeId isn't on PipelineInput)
  *   - Mutates the manifest in place (matches existing conversatorEnrichments.push
  *     pattern at coachingService.ts:1243)
@@ -72,7 +72,7 @@ const ROUTE_TO_ISSUE_TYPE: Record<string, IssueType | null> = {
   'ENACTED PARALLEL':                     'missing_connection_specificity',
 
   // Scope 2 additions — 6 new LLM-emitted techniques
-  // (mapping rationales documented in FORGE_PLAN_ARTIFACTS.md)
+  // (mapping rationales documented in docs/specs/FORGE_PLAN_ARTIFACTS.md)
   'COLLABORATIVE SPECIFICITY':            'missing_evidence_of_impact',
   'FUNCTIONAL DETAIL':                    'telling_not_showing',
   'ANTI-LESSON':                          'shallow_reflection',

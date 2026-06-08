@@ -1488,6 +1488,13 @@ function validateAndTransform(
         isStrength: false,
         isProblem: false,
         priorityForImprovement: 1,
+        // AnnotationV2 §3.6: tag the fallback entry 'low' confidence so the
+        // L5 sentenceEffectiveness grid can de-emphasize a guessed tier.
+        confidence: {
+          reasoning: 'Effectiveness defaulted — L3.5 did not return analysis for this sentence.',
+          level: 'low',
+          sensitivityNote: 'Score is a conservative placeholder, not an assessment.',
+        },
       });
     }
   }
@@ -2399,14 +2406,20 @@ export class AnalysisPassService {
         }
       }
 
-      // Add paragraph-specific strength if present
-      if (rawVerdict?.primaryStrength && typeof rawVerdict.primaryStrength === 'string') {
-        strengthSignatures.push({
-          quality: rawVerdict.primaryStrength,
-          evidence: reasoning,
-          paragraphs: [para.index],
-        });
-      }
+      // Deliberately NOT routing rawVerdict.primaryStrength into strengthSignatures.
+      // primaryStrength is a per-paragraph VERDICT — its "evidence" here was the
+      // full `reasoning` string — not an essay-level craft fingerprint. Routing it
+      // produced three defects: (a) long verdict-prose entries bloated
+      // craftAssessment.strengthSignatures (each paragraph's unique full-sentence
+      // quality never deduped against the curated L3.75 craftSignatures);
+      // (b) the SAME `reasoning` surfaced as both a "strength" (here) and a "growth
+      // edge" (the primaryWeakness push below also uses `reasoning`), so a strength
+      // read as a critique mid-sentence; (c) promoteStrengthSignatures turned each
+      // into a bogus "Strength signature: <whole sentence>" finding. The paragraph's
+      // strength is already preserved in paragraphVerdict (= reasoning); the curated
+      // essay-level craft fingerprint comes from L3.75 craftSignatures. Keep this
+      // channel for genuine cross-paragraph essay-level strengths only (the loop
+      // above), which dedup correctly by shared quality.
 
       // Build growth edges from essay-level weaknesses that reference this paragraph
       const growthEdges: Array<{ quality: string; description: string; paragraphs: number[] }> = [];
@@ -2422,14 +2435,15 @@ export class AnalysisPassService {
         }
       }
 
-      // Add paragraph-specific weakness if present
-      if (rawVerdict?.primaryWeakness && typeof rawVerdict.primaryWeakness === 'string') {
-        growthEdges.push({
-          quality: rawVerdict.primaryWeakness,
-          description: reasoning,
-          paragraphs: [para.index],
-        });
-      }
+      // Deliberately NOT routing rawVerdict.primaryWeakness into growthEdges —
+      // symmetric to the primaryStrength decision above. primaryWeakness is a
+      // per-paragraph VERDICT (its "description" was the full `reasoning`), not a
+      // curated growth edge. Routing it duplicated every growth edge in two forms
+      // (a short essay-level edge AND a long verdict-prose edge with the same
+      // meaning), which surfaced to the student as the same coaching said twice.
+      // The paragraph's weakness is already preserved in paragraphVerdict
+      // (= reasoning); curated growth edges come from the essay-level weaknesses
+      // loop above (which dedup correctly by shared quality).
 
       results.push({
         paragraphIndex: para.index,

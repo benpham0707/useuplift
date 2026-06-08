@@ -1,7 +1,7 @@
 // ============================================================================
 // D-1.16-prefix F-04 closure — buildEditProcessResponse branching test
 // ============================================================================
-// Spec: docs/audit/d1-15-mock-llm-integration.md (forthcoming) + Phase 1
+// Spec: docs/archived/audit/d1-15-mock-llm-integration.md (forthcoming) + Phase 1
 // dead-wire audit (2026-04-30) F-04 finding.
 //
 // EditProcessResult.deferReason is the discriminator added in D-1.12 Commit

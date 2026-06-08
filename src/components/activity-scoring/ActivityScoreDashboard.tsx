@@ -239,12 +239,12 @@ export const ActivityScoreDashboard: React.FC<ActivityScoreDashboardProps> = ({ 
       className="w-full flex flex-col lg:flex-row gap-4 lg:items-stretch"
     >
       {/* Left Column: Holographic Score Card — fixed width, sets the row height */}
-      <div className="w-full lg:w-[340px] flex-shrink-0">
+      <div className="w-full lg:w-[340px] flex-shrink-0 lg:h-auto flex">
         <OverviewPanel data={data} />
       </div>
 
       {/* Right Column: Metrics — stretches to match left panel height */}
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0 flex">
         <MetricsPanel
           activityStats={activityStats}
           narrativeStats={narrativeStats}

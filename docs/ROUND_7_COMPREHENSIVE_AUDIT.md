@@ -6,8 +6,85 @@
 **Method:** 8 parallel read-only audit agents across pipeline, historical (7a), analytical/strategic (7b+7c), persistence, lifecycle, coaching, cost/cache/perf, and test coverage.
 
 ---
+           
 
-## Executive Summary
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+           
+## Executive Summary  
 
 Round 7a/7b/7c landed the signal infrastructure cleanly. Each round's per-round audit caught its local bugs. But a system-wide lens surfaces **cross-cutting issues that per-round audits couldn't see** — particularly at the boundaries between layers.
 

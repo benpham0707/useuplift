@@ -3,7 +3,6 @@ import { motion } from 'motion/react';
 import { ChatHeader } from './ChatHeader';
 import { MessageDisplay, type Message } from './MessageDisplay';
 import { ChatInput } from './ChatInput';
-import { LunaSprite, type LunaState } from './LunaSprite';
 import { cn } from '@/lib/utils';
 
 const MOCK_MESSAGES: Message[] = [
@@ -60,37 +59,14 @@ const MOCK_MESSAGES: Message[] = [
 
 interface ChatPanelProps {
   className?: string;
+  /** Show the built-in Luna header. Set to false when an outer tab bar already serves as the header. */
+  showHeader?: boolean;
 }
 
-export function ChatPanel({ className }: ChatPanelProps) {
+export function ChatPanel({ className, showHeader = true }: ChatPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   // Progressive reveal — simulates real chat so each message triggers its mount animation
   const [visibleMessages, setVisibleMessages] = useState<Message[]>([]);
-
-  // ═══ Luna Phase 1 demo cycler ═══
-  // Cycles through the 3 MVP states so the spatial design and motion
-  // can be validated before investing in Kling video generation.
-  // Remove this once real coaching state is wired in from session memory.
-  const [lunaState, setLunaState] = useState<LunaState>('neutral');
-
-  useEffect(() => {
-    const sequence: { state: LunaState; hold: number }[] = [
-      { state: 'neutral', hold: 4500 },
-      { state: 'thinking', hold: 3500 },
-      { state: 'happy', hold: 3500 },
-    ];
-    let i = 0;
-    let timer: ReturnType<typeof setTimeout>;
-    const tick = () => {
-      setLunaState(sequence[i].state);
-      timer = setTimeout(() => {
-        i = (i + 1) % sequence.length;
-        tick();
-      }, sequence[i].hold);
-    };
-    tick();
-    return () => clearTimeout(timer);
-  }, []);
 
   useEffect(() => {
     const timers = MOCK_MESSAGES.map((msg, i) =>
@@ -128,7 +104,7 @@ export function ChatPanel({ className }: ChatPanelProps) {
 
       {/* Content Wrapper */}
       <div className="relative z-10 flex flex-col h-full w-full">
-        <ChatHeader />
+        {showHeader && <ChatHeader />}
 
         {/* Scrollable Messages Area */}
         <div
@@ -200,45 +176,11 @@ export function ChatPanel({ className }: ChatPanelProps) {
 
         </div>
 
-        {/* Luna — free-floating mascot that inhabits the chat panel.
-            Lives at z-25, above the cloud valley pillars (z-20) and
-            below the input (z-30). Her spatial home is the cloud
-            valley, and she travels up into the message area for
-            reading/thinking states and rises to center for celebration. */}
-        <LunaSprite state={lunaState} />
-
         {/* Interactive Input Container - Above everything */}
         <div className="absolute bottom-0 left-0 right-0 p-5 flex justify-center z-30">
           <div className="w-full relative">
             <ChatInput />
           </div>
-        </div>
-
-        {/* ═══ Luna Phase 1 manual state controls (dev only) ═══
-            Tiny button cluster pinned to the top-right of the panel so
-            you can manually trigger state changes and evaluate whether
-            the spatial design + spring motion feels alive. Remove once
-            Phase 1 validation passes. */}
-        <div className="absolute top-14 right-3 z-40 flex flex-col gap-1 pointer-events-auto">
-          {(['neutral', 'thinking', 'happy'] as LunaState[]).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setLunaState(s)}
-              className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all"
-              style={{
-                background:
-                  lunaState === s
-                    ? 'hsla(260, 70%, 60%, 0.9)'
-                    : 'hsla(260, 30%, 95%, 0.85)',
-                color: lunaState === s ? 'white' : 'hsl(260, 30%, 35%)',
-                border: '1px solid hsla(260, 40%, 60%, 0.25)',
-                backdropFilter: 'blur(4px)',
-              }}
-            >
-              {s}
-            </button>
-          ))}
         </div>
       </div>
     </div>

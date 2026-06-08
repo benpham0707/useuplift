@@ -12,7 +12,7 @@
  * - Phase transition detection when priorPhase is available
  * - legacyReadiness computed deterministically from level for backward compat
  *
- * Spec: Improvement 9 in PLAN.md
+ * Spec: Improvement 9 in docs/specs/PLAN.md
  */
 
 import type {
@@ -163,9 +163,43 @@ OUTPUT FORMAT (strict JSON, no markdown wrapping):
   "transition": null | {
     "priorLevel": "the prior phase level",
     "isGenuineShift": true | false,
-    "transitionReasoning": "why the shift is/isn't genuine"
+    "transitionReasoning": "why the shift is/isn't genuine",
+    "celebratoryLine": "string OR null — see PHASE-UP CELEBRATORY LINE below"
   }
-}`;
+}
+
+PHASE-UP CELEBRATORY LINE (only relevant when transition.isGenuineShift = true)
+
+When you have determined the phase shift is genuine, also produce a 15-40
+word line that will be shown to the student inside a celebratory modal
+AFTER they re-analyze. Set transition.celebratoryLine to this string.
+
+The line must:
+- Reference at least one specific move, scene, choice, image, or pattern
+  unique to THIS essay (no generic phrasing).
+- Acknowledge what the crossing means — what kind of work is now done,
+  and what kind of work is now possible.
+- Stay in third-person observational register. The modal already says
+  "You moved from {prior} to {new}" — your line is the MEANING of the
+  move, not another announcement of it.
+- Avoid: metrics, scores, "great job", "way to go", "you leveled up",
+  any second-person command, any praise that would read identically for
+  another essay.
+
+Calibration test: read your line and ask "could I paste this under any
+other essay's phase-up beat?" If yes, rewrite with more specificity. The
+line should feel hand-written by a counselor who read THIS draft three
+times.
+
+Set celebratoryLine = null when:
+  - transition.isGenuineShift is false.
+  - The essay's moves don't warrant a celebratory beat (e.g., the phase
+    shifted because of a structural deletion that fixed a problem but
+    didn't add craft).
+  - You cannot meet the calibration test above without generic copy.
+
+Better to emit null than a generic line — the UI has a fallback registry
+for null cases. Never emit a template-interpolated line.`;
 }
 
 function buildScoringDigest(analyses: AnalysisPassOutput[]): string {
@@ -409,10 +443,21 @@ function validatePhaseOutput(raw: Record<string, unknown>, priorPhase?: Improvem
     const priorLevel = VALID_LEVELS.has(String(t.priorLevel))
       ? String(t.priorLevel) as ImprovementPhaseLevel
       : priorPhase.level;
+    const isGenuineShift = typeof t.isGenuineShift === 'boolean'
+      ? t.isGenuineShift
+      : level !== priorPhase.level;
+    // §11.5 celebratory line: only meaningful on a genuine shift. Coerce to
+    // null on a non-genuine shift even if the LLM emitted a line, and on any
+    // non-string/empty value — null is the explicit "use registry" signal.
+    const celebratoryLine =
+      isGenuineShift && typeof t.celebratoryLine === 'string' && t.celebratoryLine.trim().length > 0
+        ? t.celebratoryLine.trim()
+        : null;
     transition = {
       priorLevel,
-      isGenuineShift: typeof t.isGenuineShift === 'boolean' ? t.isGenuineShift : level !== priorPhase.level,
+      isGenuineShift,
       transitionReasoning: typeof t.transitionReasoning === 'string' ? t.transitionReasoning : '',
+      celebratoryLine,
     };
   }
 

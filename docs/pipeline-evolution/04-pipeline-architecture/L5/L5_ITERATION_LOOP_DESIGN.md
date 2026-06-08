@@ -87,7 +87,7 @@ deepAnnotationService.generateAnnotations(
 | Primitive | Status | Note |
 |---|---|---|
 | **Global iteration counter on `EssayProfile` / `ProfileIndex`** | ✗ Missing | Only `fullAnalysisCount` (profileTypes.ts:1918–2080) and `lastComprehensiveAt`. No `currentIteration`, `currentEditRound`. |
-| **`taughtMoves` ledger** (which prior critiques have been delivered, in which iteration, with what landing status) | ✗ Aspirational only | Present in PLAN2.md and the memory; absent in code. |
+| **`taughtMoves` ledger** (which prior critiques have been delivered, in which iteration, with what landing status) | ✗ Aspirational only | Present in docs/specs/PLAN2.md and the memory; absent in code. |
 | **"Did this edit address this annotation?" detector** | ✗ Missing | The `addressedByEdit` field exists on the type (profileTypes.ts:4621); no producer code. |
 | **`StalenessEffect → Finding ID` link** | ✗ Missing | StalenessEffect.target = `'finding'` is a category; no `findingIds[]` array. The orchestrator has no way to know "this edit invalidates F7." |
 | **Per-section L3.75 staleness** | ✗ Missing | The single Sonnet call regenerates all 10 holistic sections atomically; no section-level invalidation. |
@@ -99,7 +99,7 @@ deepAnnotationService.generateAnnotations(
 Two slightly different numbers appear:
 
 - `focusedAnalyzer.ts:15–16` (file header comment): *"Cost acceleration: Round 1 ~$0.75 → Round 5 ~$0.03 (focused pipeline = 10x cheaper)"*.
-- `PLAN.md:6955, 7019`: *"Round 1 ~$0.75 (full pipeline, no prior knowledge) to Round 5 ~$0.03 (focused, zoomed, informed) — a 25x reduction."*
+- `docs/specs/PLAN.md:6955, 7019`: *"Round 1 ~$0.75 (full pipeline, no prior knowledge) to Round 5 ~$0.03 (focused, zoomed, informed) — a 25x reduction."*
 
 Both endpoints agree ($0.75 → $0.03). The compounding multiplier (10x vs 25x) is a derivation choice. Per-layer baseline costs (from `docs/L5_CONSUMPTION_AUDIT.md`'s cost table at lines 15–28):
 
@@ -289,7 +289,7 @@ The maturity lifecycle (#33–34) is *the* mature carry-forward mechanism. The r
 
 ### 4.12 UnderstandingQuestion queue
 
-Carry-forward is the queue's design intent (`iterationsSurvived: number`, profileTypes.ts:4284). No changes. Convergence-driven pruning continues to apply per `essay-intelligence-v2.md` and PLAN2.md.
+Carry-forward is the queue's design intent (`iterationsSurvived: number`, profileTypes.ts:4284). No changes. Convergence-driven pruning continues to apply per `essay-intelligence-v2.md` and docs/specs/PLAN2.md.
 
 ---
 
@@ -565,9 +565,9 @@ The iteration scenarios:
 | **% of comprehensive baseline ($1.035)** | 100% | 28% | 33% | 31% | 27% |
 
 Notes:
-- Iter 1's $1.035 includes craft-phase L5 ($0.30); foundation-phase L5 (~$0.10) yields ~$0.835. PLAN.md's $0.75 figure assumes the lower end.
+- Iter 1's $1.035 includes craft-phase L5 ($0.30); foundation-phase L5 (~$0.10) yields ~$0.835. docs/specs/PLAN.md's $0.75 figure assumes the lower end.
 - **Iter 4 is the key correction.** Today's `selectAnalysisMode()` routes reorders to comprehensive (~$1.12). The `focused_structural` mode (§4.4b) re-derives only the structural reads (L2, narrativeStrategy/thematicArchitecture/momentEarnedness sections of L3.75, northStar.throughLineMap, scoreMatrix.crossParagraphPatterns, coachingMap, cross-para L5) and carries the rest with index remapping. ~$0.325 vs ~$1.12 — a ~$0.80 saving on a common edit type.
-- Trajectory: **$1.035 → $0.275** ≈ **3.8x reduction** by iteration 5. Less than PLAN.md's stated 25x, but PLAN.md's number assumes a polish iteration where almost everything caches and only a single sentence-level L5 call fires; achievable on the smallest edits but not the typical case.
+- Trajectory: **$1.035 → $0.275** ≈ **3.8x reduction** by iteration 5. Less than docs/specs/PLAN.md's stated 25x, but docs/specs/PLAN.md's number assumes a polish iteration where almost everything caches and only a single sentence-level L5 call fires; achievable on the smallest edits but not the typical case.
 - No redirection. Saved budget is genuine savings, not a slush fund.
 - The quality booster lives in *what iteration N's L5 call sees*: priorAnnotations on the changed paragraph + carry-forward context from every other paragraph + matured findings. That's structurally deeper than iteration 1's cold read at no extra cost.
 
@@ -631,7 +631,7 @@ Real product calls; not solvable in the design doc alone.
 
 6. **Iteration counter visibility.** Should `IterationLedger.currentIteration` be surfaced to the student UI ("iteration 4 of your essay"), or is this internal-only? Surfacing creates a cleaner mental model; not surfacing keeps the loop invisible.
 
-7. **Comprehensive-mode baseline alignment.** §8's $1.035 baseline doesn't match PLAN.md's $0.75 exactly because the table includes craft-phase L5. Harmonize numbers across docs, or accept the order-of-magnitude agreement?
+7. **Comprehensive-mode baseline alignment.** §8's $1.035 baseline doesn't match docs/specs/PLAN.md's $0.75 exactly because the table includes craft-phase L5. Harmonize numbers across docs, or accept the order-of-magnitude agreement?
 
 ---
 

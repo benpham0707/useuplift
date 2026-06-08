@@ -66,7 +66,7 @@ export const OverviewPanel: React.FC<OverviewPanelProps> = ({ data }) => {
   const [ringStart, ringEnd] = ringGradientColors(data.combinedScore);
 
   return (
-    <div className="w-full flex flex-col">
+    <div className="w-full flex flex-col h-full">
       {/* @property lets us animate the conic-gradient angle via CSS */}
       <style>{`
         @property --scanner-angle {
@@ -83,7 +83,7 @@ export const OverviewPanel: React.FC<OverviewPanelProps> = ({ data }) => {
           Outer div: conic-gradient IS the background, with p-[2px] creating the border gap.
           Inner div: fully opaque bg-background masks everything except the 2px edge. */}
       <div
-        className="relative w-full rounded-3xl shadow-2xl p-[2px] overflow-hidden"
+        className="relative w-full flex-1 rounded-3xl shadow-2xl p-[2px] overflow-hidden"
         style={{
           background: [
             // Top layer: animated scanner glow (soft, blends into the base)

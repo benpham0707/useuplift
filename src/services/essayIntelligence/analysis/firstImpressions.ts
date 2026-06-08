@@ -155,7 +155,7 @@ function buildUserPrompt(
   totalParagraphs: number,
   allParagraphs: string[],
 ): string {
-  // PLAN.md: each L1 call receives the full essay text (for context) + the target paragraph
+  // docs/specs/PLAN.md: each L1 call receives the full essay text (for context) + the target paragraph
   const markedEssay = allParagraphs
     .map((p, i) => {
       const marker = i === paragraphIndex ? `>>> [P${i + 1}] <<<` : `[P${i + 1}]`;

@@ -80,7 +80,7 @@ grep -r "20250929" src/ supabase/ --include="*.ts" | wc -l
 
 **Validation test:**
 ```typescript
-// tests/test-prompt-caching-validation.ts
+// tests/infra/test-prompt-caching-validation.ts
 // Run Activity Workshop pipeline twice with same system prompts
 // First run: expect cache_creation_input_tokens > 0
 // Second run: expect cache_read_input_tokens > 0, cost < first run
@@ -123,7 +123,7 @@ The voice profiling system must accurately capture a student's writing style. Te
 
 **Validation test:**
 ```typescript
-// tests/test-voice-profile-accuracy.ts
+// tests/essay-intelligence/test-voice-profile-accuracy.ts
 // 10 diverse writing samples (formal, casual, academic, creative, etc.)
 // Each labeled by human for register, vocabulary, formality
 // Pass if: 80%+ agreement with human labels
@@ -144,7 +144,7 @@ When the voice profile is injected into prompts, the output should sound like th
 
 **Validation test:**
 ```typescript
-// tests/test-voice-preservation.ts
+// tests/essay-intelligence/test-voice-preservation.ts
 // Take 5 student samples, build profiles, generate suggestions with and without profile
 // Measure: sentence length deviation, banned term count, formality match
 // Pass if: profiled output is closer to original voice on all metrics
@@ -162,7 +162,7 @@ The same voice profile should produce consistent-sounding output across all 3 wo
 
 **Validation test:**
 ```typescript
-// tests/test-voice-cross-workshop.ts
+// tests/essay-intelligence/test-voice-cross-workshop.ts
 // Build profile for one student
 // Generate: Common App suggestion, PIQ feedback, Activity description optimization
 // Measure: sentence length variance, formality consistency, vocabulary overlap
@@ -198,7 +198,7 @@ Each of the 15 editing commands must produce useful, voice-consistent edits.
 
 **Validation test per command:**
 ```typescript
-// tests/test-inline-editing-e2e.ts
+// tests/essay-intelligence/test-inline-editing-e2e.ts
 // For each of 15 commands:
 //   1. Apply to 5 different test passages
 //   2. Verify JSON schema (primary, creative, teachingNote, principle)
@@ -253,7 +253,7 @@ Each of the 15 editing commands must produce useful, voice-consistent edits.
 
 **Validation test:**
 ```typescript
-// tests/test-ai-risk-scorer.ts
+// tests/essay-intelligence/test-ai-risk-scorer.ts
 // 10 AI-generated essays (ChatGPT, Claude raw output)
 // 10 real student essays (anonymized, consented)
 // Pass if:
@@ -301,7 +301,7 @@ Each of the 15 editing commands must produce useful, voice-consistent edits.
 
 **Validation test:**
 ```typescript
-// tests/test-rag-retrieval-e2e.ts
+// tests/essay-intelligence/test-rag-retrieval-e2e.ts
 // Seed 50 test fragments with known metadata
 // Query 10 different student texts
 // For each: retrieve top-3, verify:
@@ -324,7 +324,7 @@ The most important test: does RAG actually improve the teaching output?
 
 **Validation test:**
 ```typescript
-// tests/test-rag-teaching-impact.ts
+// tests/infra/test-rag-teaching-impact.ts
 // Take 10 real essay issues
 // Generate teaching for each: once with RAG context, once without
 // Measure:
@@ -357,7 +357,7 @@ The most important test: does RAG actually improve the teaching output?
 
 **Validation test:**
 ```typescript
-// tests/test-story-mining-e2e.ts
+// tests/essay-intelligence/test-story-mining-e2e.ts
 // Provide 8 diverse activity profiles (athletics, research, community service, arts, etc.)
 // Run mineStories()
 // Verify:
@@ -505,19 +505,19 @@ Each test is created in the phase that builds the feature, but ALL tests are run
 
 | Test File | Phase | What It Validates | Pass Criteria |
 |-----------|-------|-------------------|---------------|
-| `tests/test-prompt-caching-validation.ts` | 0 | Caching reduces cost 30%+ | Second run cost < 70% of first |
-| `tests/test-voice-profile-accuracy.ts` | 1 | Voice profiling matches human labels | 80%+ agreement on 10 samples |
-| `tests/test-voice-preservation.ts` | 1 | Output preserves student voice | Profiled output closer to original in all metrics |
-| `tests/test-voice-cross-workshop.ts` | 1 | Same voice across all workshops | Voice metrics within 20% across workshops |
-| `tests/test-inline-editing-e2e.ts` | 2 | All 15 commands produce quality edits | 4/5 passages pass per command |
-| `tests/test-inline-editing-latency.ts` | 2 | Response time meets targets | p95 < 3s (Haiku), < 5s (Sonnet) |
-| `tests/test-ai-risk-scorer.ts` | 2 | Separates AI from human text | Mean gap > 30 points |
-| `tests/test-style-consistency.ts` | 2 | Voice check catches violations | < 10% false positive, > 80% true positive |
-| `tests/test-rag-retrieval-e2e.ts` | 3 | RAG returns relevant examples | 8/10 queries return relevant results |
-| `tests/test-rag-teaching-impact.ts` | 3 | RAG improves teaching quality | Preferred in 7/10 blind comparisons |
-| `tests/test-story-mining-e2e.ts` | 3 | Story mining extracts quality moments | 8-12 specific moments, ranking correlates with human |
-| `tests/test-analytics-tracking.ts` | 4 | Events captured correctly | All event types produce DB rows |
-| `tests/test-version-comparison.ts` | 4 | Version deltas are accurate | Computed deltas match manual calculation |
+| `tests/infra/test-prompt-caching-validation.ts` | 0 | Caching reduces cost 30%+ | Second run cost < 70% of first |
+| `tests/essay-intelligence/test-voice-profile-accuracy.ts` | 1 | Voice profiling matches human labels | 80%+ agreement on 10 samples |
+| `tests/essay-intelligence/test-voice-preservation.ts` | 1 | Output preserves student voice | Profiled output closer to original in all metrics |
+| `tests/essay-intelligence/test-voice-cross-workshop.ts` | 1 | Same voice across all workshops | Voice metrics within 20% across workshops |
+| `tests/essay-intelligence/test-inline-editing-e2e.ts` | 2 | All 15 commands produce quality edits | 4/5 passages pass per command |
+| `tests/essay-intelligence/test-inline-editing-latency.ts` | 2 | Response time meets targets | p95 < 3s (Haiku), < 5s (Sonnet) |
+| `tests/essay-intelligence/test-ai-risk-scorer.ts` | 2 | Separates AI from human text | Mean gap > 30 points |
+| `tests/essay-intelligence/test-style-consistency.ts` | 2 | Voice check catches violations | < 10% false positive, > 80% true positive |
+| `tests/essay-intelligence/test-rag-retrieval-e2e.ts` | 3 | RAG returns relevant examples | 8/10 queries return relevant results |
+| `tests/infra/test-rag-teaching-impact.ts` | 3 | RAG improves teaching quality | Preferred in 7/10 blind comparisons |
+| `tests/essay-intelligence/test-story-mining-e2e.ts` | 3 | Story mining extracts quality moments | 8-12 specific moments, ranking correlates with human |
+| `tests/infra/test-analytics-tracking.ts` | 4 | Events captured correctly | All event types produce DB rows |
+| `tests/infra/test-version-comparison.ts` | 4 | Version deltas are accurate | Computed deltas match manual calculation |
 | `tests/test-cost-validation.ts` | 4 | Cost targets met | Per-student < $1.60 |
 
 ### Running the Full Suite
@@ -527,27 +527,27 @@ Each test is created in the phase that builds the feature, but ALL tests are run
 npx tsc --noEmit
 
 # Phase 0 validation
-ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/test-prompt-caching-validation.ts
+ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/infra/test-prompt-caching-validation.ts
 
 # Phase 1 validation
-ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/test-voice-profile-accuracy.ts
-ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/test-voice-preservation.ts
-ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/test-voice-cross-workshop.ts
+ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/essay-intelligence/test-voice-profile-accuracy.ts
+ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/essay-intelligence/test-voice-preservation.ts
+ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/essay-intelligence/test-voice-cross-workshop.ts
 
 # Phase 2 validation
-ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/test-inline-editing-e2e.ts
-ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/test-inline-editing-latency.ts
-npx tsx tests/test-ai-risk-scorer.ts  # No API key needed (heuristic only)
-npx tsx tests/test-style-consistency.ts  # No API key needed (heuristic only)
+ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/essay-intelligence/test-inline-editing-e2e.ts
+ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/essay-intelligence/test-inline-editing-latency.ts
+npx tsx tests/essay-intelligence/test-ai-risk-scorer.ts  # No API key needed (heuristic only)
+npx tsx tests/essay-intelligence/test-style-consistency.ts  # No API key needed (heuristic only)
 
 # Phase 3 validation
-ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/test-rag-retrieval-e2e.ts
-ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/test-rag-teaching-impact.ts
-ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/test-story-mining-e2e.ts
+ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/essay-intelligence/test-rag-retrieval-e2e.ts
+ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/infra/test-rag-teaching-impact.ts
+ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/essay-intelligence/test-story-mining-e2e.ts
 
 # Phase 4 validation
-ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/test-analytics-tracking.ts
-npx tsx tests/test-version-comparison.ts  # No API key needed
+ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/infra/test-analytics-tracking.ts
+npx tsx tests/infra/test-version-comparison.ts  # No API key needed
 ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/test-cost-validation.ts
 
 # Full regression (run after every phase)

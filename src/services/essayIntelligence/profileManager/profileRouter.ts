@@ -14,7 +14,7 @@
  *              re-analysis pipeline, focused analysis pipeline.
  *
  * Spec: docs/plan-sections/04-profile-manager.md (Section 4-5)
- *       PLAN.md lines 3170-3212 (routing rules table)
+ *       docs/specs/PLAN.md lines 3170-3212 (routing rules table)
  */
 
 import type {
@@ -507,6 +507,14 @@ function getScoutLeadsForParagraph(
 
 export class ProfileRouter {
   private relevanceTracker: ContextRelevanceTracker;
+
+  /**
+   * Process-wide set of rules that have already emitted an "always exceeds
+   * budget" warning. Used to throttle otherwise-noisy warnings without losing
+   * the signal entirely. Static so it's shared across all ProfileRouter
+   * instances in a process.
+   */
+  private static readonly budgetWarnedRules = new Set<RoutingRule>();
 
   constructor() {
     this.relevanceTracker = new InMemoryRelevanceTracker();
@@ -2334,15 +2342,21 @@ export class ProfileRouter {
       nice_to_have: 3,
     };
 
-    // Warn if always-priority items alone exceed the budget
+    // Warn if always-priority items alone exceed the budget. Throttled per-rule
+    // per-process: the warning is informational (always-priority sections are
+    // never dropped), and un-throttled it produced 150+ identical lines in a
+    // single checkpoint3 run. One warning per rule is sufficient to surface the
+    // issue without burying the rest of the log.
     const alwaysTokens = sections
       .filter((s) => s.priority === 'always')
       .reduce((sum, s) => sum + s.tokenEstimate, 0);
 
-    if (alwaysTokens > budget) {
+    if (alwaysTokens > budget && !ProfileRouter.budgetWarnedRules.has(rule)) {
+      ProfileRouter.budgetWarnedRules.add(rule);
       console.warn(
         `[ProfileRouter] Always-priority items (${alwaysTokens} tokens) exceed budget ` +
-        `(${budget} tokens) for ${rule}. LLM context will be larger than intended.`,
+        `(${budget} tokens) for ${rule}. LLM context will be larger than intended. ` +
+        `(Further identical warnings for this rule suppressed for the remainder of this process.)`,
       );
     }
 

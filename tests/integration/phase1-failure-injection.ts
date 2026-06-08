@@ -1176,7 +1176,7 @@ describe('D-1.16 Item 13 — C5 warm-edit: triggerReanalysis partial-result guar
 //       defaults honestly to 0 via the consumer's `?? 0`.
 //
 // These are the "Commit B HIGH violations" closures the audit named
-// (H1-H3 in §4 of d1-12-halt-on-error-pass.md). Item 13 verifies the
+// (H1-H3 in §4 of docs/archived/audit/d1-12-halt-on-error-pass.md). Item 13 verifies the
 // consumer-side wiring fires under runtime conditions.
 
 describe('D-1.16 Item 13 — Commit B: focusedAnalyzer failure-flag consumption', () => {

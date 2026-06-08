@@ -13,7 +13,7 @@
  */
 
 import * as React from 'react';
-import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/resizable';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  Pencil, Sparkles, User, Eye, Compass, Mic, BookOpen, Heart, Map,
+  Pencil, Sparkles, User, Eye, Compass, Mic, BookOpen, Heart, Map as MapIcon,
   GraduationCap, Shield, ChevronDown, ChevronRight, Gem, Wrench, Zap,
   Send, History, Lightbulb, MessageSquare, UserCircle, Target,
   ArrowRight, Link2, Palette, Layers, Volume2, AlertTriangle, AlertCircle,
@@ -37,6 +37,13 @@ import {
   type HighlightType,
   type RightTab,
 } from '@/components/annotation-v2/mockData';
+import { ChatPanel } from '@/components/chat/ChatPanel';
+import { WorkshopHeader } from '@/components/annotation-v2/WorkshopHeader';
+import {
+  CommonAppPromptSelector,
+  DEFAULT_COLLEGE_ID,
+  DEFAULT_ESSAY_NUMBER,
+} from '@/components/annotation-v2/CommonAppPromptSelector';
 import '@/components/annotation-v2/workshop.css';
 
 // ═══════════════════════════════════════════
@@ -46,14 +53,8 @@ import '@/components/annotation-v2/workshop.css';
 interface HighlightStyle {
   label: string;
   icon: React.ReactNode;
-  /** CSS for the inline span border-bottom */
-  borderStyle: (isHovered: boolean) => string;
-  /** CSS background on hover */
-  hoverBg: string;
-  /** Popup accent color */
-  accentColor: string;
-  /** Popup accent bg */
-  accentBg: string;
+  /** Stroke pattern for the underline — color is driven by severity tier, not type. */
+  strokePattern: 'solid' | 'dotted' | 'dashed' | 'double' | 'wavy';
   /** Tab label in popup */
   actionLabel: string;
 }
@@ -65,75 +66,133 @@ const SEVERITY_ICONS: Record<string, React.ReactNode> = {
   strength: <Star className="w-3 h-3" />,
 };
 
+// ─────────────────────────────────────────────
+// Color system: 3 tiers, type drives stroke style only.
+//
+//   needs-work (red)    — critical + important feedback, blocking issues
+//   improve    (yellow) — suggestions, opportunities, neutral observations
+//   strength   (green)  — earned wins, authentic voice, things working
+//
+// `highlightType` no longer carries a hue — it carries a *stroke pattern*.
+// Same color + different stroke = different kind of insight on the same span.
+// ─────────────────────────────────────────────
+
+type SeverityTier = 'needs-work' | 'improve' | 'strength';
+
+interface TierTokens {
+  /** Solid hue used for the gutter pill. */
+  solid: string;
+  /** Strong border color used for hover/active state. */
+  borderStrong: string;
+  /** Faded border color used for the resting underline. */
+  borderFaded: string;
+  /** Subtle background tint for hover. */
+  hoverBg: string;
+  /** Popup accent text. */
+  accentText: string;
+  /** Popup accent surface. */
+  accentBg: string;
+}
+
+const TIER_TOKENS: Record<SeverityTier, TierTokens> = {
+  'needs-work': {
+    solid:         'hsl(355, 75%, 56%)',
+    borderStrong:  'hsl(355, 75%, 56%)',
+    borderFaded:   'hsla(355, 75%, 56%, 0.42)',
+    hoverBg:       'hsla(355, 75%, 56%, 0.07)',
+    accentText:    'hsl(355, 70%, 44%)',
+    accentBg:      'hsla(355, 75%, 56%, 0.10)',
+  },
+  improve: {
+    solid:         'hsl(42, 92%, 50%)',
+    borderStrong:  'hsl(36, 88%, 48%)',
+    borderFaded:   'hsla(42, 92%, 50%, 0.45)',
+    hoverBg:       'hsla(42, 92%, 50%, 0.08)',
+    accentText:    'hsl(32, 88%, 38%)',
+    accentBg:      'hsla(42, 92%, 50%, 0.12)',
+  },
+  strength: {
+    solid:         'hsl(160, 65%, 42%)',
+    borderStrong:  'hsl(160, 65%, 42%)',
+    borderFaded:   'hsla(160, 65%, 42%, 0.40)',
+    hoverBg:       'hsla(160, 65%, 42%, 0.07)',
+    accentText:    'hsl(160, 60%, 30%)',
+    accentBg:      'hsla(160, 65%, 42%, 0.10)',
+  },
+};
+
+/** Map raw severity + highlight type → 3-tier severity bucket. */
+function getSeverityTier(ann: MockAnnotation): SeverityTier {
+  // Voice = celebration of authentic writing → strength.
+  if (ann.highlightType === 'voice') return 'strength';
+  // Coaching feedback uses its severity field directly.
+  if (ann.highlightType === 'feedback') {
+    if (ann.severity === 'critical' || ann.severity === 'important') return 'needs-work';
+    if (ann.severity === 'strength') return 'strength';
+    return 'improve';
+  }
+  // Connection / craft / thematic = neutral observations / opportunities.
+  return 'improve';
+}
+
 const HIGHLIGHT_STYLES: Record<HighlightType, HighlightStyle> = {
   feedback: {
     label: 'Coaching Feedback',
     icon: <MessageSquare className="w-3 h-3" />,
-    borderStyle: (h) => h ? '2px solid hsl(250, 70%, 60%)' : '2px solid hsla(250, 70%, 60%, 0.35)',
-    hoverBg: 'hsla(250, 70%, 60%, 0.06)',
-    accentColor: 'hsl(250, 70%, 50%)',
-    accentBg: 'hsla(250, 70%, 60%, 0.08)',
+    strokePattern: 'solid',
     actionLabel: 'Discuss',
   },
   voice: {
     label: 'Authentic Voice',
     icon: <Volume2 className="w-3 h-3" />,
-    borderStyle: (h) => h ? '2px solid hsl(280, 65%, 60%)' : '2px solid hsla(280, 65%, 60%, 0.3)',
-    hoverBg: 'hsla(280, 65%, 60%, 0.06)',
-    accentColor: 'hsl(280, 65%, 50%)',
-    accentBg: 'hsla(280, 65%, 60%, 0.08)',
-    actionLabel: 'See in Portrait',
+    strokePattern: 'wavy',
+    actionLabel: 'See in Profile',
   },
   connection: {
     label: 'Connection',
     icon: <Link2 className="w-3 h-3" />,
-    borderStyle: (h) => h ? '2px dotted hsl(185, 80%, 42%)' : '2px dotted hsla(185, 80%, 42%, 0.35)',
-    hoverBg: 'hsla(185, 80%, 50%, 0.06)',
-    accentColor: 'hsl(185, 80%, 38%)',
-    accentBg: 'hsla(185, 80%, 50%, 0.08)',
+    strokePattern: 'dotted',
     actionLabel: 'View Connection',
   },
   craft: {
     label: 'Writing Craft',
     icon: <Palette className="w-3 h-3" />,
-    borderStyle: (h) => h ? '2px dashed hsl(230, 60%, 55%)' : '2px dashed hsla(230, 60%, 55%, 0.3)',
-    hoverBg: 'hsla(230, 60%, 55%, 0.05)',
-    accentColor: 'hsl(230, 60%, 45%)',
-    accentBg: 'hsla(230, 60%, 55%, 0.08)',
-    actionLabel: 'See in Portrait',
+    strokePattern: 'dashed',
+    actionLabel: 'See in Profile',
   },
   thematic: {
     label: 'Thematic Thread',
     icon: <Layers className="w-3 h-3" />,
-    borderStyle: (h) => h ? '2px solid hsl(170, 60%, 42%)' : '2px solid hsla(170, 60%, 42%, 0.25)',
-    hoverBg: 'hsla(170, 60%, 50%, 0.06)',
-    accentColor: 'hsl(170, 60%, 35%)',
-    accentBg: 'hsla(170, 60%, 50%, 0.08)',
-    actionLabel: 'See in Portrait',
+    strokePattern: 'double',
+    actionLabel: 'See in Profile',
   },
 };
 
-// Override feedback border with severity-specific colors
-function getFeedbackBorder(severity: string, isHovered: boolean): string {
-  const colors: Record<string, [string, string]> = {
-    critical: ['hsl(350, 75%, 60%)', 'hsla(350, 75%, 60%, 0.4)'],
-    important: ['hsl(35, 85%, 55%)', 'hsla(35, 85%, 55%, 0.35)'],
-    suggestion: ['hsl(220, 70%, 60%)', 'hsla(220, 70%, 60%, 0.3)'],
-    strength: ['hsl(160, 70%, 45%)', 'hsla(160, 70%, 45%, 0.3)'],
-  };
-  const [solid, faded] = colors[severity] ?? colors.suggestion;
-  const style = severity === 'suggestion' ? 'dotted' : severity === 'critical' ? 'wavy' : 'solid';
-  return `2px ${style} ${isHovered ? solid : faded}`;
+/** Border style for an inline annotated span. Hover deepens color; pattern is type-driven. */
+function getAnnotationBorder(ann: MockAnnotation, isHovered: boolean): string {
+  const tier = getSeverityTier(ann);
+  const tokens = TIER_TOKENS[tier];
+  const pattern = HIGHLIGHT_STYLES[ann.highlightType].strokePattern;
+  const color = isHovered ? tokens.borderStrong : tokens.borderFaded;
+  // `double` needs ≥3px to render two stripes; the others render fine at 2px.
+  const width = pattern === 'double' ? '3px' : '2px';
+  return `${width} ${pattern} ${color}`;
 }
 
-function getFeedbackHoverBg(severity: string): string {
-  const bgs: Record<string, string> = {
-    critical: 'hsla(350, 75%, 60%, 0.06)',
-    important: 'hsla(35, 85%, 55%, 0.06)',
-    suggestion: 'hsla(220, 70%, 60%, 0.05)',
-    strength: 'hsla(160, 70%, 45%, 0.06)',
-  };
-  return bgs[severity] ?? bgs.suggestion;
+/** Hover background tint for a span. */
+function getAnnotationHoverBg(ann: MockAnnotation): string {
+  return TIER_TOKENS[getSeverityTier(ann)].hoverBg;
+}
+
+/** Solid hue used for the gutter pill — driven by severity tier. */
+function getAnnotationColor(ann: MockAnnotation): string {
+  return TIER_TOKENS[getSeverityTier(ann)].solid;
+}
+
+/** Popup accent surface for tier-tinted UI (badges, chips). */
+function getAnnotationAccent(ann: MockAnnotation): { text: string; bg: string } {
+  const tokens = TIER_TOKENS[getSeverityTier(ann)];
+  return { text: tokens.accentText, bg: tokens.accentBg };
 }
 
 // ═══════════════════════════════════════════
@@ -280,6 +339,7 @@ function HoverPopup({
   onMouseLeave: () => void;
 }) {
   const hs = HIGHLIGHT_STYLES[annotation.highlightType];
+  const accent = getAnnotationAccent(annotation);
   const para = paragraphs.find((p) => p.index === annotation.paragraphIndex);
   const quotedText = para ? para.text.slice(annotation.startOffset, Math.min(annotation.endOffset, para.text.length)) : '';
 
@@ -385,7 +445,7 @@ function HoverPopup({
         )}
         <div
           className="rounded-2xl bg-white border border-slate-200/70 overflow-y-auto"
-          style={{ boxShadow: `0 25px 50px -12px ${hs.accentColor}15, 0 0 0 1px ${hs.accentColor}08, 0 10px 25px -5px rgba(0,0,0,0.08)` }}
+          style={{ boxShadow: `0 25px 50px -12px ${accent.text}15, 0 0 0 1px ${accent.text}08, 0 10px 25px -5px rgba(0,0,0,0.08)` }}
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
         >
@@ -393,15 +453,15 @@ function HoverPopup({
           {/* ═══ TIER 1: Type + Context — small, muted, orients the reader ═══ */}
           <div className="flex items-center justify-between px-6 pt-5 pb-1">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: hs.accentBg }}>
-                <span style={{ color: hs.accentColor }}>{hs.icon}</span>
+              <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: accent.bg }}>
+                <span style={{ color: accent.text }}>{hs.icon}</span>
               </div>
-              <span className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: hs.accentColor }}>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: accent.text }}>
                 {hs.label}
               </span>
               {annotation.highlightType === 'feedback' && (
                 <span className="text-[9px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded-full border"
-                  style={{ borderColor: `${hs.accentColor}25`, color: hs.accentColor, background: hs.accentBg }}>
+                  style={{ borderColor: `${accent.text}25`, color: accent.text, background: accent.bg }}>
                   {annotation.severity}
                 </span>
               )}
@@ -421,7 +481,7 @@ function HoverPopup({
           {/* ═══ TIER 3: Quoted text — grounds in the essay, italic for distinction ═══ */}
           {quotedText && (
             <div className="mx-6 mb-4 pl-4 py-3 border-l-[3px] rounded-r-lg bg-slate-50/60"
-              style={{ borderLeftColor: `${hs.accentColor}70` }}>
+              style={{ borderLeftColor: `${accent.text}70` }}>
               <p className="text-[13px] text-slate-500 italic leading-relaxed pr-4">
                 &ldquo;{quotedText.length > 140 ? quotedText.slice(0, 140) + '...' : quotedText}&rdquo;
               </p>
@@ -437,7 +497,7 @@ function HoverPopup({
           <div className="px-6 pb-4 flex flex-wrap items-center gap-3">
             {annotation.connectionLabel && (
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium"
-                style={{ background: hs.accentBg, color: hs.accentColor }}>
+                style={{ background: accent.bg, color: accent.text }}>
                 <Link2 className="w-3 h-3" />
                 {annotation.connectionLabel}
                 {annotation.connectedParagraph !== undefined && (
@@ -456,7 +516,7 @@ function HoverPopup({
             <button
               onClick={() => onNavigate(annotation.navigateTo, annotation.id)}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[12px] font-semibold transition-all hover:shadow-md active:scale-[0.98]"
-              style={{ background: hs.accentBg, color: hs.accentColor, border: `1px solid ${hs.accentColor}20` }}
+              style={{ background: accent.bg, color: accent.text, border: `1px solid ${accent.text}20` }}
             >
               {hs.icon}
               {hs.actionLabel}
@@ -491,16 +551,22 @@ function EssayEditor({
   data,
   hoveredId,
   warmingId,
-  onMouseEnter,
-  onMouseLeave,
-  onClick,
+  selectedCollegeId,
+  selectedEssayNumber,
+  onPromptChange,
+  onMarkerClick,
+  onMarkerMouseEnter,
+  onMarkerMouseLeave,
 }: {
   data: MockEssayData;
   hoveredId: string | null;
   warmingId: string | null;
-  onMouseEnter: (ann: MockAnnotation, e: React.MouseEvent) => void;
-  onMouseLeave: () => void;
-  onClick: (ann: MockAnnotation, e: React.MouseEvent) => void;
+  selectedCollegeId: string;
+  selectedEssayNumber: number;
+  onPromptChange: (next: { collegeId: string; essayNumber: number }) => void;
+  onMarkerClick: (ann: MockAnnotation, anchorEl: HTMLElement) => void;
+  onMarkerMouseEnter: (ann: MockAnnotation, anchorEl: HTMLElement) => void;
+  onMarkerMouseLeave: () => void;
 }) {
   return (
     <div className="h-full flex flex-col bg-white">
@@ -512,12 +578,13 @@ function EssayEditor({
       </div>
 
       <ScrollArea className="flex-1">
-        <div className="max-w-[640px] mx-auto px-8 py-8">
-          <div className="mb-6 pb-4 border-b border-slate-100">
-            <h1 className="text-xl font-semibold text-slate-800 outline-none" contentEditable suppressContentEditableWarning>
-              The Architecture of Understanding
-            </h1>
-            <p className="text-[11px] text-slate-400 mt-1.5">Common Application · 650 word limit</p>
+        <div className="max-w-[680px] mx-auto px-4 py-8">
+          <div className="mb-6 pb-4 border-b border-slate-100 pl-10 pr-2">
+            <CommonAppPromptSelector
+              collegeId={selectedCollegeId}
+              essayNumber={selectedEssayNumber}
+              onChange={onPromptChange}
+            />
           </div>
 
           <div className="space-y-5">
@@ -530,9 +597,9 @@ function EssayEditor({
                   annotations={paraAnns}
                   hoveredId={hoveredId}
                   warmingId={warmingId}
-                  onMouseEnter={onMouseEnter}
-                  onMouseLeave={onMouseLeave}
-                  onClick={onClick}
+                  onMarkerClick={onMarkerClick}
+                  onMarkerMouseEnter={onMarkerMouseEnter}
+                  onMarkerMouseLeave={onMarkerMouseLeave}
                 />
               );
             })}
@@ -543,23 +610,245 @@ function EssayEditor({
   );
 }
 
+/**
+ * Left-margin column of indicator pills — one per active annotation, vertically
+ * aligned with the first line of its span. Clicking a pill opens the popup for
+ * that annotation (anchored to the underlying span, not the pill).
+ *
+ * The pills live in an absolutely-positioned column so they don't participate
+ * in the editable paragraph's DOM — editing the text can't disturb them.
+ */
+/** Dwell: ms of hover before the popup auto-opens. Pill + text glow ramps over this window. */
+const DWELL_MS = 4000;
+
+interface GutterSlot {
+  id: string;
+  key: string;       // stable key per (annotation, line)
+  top: number;       // pill's vertical anchor, relative to paragraph top
+  height: number;    // line-box height — used to vertically center the pill
+  xOffset: number;   // lateral stack index when multiple annotations share a line
+}
+
+function AnnotationGutter({
+  annotations,
+  paragraphRef,
+  spanRefs,
+  hoveredId,
+  warmingId,
+  onMarkerClick,
+  onMarkerMouseEnter,
+  onMarkerMouseLeave,
+}: {
+  annotations: MockAnnotation[];
+  paragraphRef: React.RefObject<HTMLParagraphElement>;
+  spanRefs: React.MutableRefObject<Map<string, HTMLSpanElement>>;
+  hoveredId: string | null;
+  warmingId: string | null;
+  onMarkerClick: (ann: MockAnnotation, anchorEl: HTMLElement) => void;
+  onMarkerMouseEnter: (ann: MockAnnotation, anchorEl: HTMLElement) => void;
+  onMarkerMouseLeave: () => void;
+}) {
+  const [slots, setSlots] = useState<GutterSlot[]>([]);
+
+  // Emit one slot per visual line each annotation occupies, then cluster slots
+  // by line so overlapping annotations stack horizontally on every shared line
+  // (not just the first). Multi-line annotations now show a bar on each line
+  // they cover, which mirrors the visual extent of the underline.
+  useLayoutEffect(() => {
+    function measure() {
+      const paraEl = paragraphRef.current;
+      if (!paraEl) return;
+      const paraTop = paraEl.getBoundingClientRect().top;
+      // Dedupe by annotation id up front so the same insight can never produce
+      // more than one gutter marker, even if the input array has accidental
+      // duplicates or the same span is referenced twice.
+      const seen = new Set<string>();
+      const raw: Array<{ id: string; lineIdx: number; top: number; height: number }> = [];
+      for (const ann of annotations) {
+        if (ann.isDeferred) continue;
+        if (seen.has(ann.id)) continue;
+        seen.add(ann.id);
+        const span = spanRefs.current.get(ann.id);
+        if (!span) continue;
+        const rects = span.getClientRects();
+        // Fall back to bounding rect if getClientRects returns nothing (e.g. empty span).
+        const lineRects = rects.length > 0 ? Array.from(rects) : [span.getBoundingClientRect()];
+        // One marker per annotation: anchor on its first non-empty line rect so
+        // multi-line highlights don't get duplicate gutter pills for the same insight.
+        const firstRect = lineRects.find((r) => r.height > 0);
+        if (!firstRect) continue;
+        raw.push({
+          id: ann.id,
+          lineIdx: 0,
+          top: firstRect.top - paraTop,
+          height: firstRect.height,
+        });
+      }
+      // Sort by line position first, then preserve annotation order for stable
+      // left-to-right stacking within a cluster.
+      raw.sort((a, b) => a.top - b.top || a.id.localeCompare(b.id));
+
+      // Cluster by line: anything whose top is within half a line height of the
+      // cluster's anchor top is considered the same visual line and gets stacked.
+      const LINE_THRESHOLD = 12;
+      const next: GutterSlot[] = [];
+      let clusterTop = -Infinity;
+      let stackIdx = 0;
+      for (const item of raw) {
+        if (Math.abs(item.top - clusterTop) < LINE_THRESHOLD) {
+          stackIdx += 1;
+        } else {
+          clusterTop = item.top;
+          stackIdx = 0;
+        }
+        next.push({
+          id: item.id,
+          key: `${item.id}-${item.lineIdx}`,
+          top: item.top,
+          height: item.height,
+          xOffset: stackIdx,
+        });
+      }
+      setSlots(next);
+    }
+    measure();
+
+    const ro = new ResizeObserver(measure);
+    if (paragraphRef.current) ro.observe(paragraphRef.current);
+    window.addEventListener('resize', measure);
+
+    // Re-measure after the user edits the paragraph — line breaks may shift.
+    const paraEl = paragraphRef.current;
+    paraEl?.addEventListener('input', measure);
+
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+      paraEl?.removeEventListener('input', measure);
+    };
+  }, [annotations, paragraphRef, spanRefs]);
+
+  // Imperatively sync inline-text glow with warmingId / hoveredId. Going through
+  // DOM side-effect rather than React state so editing the contentEditable <p>
+  // doesn't collide with React trying to re-render segments.
+  useEffect(() => {
+    for (const ann of annotations) {
+      if (ann.isDeferred) continue;
+      const span = spanRefs.current.get(ann.id);
+      if (!span) continue;
+      const hoverBg = getAnnotationHoverBg(ann);
+
+      if (ann.id === warmingId) {
+        // Ramp up over the full dwell — visually crescendos into the popup.
+        span.style.transition = `background-color ${DWELL_MS}ms ease-in`;
+        span.style.backgroundColor = hoverBg;
+      } else if (ann.id === hoveredId) {
+        // Popup is open (or pill is active post-warming) — hold at full bg.
+        span.style.transition = 'background-color 150ms ease-out';
+        span.style.backgroundColor = hoverBg;
+      } else {
+        span.style.transition = 'background-color 220ms ease-out';
+        span.style.backgroundColor = 'transparent';
+      }
+    }
+  }, [warmingId, hoveredId, annotations, spanRefs]);
+
+  return (
+    <div className="absolute left-0 top-0 bottom-0 w-9 pointer-events-none select-none">
+      {slots.map((slot) => {
+        const ann = annotations.find((a) => a.id === slot.id);
+        if (!ann) return null;
+        const color = getAnnotationColor(ann);
+        const isWarming = warmingId === ann.id;
+        const isActive = hoveredId === ann.id || isWarming;
+
+        // Pill fills most of its line-box vertically → alignment tracks the text line.
+        const pillWidth = isActive ? 4 : 3;
+        const pillHeight = Math.max(slot.height * (isActive ? 0.72 : 0.58), 14);
+
+        return (
+          <button
+            key={slot.key}
+            type="button"
+            aria-label={`Open ${HIGHLIGHT_STYLES[ann.highlightType].label} note`}
+            title={HIGHLIGHT_STYLES[ann.highlightType].label}
+            onClick={(e) => {
+              e.preventDefault();
+              const span = spanRefs.current.get(ann.id);
+              onMarkerClick(ann, span ?? (e.currentTarget as HTMLElement));
+            }}
+            onMouseEnter={(e) => {
+              const span = spanRefs.current.get(ann.id);
+              onMarkerMouseEnter(ann, span ?? (e.currentTarget as HTMLElement));
+            }}
+            onMouseLeave={onMarkerMouseLeave}
+            className="absolute pointer-events-auto flex items-center justify-center focus:outline-none"
+            style={{
+              top: slot.top,
+              // Stacked pills shift right by 8px each so overlaps read as separate markers.
+              left: 4 + slot.xOffset * 8,
+              width: 14,
+              height: slot.height,
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            <span
+              className="block rounded-full"
+              style={{
+                width: pillWidth,
+                height: pillHeight,
+                background: color,
+                // Warming ramps saturation + halo across the whole dwell window,
+                // so the pill visibly "charges up" until the popup snaps open.
+                opacity: isWarming ? 1 : isActive ? 0.95 : 0.55,
+                boxShadow: isWarming
+                  ? `0 0 0 3px ${color}33, 0 0 14px ${color}99`
+                  : isActive
+                    ? `0 0 0 2px ${color}22, 0 0 8px ${color}66`
+                    : 'none',
+                transition: isWarming
+                  ? `width ${DWELL_MS}ms ease-in, height ${DWELL_MS}ms ease-in, opacity ${DWELL_MS}ms ease-in, box-shadow ${DWELL_MS}ms ease-in`
+                  : 'width 180ms ease-out, height 180ms ease-out, opacity 180ms ease-out, box-shadow 180ms ease-out',
+              }}
+            />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Editable paragraph with colored underlines on annotated ranges + a left gutter
+ * of clickable indicators.
+ *
+ * The paragraph is contentEditable — clicks place the cursor, typing works. The
+ * underlined spans are purely visual: they do NOT handle pointer events, so they
+ * can't intercept clicks meant for cursor placement. All popup-opening happens
+ * via the gutter pills.
+ */
 function AnnotatedParagraph({
   text,
   annotations,
   hoveredId,
   warmingId,
-  onMouseEnter,
-  onMouseLeave,
-  onClick,
+  onMarkerClick,
+  onMarkerMouseEnter,
+  onMarkerMouseLeave,
 }: {
   text: string;
   annotations: MockAnnotation[];
   hoveredId: string | null;
   warmingId: string | null;
-  onMouseEnter: (ann: MockAnnotation, e: React.MouseEvent) => void;
-  onMouseLeave: () => void;
-  onClick: (ann: MockAnnotation, e: React.MouseEvent) => void;
+  onMarkerClick: (ann: MockAnnotation, anchorEl: HTMLElement) => void;
+  onMarkerMouseEnter: (ann: MockAnnotation, anchorEl: HTMLElement) => void;
+  onMarkerMouseLeave: () => void;
 }) {
+  const paragraphRef = useRef<HTMLParagraphElement>(null);
+  const spanRefs = useRef<Map<string, HTMLSpanElement>>(new Map());
+
   const segments = useMemo(() => {
     if (annotations.length === 0) return [{ text, annotation: null as MockAnnotation | null }];
     const sorted = [...annotations].sort((a, b) => a.startOffset - b.startOffset);
@@ -577,65 +866,56 @@ function AnnotatedParagraph({
   }, [text, annotations]);
 
   return (
-    <p className="text-[15px] leading-[1.85] text-slate-700 selection:bg-purple-100/80">
-      {segments.map((seg, i) => {
-        if (!seg.annotation) return <React.Fragment key={i}>{seg.text}</React.Fragment>;
-        const ann = seg.annotation;
-        const hs = HIGHLIGHT_STYLES[ann.highlightType];
-        const isHovered = hoveredId === ann.id;
-        const isWarming = warmingId === ann.id;
-        const isDeferred = ann.isDeferred;
+    <div className="relative">
+      <AnnotationGutter
+        annotations={annotations}
+        paragraphRef={paragraphRef}
+        spanRefs={spanRefs}
+        hoveredId={hoveredId}
+        warmingId={warmingId}
+        onMarkerClick={onMarkerClick}
+        onMarkerMouseEnter={onMarkerMouseEnter}
+        onMarkerMouseLeave={onMarkerMouseLeave}
+      />
+      <p
+        ref={paragraphRef}
+        contentEditable
+        suppressContentEditableWarning
+        spellCheck={false}
+        className="text-[15px] leading-[1.85] text-slate-700 selection:bg-purple-100/80 outline-none pl-10 pr-2 rounded-sm focus-visible:bg-slate-50/60 transition-colors"
+      >
+        {segments.map((seg, i) => {
+          if (!seg.annotation) return <React.Fragment key={i}>{seg.text}</React.Fragment>;
+          const ann = seg.annotation;
+          const hs = HIGHLIGHT_STYLES[ann.highlightType];
+          const isDeferred = ann.isDeferred;
 
-        // Border: full intensity when hovered/popup open, default is subtle
-        const borderBottom = ann.highlightType === 'feedback'
-          ? getFeedbackBorder(ann.severity, isHovered)
-          : hs.borderStyle(isHovered);
+          // Static underline — intensity does NOT depend on hoveredId so editing
+          // the paragraph doesn't re-render when the gutter state changes.
+          const borderBottom = isDeferred
+            ? '1px dashed hsla(0,0%,60%,0.25)'
+            : getAnnotationBorder(ann, false);
 
-        const hoverBg = ann.highlightType === 'feedback'
-          ? getFeedbackHoverBg(ann.severity)
-          : hs.hoverBg;
-
-        // Warming state: gradually increase background opacity over 800ms
-        // CSS transition handles the smooth ramp-up
-        let bgColor = 'transparent';
-        if (isDeferred) {
-          bgColor = 'transparent';
-        } else if (isHovered && !isWarming) {
-          // Popup is open — full highlight
-          bgColor = hoverBg;
-        } else if (isWarming) {
-          // Actively warming — CSS transition will animate TO this
-          bgColor = hoverBg;
-        }
-
-        return (
-          <span
-            key={i}
-            role="button"
-            tabIndex={0}
-            onClick={(e) => { e.preventDefault(); onClick(ann, e); }}
-            onMouseEnter={(e) => onMouseEnter(ann, e)}
-            onMouseLeave={onMouseLeave}
-            className={cn(
-              'cursor-pointer rounded-sm relative',
-              isDeferred && 'opacity-30',
-            )}
-            style={{
-              // Warming uses a slow 700ms ease-in for the satisfying glow-up
-              // Normal hover/unhover uses a quick 150ms transition
-              transition: isWarming
-                ? 'background-color 700ms ease-in, border-color 700ms ease-in'
-                : 'background-color 150ms ease-out, border-color 150ms ease-out',
-              backgroundColor: bgColor,
-              borderBottom: isDeferred ? '1px dashed hsla(0,0%,60%,0.25)' : borderBottom,
-              paddingBottom: '1px',
-            }}
-          >
-            {seg.text}
-          </span>
-        );
-      })}
-    </p>
+          return (
+            <span
+              key={i}
+              ref={(el) => {
+                if (el) spanRefs.current.set(ann.id, el);
+                else spanRefs.current.delete(ann.id);
+              }}
+              data-ann-id={ann.id}
+              className={cn('rounded-sm', isDeferred && 'opacity-30')}
+              style={{
+                borderBottom,
+                paddingBottom: '1px',
+              }}
+            >
+              {seg.text}
+            </span>
+          );
+        })}
+      </p>
+    </div>
   );
 }
 
@@ -647,7 +927,7 @@ function RightTabBar({ active, onChange }: { active: RightTab; onChange: (t: Rig
   const tabs: Array<{ id: RightTab; label: string; icon: React.ReactNode }> = [
     { id: 'chat', label: 'Coach', icon: <MessageSquare className="w-3.5 h-3.5" /> },
     { id: 'insights', label: 'Insights', icon: <Eye className="w-3.5 h-3.5" /> },
-    { id: 'portrait', label: 'Portrait', icon: <UserCircle className="w-3.5 h-3.5" /> },
+    { id: 'profile', label: 'Profile', icon: <UserCircle className="w-3.5 h-3.5" /> },
     { id: 'roadmap', label: 'Roadmap', icon: <Target className="w-3.5 h-3.5" /> },
   ];
   return (
@@ -683,57 +963,15 @@ function RightTabBar({ active, onChange }: { active: RightTab; onChange: (t: Rig
 }
 
 // ── Chat Tab ──
-const MOCK_CHAT = [
-  { id: '1', role: 'assistant' as const, content: "I've read your essay closely. The structural insight — from translator of language to translator of systems — is genuinely powerful. Your essay scores well on voice and specificity, but there are craft-level opportunities that could make this unforgettable." },
-  { id: '2', role: 'user' as const, content: 'What should I focus on first?' },
-  { id: '3', role: 'assistant' as const, content: "Paragraph 4's thesis — \"understanding isn't just linguistic, it's structural\" — currently tells the reader what to think. But your entire essay has been showing this. Trust your scenes. Try rewriting that line as a moment: what were you doing when you first realized the system was structural?" },
-  { id: '4', role: 'user' as const, content: "I think it was when I realized the insurance forms didn't have a box for 'single parent who works nights.'" },
-  { id: '5', role: 'assistant' as const, content: "That's it. That specific absence — no box for your family's reality — is more powerful than any thesis statement. Put that moment in paragraph 4 and let the reader arrive at the structural insight themselves. The missing checkbox IS the structural argument." },
-];
-
+// Uses the production chat surface from /chat-demo. Tab bar above acts as header,
+// so the ChatPanel's built-in Luna header is suppressed via showHeader={false}.
 function ChatTab() {
   return (
-    <div className="h-full flex flex-col relative overflow-hidden">
-      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden bg-[#f8faff]">
-        <motion.div animate={{ y: [0, -15, 0], opacity: [0.2, 0.35, 0.2] }} transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
-          className="absolute top-[10%] left-[5%] w-[300px] h-[300px] rounded-full"
-          style={{ background: 'radial-gradient(circle, rgba(192,132,252,0.1) 0%, transparent 60%)', filter: 'blur(35px)' }} />
-        <motion.div animate={{ y: [0, 18, 0], opacity: [0.15, 0.3, 0.15] }} transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
-          className="absolute bottom-[20%] right-[10%] w-[250px] h-[250px] rounded-full"
-          style={{ background: 'radial-gradient(circle, rgba(34,211,238,0.1) 0%, transparent 60%)', filter: 'blur(35px)' }} />
-      </div>
-      <ScrollArea className="flex-1 z-10 relative">
-        <div className="px-4 py-4 space-y-3 pb-4">
-          {MOCK_CHAT.map((msg, i) => (
-            <motion.div key={msg.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1, duration: 0.35 }}
-              className={cn('flex gap-2.5', msg.role === 'user' ? 'flex-row-reverse' : 'flex-row')}>
-              <div className={cn('w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-1',
-                msg.role === 'assistant' ? 'bg-gradient-to-br from-cyan-100 to-purple-100 border border-white shadow-sm'
-                : 'bg-gradient-to-br from-purple-100 to-pink-100 border border-white shadow-sm')}>
-                {msg.role === 'assistant' ? <Sparkles className="w-3 h-3 text-cyan-600" /> : <User className="w-3 h-3 text-purple-600" />}
-              </div>
-              <div className={cn('rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed max-w-[82%]',
-                msg.role === 'assistant' ? 'bg-white/80 backdrop-blur-sm border border-white/70 text-slate-700 shadow-sm'
-                : 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-md')}>
-                {msg.content}
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </ScrollArea>
-      <div className="relative z-20 px-3 pb-3 pt-1 bg-gradient-to-t from-white/80 to-transparent">
-        <div className="relative group">
-          <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-400/10 via-purple-400/10 to-cyan-400/10 rounded-xl blur-sm opacity-60 group-hover:opacity-100 transition duration-500" />
-          <div className="relative flex items-center gap-1 p-1 bg-white/70 backdrop-blur-xl border border-white/80 shadow-sm rounded-full">
-            <input type="text" placeholder="Ask about your essay..."
-              className="flex-1 min-h-[30px] px-3 bg-transparent border-none outline-none text-sm text-slate-700 placeholder:text-purple-400/40 font-medium" />
-            <button className="flex items-center justify-center w-7 h-7 rounded-full bg-gradient-to-r from-purple-500 to-cyan-500 text-white shadow-[0_0_10px_rgba(168,85,247,0.25)] hover:scale-105 transition-transform">
-              <Send className="w-3 h-3 ml-0.5" />
-            </button>
-          </div>
-        </div>
-      </div>
+    <div className="h-full w-full">
+      <ChatPanel
+        showHeader={false}
+        className="max-w-none rounded-none border-0 shadow-none h-full w-full"
+      />
     </div>
   );
 }
@@ -763,17 +1001,17 @@ function InsightsTab({ data, onNavigate }: { data: MockEssayData; onNavigate: (t
           const hs = HIGHLIGHT_STYLES[type];
           return (
             <div key={type}>
-              <h3 className="text-[10px] font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5"
-                style={{ color: hs.accentColor }}>
+              <h3 className="text-[10px] font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5 text-slate-500">
                 {hs.icon} {hs.label} · {anns.length}
               </h3>
               <div className="space-y-1.5">
                 {anns.map((ann) => {
                   const isExp = expandedId === ann.id;
+                  const dotColor = getAnnotationColor(ann);
                   return (
                     <div key={ann.id} className="rounded-lg border border-slate-100 bg-white/80 hover:bg-white transition-all overflow-hidden">
                       <button onClick={() => setExpandedId(isExp ? null : ann.id)} className="w-full text-left flex items-start gap-2.5 p-3">
-                        <div className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: hs.accentColor }} />
+                        <div className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: dotColor }} />
                         <div className="flex-1 min-w-0">
                           <span className="text-[9px] text-slate-400">P{ann.paragraphIndex + 1}</span>
                           <p className="text-[13px] text-slate-700 leading-snug">{ann.title}</p>
@@ -805,7 +1043,7 @@ function InsightsTab({ data, onNavigate }: { data: MockEssayData; onNavigate: (t
   );
 }
 
-// ── Portrait Tab ──
+// ── Profile Tab ──
 function PortraitSection({ icon, label, children, accent = 'purple' }: { icon: React.ReactNode; label: string; children: React.ReactNode; accent?: string }) {
   const c: Record<string, [string, string]> = { purple: ['text-purple-600', 'bg-purple-50'], cyan: ['text-cyan-600', 'bg-cyan-50'], amber: ['text-amber-600', 'bg-amber-50'], rose: ['text-rose-600', 'bg-rose-50'], emerald: ['text-emerald-600', 'bg-emerald-50'] };
   const [tc, bg] = c[accent] ?? c.purple;
@@ -820,7 +1058,7 @@ function PortraitSection({ icon, label, children, accent = 'purple' }: { icon: R
   );
 }
 
-function PortraitTab({ data }: { data: MockEssayData }) {
+function ProfileTab({ data }: { data: MockEssayData }) {
   const [showDeeper, setShowDeeper] = useState(false);
   const p = data.portrait;
   return (
@@ -845,7 +1083,7 @@ function PortraitTab({ data }: { data: MockEssayData }) {
         </div>
         <PortraitSection icon={<Mic className="w-3 h-3" />} label="Voice" accent="purple">{p.voiceSignature}</PortraitSection>
         <PortraitSection icon={<User className="w-3 h-3" />} label="Writer" accent="cyan">{p.writerPortrait}</PortraitSection>
-        <PortraitSection icon={<Map className="w-3 h-3" />} label="Strategy" accent="amber">
+        <PortraitSection icon={<MapIcon className="w-3 h-3" />} label="Strategy" accent="amber">
           <p>{p.narrativeStrategy}</p>
           <span className="inline-block mt-1.5 text-[9px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200/60">{p.arcType}</span>
         </PortraitSection>
@@ -945,13 +1183,24 @@ function RoadmapTab({ data }: { data: MockEssayData }) {
 export default function AnnotationV2Demo() {
   const data = MOCK_ESSAY_DATA;
   const [rightTab, setRightTab] = useState<RightTab>('chat');
+  const [selectedCollegeId, setSelectedCollegeId] = useState<string>(DEFAULT_COLLEGE_ID);
+  const [selectedEssayNumber, setSelectedEssayNumber] = useState<number>(DEFAULT_ESSAY_NUMBER);
+  const handlePromptChange = useCallback(
+    (next: { collegeId: string; essayNumber: number }) => {
+      setSelectedCollegeId(next.collegeId);
+      setSelectedEssayNumber(next.essayNumber);
+    },
+    [],
+  );
 
-  // Popup state — lifted to page level so portal renders outside ResizablePanel
+  // Popup state — lifted to page level so portal renders outside ResizablePanel.
+  // `hoveredId` now tracks the active gutter pill / open popup, not inline text hover.
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [popupAnn, setPopupAnn] = useState<MockAnnotation | null>(null);
   const [popupPos, setPopupPos] = useState({ top: 0, left: 0, width: 0 });
-  const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leftPanelRef = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isOverPopup = useRef(false);
 
   const wordCount = useMemo(() => data.essayText.trim().split(/\s+/).filter(Boolean).length, [data.essayText]);
 
@@ -961,77 +1210,33 @@ export default function AnnotationV2Demo() {
     setHoveredId(null);
   }, []);
 
-  // Dwell-based hover: highlight gradually warms up, popup appears after ~800ms.
-  // "warming" = hovering but popup not yet shown (highlight intensifies via CSS).
-  // Once popup is open, it stays as long as mouse is over highlight OR popup.
-  const [warmingId, setWarmingId] = useState<string | null>(null); // which highlight is warming up
-  const dwellTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isOverPopup = useRef(false);
-  const isOverHighlight = useRef(false);
-
-  const clearAllTimers = useCallback(() => {
-    if (dwellTimer.current) clearTimeout(dwellTimer.current);
-    if (closeTimer.current) clearTimeout(closeTimer.current);
-  }, []);
-
   const scheduleClose = useCallback(() => {
     if (closeTimer.current) clearTimeout(closeTimer.current);
     closeTimer.current = setTimeout(() => {
-      if (!isOverPopup.current && !isOverHighlight.current) {
+      if (!isOverPopup.current) {
         setPopupAnn(null);
         setHoveredId(null);
-        setWarmingId(null);
       }
-    }, 300);
+    }, 220);
   }, []);
 
-  const handleMouseEnter = useCallback((ann: MockAnnotation, e: React.MouseEvent) => {
-    isOverHighlight.current = true;
+  // Gutter pill click → open popup anchored to the annotation's inline span.
+  const handleMarkerClick = useCallback((ann: MockAnnotation, anchorEl: HTMLElement) => {
     if (closeTimer.current) clearTimeout(closeTimer.current);
-
-    // If popup is already open for this annotation, just keep it
-    if (popupAnn?.id === ann.id) return;
-
-    // Start warming — highlight begins to glow
-    setHoveredId(ann.id);
-    setWarmingId(ann.id);
-
-    // After dwell, show the popup
-    if (dwellTimer.current) clearTimeout(dwellTimer.current);
-    const el = e.currentTarget as HTMLElement;
-    dwellTimer.current = setTimeout(() => {
-      const rect = el.getBoundingClientRect();
-      setPopupPos({ top: rect.top, left: rect.left, width: rect.width });
-      setPopupAnn(ann);
-      setWarmingId(null); // no longer warming, now fully open
-    }, 800);
-  }, [popupAnn]);
-
-  const handleClick = useCallback((ann: MockAnnotation, e: React.MouseEvent) => {
-    e.preventDefault();
-    // Click skips the dwell — opens immediately
-    clearAllTimers();
-    isOverHighlight.current = true;
-    setWarmingId(null);
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const rect = anchorEl.getBoundingClientRect();
     setPopupPos({ top: rect.top, left: rect.left, width: rect.width });
     setPopupAnn(ann);
     setHoveredId(ann.id);
-  }, [clearAllTimers]);
+  }, []);
 
-  const handleMouseLeave = useCallback(() => {
-    isOverHighlight.current = false;
-    // Cancel any in-progress dwell
-    if (dwellTimer.current) clearTimeout(dwellTimer.current);
-    setWarmingId(null);
-    // If popup is open, give grace period to reach it
-    if (popupAnn) {
-      scheduleClose();
-    } else {
-      setHoveredId(null);
-    }
-  }, [popupAnn, scheduleClose]);
+  const handleMarkerMouseEnter = useCallback((ann: MockAnnotation) => {
+    setHoveredId(ann.id);
+  }, []);
+
+  const handleMarkerMouseLeave = useCallback(() => {
+    // Keep the pill bright while its popup is open; otherwise dim it.
+    setHoveredId((current) => (popupAnn && current === popupAnn.id ? current : null));
+  }, [popupAnn]);
 
   const handlePopupMouseEnter = useCallback(() => {
     isOverPopup.current = true;
@@ -1044,17 +1249,14 @@ export default function AnnotationV2Demo() {
   }, [scheduleClose]);
 
   const handlePopupClose = useCallback(() => {
-    clearAllTimers();
+    if (closeTimer.current) clearTimeout(closeTimer.current);
     isOverPopup.current = false;
-    isOverHighlight.current = false;
     setPopupAnn(null);
     setHoveredId(null);
-    setWarmingId(null);
-  }, [clearAllTimers]);
+  }, []);
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-white">
-      <Toolbar wordCount={wordCount} data={data} />
       <div className="flex-1 min-h-0">
         <ResizablePanelGroup direction="horizontal" className="h-full">
           <ResizablePanel defaultSize={55} minSize={35}>
@@ -1062,22 +1264,25 @@ export default function AnnotationV2Demo() {
             <EssayEditor
               data={data}
               hoveredId={hoveredId}
-              warmingId={warmingId}
-              onMouseEnter={handleMouseEnter}
-              onMouseLeave={handleMouseLeave}
-              onClick={handleClick}
+              warmingId={null}
+              selectedCollegeId={selectedCollegeId}
+              selectedEssayNumber={selectedEssayNumber}
+              onPromptChange={handlePromptChange}
+              onMarkerClick={handleMarkerClick}
+              onMarkerMouseEnter={handleMarkerMouseEnter}
+              onMarkerMouseLeave={handleMarkerMouseLeave}
             />
           </div>
           </ResizablePanel>
           <ResizableHandle withHandle className="bg-slate-100 hover:bg-purple-100/50 transition-colors" />
           <ResizablePanel defaultSize={45} minSize={28}>
             <div className="h-full flex flex-col bg-[#f9f8fd]">
-              <RightTabBar active={rightTab} onChange={setRightTab} />
+              <WorkshopHeader activeTab={rightTab} onTabChange={setRightTab} essayType="Common App" />
               <div className="flex-1 min-h-0">
                 <AnimatePresence mode="wait">
                   {rightTab === 'chat' && <motion.div key="chat" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }} className="h-full"><ChatTab /></motion.div>}
                   {rightTab === 'insights' && <motion.div key="insights" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }} className="h-full"><InsightsTab data={data} onNavigate={handleNavigate} /></motion.div>}
-                  {rightTab === 'portrait' && <motion.div key="portrait" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }} className="h-full"><PortraitTab data={data} /></motion.div>}
+                  {rightTab === 'profile' && <motion.div key="profile" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }} className="h-full"><ProfileTab data={data} /></motion.div>}
                   {rightTab === 'roadmap' && <motion.div key="roadmap" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }} className="h-full"><RoadmapTab data={data} /></motion.div>}
                 </AnimatePresence>
               </div>
@@ -1112,3 +1317,4 @@ export default function AnnotationV2Demo() {
     </div>
   );
 }
+

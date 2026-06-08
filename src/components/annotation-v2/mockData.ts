@@ -56,7 +56,7 @@ export interface MockAnnotation {
 }
 
 /** Which right-panel tab to navigate to */
-export type RightTab = 'chat' | 'insights' | 'portrait' | 'roadmap';
+export type RightTab = 'chat' | 'insights' | 'profile' | 'roadmap';
 
 export interface MockParagraph {
   index: number;
@@ -254,7 +254,7 @@ export const MOCK_ANNOTATIONS: MockAnnotation[] = [
     title: 'Devastating precision',
     insight: '"Maybe sixty percent" — this is where your voice is most itself. The precision is devastating because it doesn\'t ask the reader to feel anything. It just names what you saw.',
     isDeferred: false,
-    navigateTo: 'portrait',
+    navigateTo: 'profile',
   },
   {
     id: 'v2',
@@ -267,7 +267,7 @@ export const MOCK_ANNOTATIONS: MockAnnotation[] = [
     title: 'Restraint as strength',
     insight: '"My mother is better now." Five words carrying the weight of every preceding paragraph. The simplicity IS the technique. Your voice is most powerful when it trusts the reader.',
     isDeferred: false,
-    navigateTo: 'portrait',
+    navigateTo: 'profile',
   },
 
   // ── Connection highlights (links between paragraphs — cyan) ──
@@ -314,7 +314,7 @@ export const MOCK_ANNOTATIONS: MockAnnotation[] = [
     title: 'Sentence-final reversal',
     insight: '"But that Tuesday, she was the one who couldn\'t find the words" — the sentence-final reversal technique. You build expectation with listing her capabilities, then invert it. This is professional-grade craft.',
     isDeferred: false,
-    navigateTo: 'portrait',
+    navigateTo: 'profile',
   },
   {
     id: 'cr2',
@@ -327,7 +327,7 @@ export const MOCK_ANNOTATIONS: MockAnnotation[] = [
     title: 'Tricolon with ascending specificity',
     insight: 'Spreadsheet → Calendar → Script. Three tools, each more sophisticated than the last. This ascending tricolon mirrors the narrator\'s growth from reactive to systematic. The parallelism is invisible but structurally perfect.',
     isDeferred: false,
-    navigateTo: 'portrait',
+    navigateTo: 'profile',
   },
 
   // ── Thematic highlights (where themes surface — teal) ──
@@ -342,7 +342,7 @@ export const MOCK_ANNOTATIONS: MockAnnotation[] = [
     title: 'Theme: Translation as Power',
     insight: '"So I became the translator. Not of language, but of consequence." — the central theme of the essay crystallizes here. Translation shifts from a linguistic act to a structural one, setting up the systemic argument in P5.',
     isDeferred: false,
-    navigateTo: 'portrait',
+    navigateTo: 'profile',
   },
   {
     id: 'th2',
@@ -355,7 +355,7 @@ export const MOCK_ANNOTATIONS: MockAnnotation[] = [
     title: 'Theme: Invisible Labor resurfaces',
     insight: 'The 3 AM dictionary and the mother trying not to cry — invisible labor made visible. This moment earns the systemic critique in P5 by showing what the system actually costs real people.',
     isDeferred: false,
-    navigateTo: 'portrait',
+    navigateTo: 'profile',
   },
 ];
 

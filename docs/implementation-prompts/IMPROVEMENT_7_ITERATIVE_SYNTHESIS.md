@@ -69,7 +69,7 @@ Per-sentence confidence with `reasoning`, `level` (high/moderate/low), `sensitiv
 
 You are implementing the upgraded L3.75 layer for the Essay Intelligence V2 system. The current L3.75 (`src/services/essayIntelligence/analysis/holisticSynthesis.ts`) makes two Sonnet calls (Phase A + Phase B) that synthesize 10 holistic sections from scratch by reading the walk's sentence-level understanding. It is a single-shot pass with no iterative deepening.
 
-The V2 evolution (PLAN2.md) gives L3.75 three distinct roles:
+The V2 evolution (docs/specs/PLAN2.md) gives L3.75 three distinct roles:
 1. **Walk Validation** -- seeing the full essay simultaneously to catch what the sequential walk missed or misread
 2. **Holistic Synthesis** -- producing the 10 structured sections (voice, emotion, theme, etc.) grounded in the walk's rich understanding
 3. **Question Curation** -- filtering, answering, and prioritizing the question queue that drives deep dives
@@ -81,7 +81,7 @@ This improvement transforms L3.75 from a single-shot synthesizer into an iterati
 - `src/services/essayIntelligence/analysis/analysisOrchestrator.ts` -- current pipeline (Phase 3 = single L3.75 call)
 - `src/services/essayIntelligence/profileTypes.ts` -- V2 type definitions
 - `src/services/essayIntelligence/profileManager/profileRouter.ts` -- context assembly
-- `PLAN2.md` -- authoritative spec for V2 evolution
+- `docs/specs/PLAN2.md` -- authoritative spec for V2 evolution
 
 ---
 

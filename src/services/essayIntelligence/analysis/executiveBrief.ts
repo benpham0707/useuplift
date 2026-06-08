@@ -170,16 +170,6 @@ function buildUserPrompt(profile: Readonly<EssayProfile>, topAnnotations: L5Anno
     parts.push('');
   }
 
-  if (profile.aoFirstRead) {
-    parts.push('=== AO FIRST READ (verdict-grounding signal) ===');
-    parts.push(
-      `putDownRisk: ${profile.aoFirstRead.putDownRisk}\n` +
-        `committeeOneLiner: ${profile.aoFirstRead.committeeOneLiner}\n` +
-        `distinctivenessSignal: ${profile.aoFirstRead.distinctivenessSignal ?? '(none)'}`,
-    );
-    parts.push('');
-  }
-
   if (profile.admissionsPositioning) {
     parts.push('=== ADMISSIONS POSITIONING ===');
     parts.push(

@@ -131,6 +131,130 @@ Distribution sanity (post-emission self-check):
 `;
 
 /**
+ * Shared spec for the `coachingMap.priorities[]` field — the action layer the
+ * student reads first. Spliced (byte-identical) into all three L4 system
+ * prompts (unified Mode C, legacy split L4b, composite) so the surface emits at
+ * mentor-grade quality regardless of which path runs. The `priority` field is
+ * the ONLY student-facing string here; architecturalReason/unlocksNext are
+ * INTERNAL (consumed by the L5 rewrite engine), which is why the spec forbids
+ * restating the priority's content in them — that kills the triple-statement
+ * (headline ≈ reason ≈ target) that made the old output read as padding.
+ */
+const PRIORITIES_DIRECTIVE = `priorities — THE ACTION LAYER. This is the surface the student reads first and acts on. Get it right and the rest of the analysis pays off. Each priority has these fields:
+
+- \`priority\`: THE STUDENT-FACING MENTOR BLOCK (~110–150 words). Not a label, not a restated diagnosis — what a sharp, warm writing mentor would say to a 17-year-old looking at their draft that makes them want to go WRITE. Three beats, IN THIS ORDER:
+    1. OPEN ON THE STAKES OR THE ISSUE ITSELF. Never a generic action headline. Lead with why this matters to THIS essay, quoting the student's own words.
+       DO:   "Your biggest claim is a word, not a moment. 'I learned to channel the magic of the crochet hook' — but we never see the afternoon it finally obeyed."
+       DON'T: "Bridge the temporal leap between P2 and P3." (a generic action label — the student feels nothing)
+    2. DIAGNOSE ONCE, THEN STOP. One line. Never restate it for emphasis.
+    3. OPEN A DOOR — the heart of the priority and the reason the student paid. GENERATE a NEW, concrete, direct direction (a scene, an argument, an image the essay could hold) the student has NOT written yet, in the real vocabulary of THIS essay's world. BUT the door is never vivid detail for its own sake — it is NOT "show don't tell" as a writing exercise. Every direction must carry its MEANING: name what writing this moment would reveal about the student — the character, the way of thinking, the value or trait — that marks them as a genuine, distinctive candidate on a level the rest of the essay only claims. The detail serves the revelation; make them see the scene AND understand why putting it on the page shows a reader who they are.
+
+  WHY IT MATTERS, NOT JUST WHAT IT LOOKS LIKE. A generated scene with no stated meaning is showcase, not coaching — and "add sensory detail / show don't tell" is the commoditized advice we are explicitly better than. Tie the new direction to what it reveals about the person: the trait, the habit of mind, the value an admissions reader would find authentic and rare. Vividness without revelation is empty; the revelation is the point.
+  STATE THE MEANING STRAIGHT — never announce it with a setup. BANNED scaffolds (corny, generic, and grating when the student reads three priorities in a row): "don't write it for the pretty detail, write it because…", "not to prove you're X, but because…", "this isn't about Y, it's about Z", "it's what separates you from every other applicant", "this is what makes you stand out / unique." Do not tell the student you're about to say something deep — just say the specific, human thing. The meaning must be concrete ("the nerve to abandon your own best argument the moment it stops being true"), never a stock distinction or an abstract label.
+  DON'T END ON A BOW. Once the meaning is stated, do NOT wrap it in a robotic feel-good summary or a wordy abstract flourish — "the version of the trait that holds up where it counts", "the exact situation built to break it", "the kind of person who…" all read as motivational filler that makes the student feel good without telling them anything. Land instead on a real, specific, slightly surprising observation a perceptive mentor would actually say out loud ("anyone's sharp when they're winning; you held it together when it was falling apart"). Genuine and a little blunt beats polished and affirming. If a closing sentence only restates the meaning more grandly, cut it.
+
+  DO NOT RECYCLE WHAT THEY ALREADY DID. The student is not paying to hear what they already accomplished. Take the essay somewhere NEW — fresh material (a moment, a line, an angle not yet on the page), never "do what you did in P2 again." Do NOT make "point back at your strongest paragraph / signature move" the structure of the output; the student's own best writing is not the deliverable. You MAY, rarely, name a strength as a one-clause touchstone, never as the focus or a required move.
+
+  INSPIRE — the test. Does the student finish reading and want to open their draft? A priority that reads like a correction or a recap has failed. Hand them a possibility so specific and alive — and so clearly meaningful about who they are — that they can already half-see the paragraph they're about to write.
+
+  MATCH THE GENERATIVE MODE TO THE ESSAY — this is critical. The door is sensory ONLY when the essay is sensory. A crochet essay's door is physical detail (the yarn-over that pulls clean, the petal that finally lies flat). A debate essay's door is logical structure and stakes (the rebuttal you dropped, the judge's flow you'd have turned). A research essay's door is the unshown decision or the failed result. A relationship essay's door is the line of dialogue never spoken. Do NOT default to imagery — match what THIS essay and THIS priority actually need.
+
+  VOICE RULES (non-negotiable, every \`priority\`):
+    • No filler openers. Kill "There's a habit worth catching," "Here's the thing," "It's worth noting." Open on the insight.
+    • No internal/system jargon in this field. BANNED words: "embodied struggle anchor," "scope expansion," "metaphorical synthesis," "structural role," "earnedness," "the arc," "load-bearing," "keystone," and every other analyst label. Say it the way a person would.
+    • No all-caps headers, no inline labels ("ISSUE:", "FIX:"). Just the mentor talking in plain prose.
+    • Concrete beats general — the student's specific line and the specific thing they'd write, not the principle behind it ("the hook finally obeyed," not "show don't tell").
+    • No obvious closers. Delete "this will make your essay stronger," "once you see it you'll catch it." The student knows.
+    • Every sentence advances — new information or new depth — or it's cut. Contextualize any contrast before leaning on it (name what you're comparing to).
+
+- \`target\`: { paragraphs: [...], description: "..." } — where the work happens. \`description\` is a plain locator, NOT a re-diagnosis.
+
+- \`architecturalReason\`: INTERNAL — NOT shown to the student; the L5 rewrite engine reads it. COMPACT: 1–2 sentences, ≤40 words. Do NOT restate the \`priority\` field's words. Give the structural WHY the student-facing block leaves out: how this paragraph's role connects to the essay's architecture / what the North Star says. System vocabulary (structural roles, etc.) is fine HERE — it's internal. This is terse scaffolding, not prose; keep it tight to leave output budget for the coherence report.
+
+- \`unlocksNext\`: INTERNAL — also for L5, not the student. COMPACT: 1 sentence, ≤30 words. What becomes structurally possible after this fix. Do not repeat \`priority\` or \`architecturalReason\`.
+
+- \`expectedImpact\`: "transformative" | "significant" | "incremental"
+
+- \`consolidatedFrom\`: [candidate IDs] — non-empty, required.
+
+THE EXAMPLES BELOW SHOW THE LEVEL, NOT A TEMPLATE. Do not reuse their phrasings or sentence shapes — copy the QUALITY (mode-matched door, meaning stated straight, genuine close), not the words. In particular these constructions are NOT formulas to repeat — reused across priorities they become the next corny tic the student notices immediately:
+  - "Your biggest [claim/X] is a [word/feeling/principle], not a moment" (the opener) — the single most over-copied line; find a different way in every time
+  - "Take us there / Take us into…" (the door opener)
+  - "Right now you tell us X; we'd (only) believe it watching Y" (the close)
+  - "X in its realest form: the nerve to Y" (the meaning)
+Build each priority's opener, meaning, and close FRESH for THIS essay. If two priorities in the same essay share a shape, rewrite one. Sameness of structure is itself a failure, even when each individual line is good — open on the actual issue in this essay's own terms, not a reused frame.
+  \`priority\`: "Your biggest claim is a word, not a moment. 'I learned to channel the magic of the crochet hook' — but we never see the afternoon it finally obeyed. So take us there: the first petal that doesn't curl, the yarn-over that used to snag pulling clean before you even register it, the moment you notice you stopped counting stitches because your fingers already know the gauge. That instant — the fight gone quiet, your hands moving on their own — is mastery the way it actually arrives: earned by staying long after it stopped being fun, the same patience your grandmother turned wartime scarcity into something she could give. Right now you tell us the hook obeyed; we'd only believe it watching your hands stop fighting."
+  \`architecturalReason\`: "P2 is the only sustained scene; P3 asserts mastery without staging the turn, so the transition from struggle to competence happens off-page. Feeds L5 anchoring at the P2→P3 boundary."
+  \`unlocksNext\`: "With the turn visible, the gift-giving purpose and the migration metaphor read as earned consequence rather than assertion."
+
+WORKED EXAMPLE B — NON-SENSORY ESSAY (debate). SAME bar, DIFFERENT generative mode — the door is argumentative, not visual. Do not force imagery onto an essay like this. Note: meaning stated straight; the "think on your feet" trait shown in its rarer, realer form (judgment under pressure), no "not to prove you're quick, but" scaffold.
+  \`priority\`: "You tell us you 'learned to think on your feet,' then skip the one round where it mattered. Take us into the semifinal — the ninety seconds after you dropped the disad. Show the decision in real time: the argument you cut loose, the link you judged not worth the seconds, the instant you chose to reframe the whole impact calculus instead of running the flow line by line. That's thinking on your feet in its realest form — not speed, but the nerve to abandon your own best argument the moment it stops being true, while you're losing and the clock won't wait. Anyone's sharp when they're winning; you held it together when it was falling apart."
+  \`architecturalReason\`: "The 'thinks on her feet' claim is told, never dramatized; the essay's strongest analytic writing is in P2 and that mode is absent where the stakes peak. Feeds L5."
+  \`unlocksNext\`: "A staged decision converts the generic 'quick thinker' trait into demonstrated judgment the reader witnesses."
+`;
+
+/**
+ * Shared spec for coachingMap.transformativeInsight — the deepest perception
+ * reframe, distinct from the priorities. Spliced into all three L4 system prompts.
+ * The hard rule (insight must NOT restate a priority) exists because the old
+ * "the insight that would unlock the MOST improvement" framing pulled the insight
+ * into duplicating Priority 1 — on the crochet after-run the insight and Priority 1
+ * carried the same diagnosis AND the same generative question. The priorities own
+ * the FIXES; this owns the SEEING.
+ */
+const TRANSFORMATIVE_INSIGHT_DIRECTIVE = `transformativeInsight: the deepest UNDERSTANDING about this essay — the structural truth beneath its surface subject that, once the student sees it, reorganizes how they read their OWN essay. This is a PERCEPTION REFRAME, not a fix.
+
+  STRIP TEST (mandatory — this is the field's whole reason to exist): the insight must NOT be a restatement of any priority. If your transformativeInsight is your #1 priority reworded — same problem, same fix, same suggested move — it is WRONG; you've collapsed the seeing-layer into the fixing-layer. Go deeper: name what the essay is REALLY about beneath its topic. Not "learn to crochet" — "inheriting your grandmother's pattern of making meaning from displacement." Not "the debate trophy" — "you think by dismantling your own position first." The priorities own the FIXES; this owns the SEEING.
+  When the deepest truth happens to coincide with the top fix: name the WHY-BENEATH here (the perception shift that makes the fix obvious), and leave the FIX itself to the priority. Never the same sentence in both places.
+
+  whyThisTransforms: how this reframe reorganizes the student's WHOLE revision — "once you see X, every change becomes about honoring Y, not just patching technical issues." A question or image that opens the deeper reading is welcome (generative is good), but it must open the UNDERSTANDING, not re-issue the priority's instruction.
+
+  VOICE — a mentor naming the real heart of the essay to a 17-year-old. No analyst jargon ("hidden architecture," "three-stage transformation," "relational gift economy," "aesthetic reclamation," "earned progression," "scalar shift"). Quote the student's actual words and images. Say it the way a person says the thing they finally understood about someone else's story.
+
+  Include evidence locations. Set requiresStudentAwareness=true if the student must grasp this reframe before any specific feedback will land.`;
+
+/**
+ * Shared spec for coachingMap.protectedStrengths — the moves the essay already
+ * gets right. Spliced into all three L4 system prompts. The hard ban on internal
+ * layer names exists because the unguarded prompt produced whyProtect strings that
+ * name-dropped the system's own layers to the student ("the entanglements map
+ * (ent-2) notes…", "the scoreMatrix gives P1 voice score 92", "the North Star's
+ * distinctiveness signature") — the student is reading the analysis pipeline's debug
+ * log. This directive makes protection mentor-voiced AND actionable (the weakening trap).
+ */
+const PROTECTED_STRENGTHS_DIRECTIVE = `protectedStrengths: the moves this essay already gets RIGHT — the student's own instincts worth naming so they (a) trust them, (b) don't accidentally wreck them while fixing other things, and (c) can reuse them. Each entry has \`description\`, \`locations\`, and \`whyProtect\`.
+
+  \`description\`: what the move is, in plain language, quoting the student's actual words ("the taxidermy feint that ends in 'I crochet'").
+
+  \`whyProtect\` MUST do two things:
+  1. Why it works, in HUMAN terms — what it does to the reader, said the way a person would. ("The wink — 'Don't get the wrong idea, now' — pulls the reader into a conspiracy with you, so when the war history lands a paragraph later it reads as something you're confiding, not reciting.")
+  2. The WEAKENING TRAP — the specific, plausible "improvement" that would gut the move, named concretely so the protection is actionable. ("If you smooth that aside into a normal transition because it feels too casual, you lose the wink, and the intimacy goes with it.") NOT the vague "any revision that dampens this would weaken the essay."
+  Where natural, add a third beat: this instinct is yours — point out where else they could lean on it.
+
+  BANNED in every student-facing string here — these are the system's internal machinery and the student has never heard of them:
+  - Internal layer names: "North Star," "score matrix," "admissions positioning," "distinctiveness signature," "entanglements"/"ent-N," "through-line map," "MEM."
+  - Raw dimension scores ("voice score 92," "structural=95").
+  - Analyst jargon: "structural DNA," "architectural recursion," "hidden fulcrum," "structural spine," "load-bearing," "the arc."
+  Say what the move DOES, not which internal layer flagged it.
+
+  VOICE: open on the move (no "This is the essay's…"); state each point once; concrete over general; and do NOT end every item with the same "Any revision that X would Y" template — vary how you name the trap.`;
+
+/**
+ * Shared spec for scoreMatrix.paragraphs[].verdict — the one-line prose companion
+ * to each paragraph's score row. Spliced into all four L4 system prompts. The old
+ * instruction ("a single sentence capturing the paragraph's ARCHITECTURAL ASSESSMENT")
+ * literally invited architect-jargon ("load-bearing role", "structural synthesis
+ * work", "the voice is the architecture"). This grounds it in plain mentor language.
+ */
+const VERDICT_DIRECTIVE = `verdict: ONE plain-language sentence — the honest read of what THIS paragraph does and where it stands, in words a 17-year-old immediately gets. It sits right beside the paragraph's scores, so don't cite numbers; give the prose story the numbers can't. Name what the paragraph accomplishes and, if it falls short, the specific gap — point at the actual text.
+NO architect/analyst jargon: "architectural assessment", "load-bearing", "structural role", "carries the load", "executes its role", "the architecture", "synthesis work", "pivot". Say what the paragraph DOES the way a person would; quote the writing where it helps.
+Don't merely restate the paragraph's top priority — the verdict is the per-paragraph orientation; the priority is the fix.
+BAD: "Good paragraph with strong writing." (empty)
+BAD: "Load-bearing pivot that executes its architectural role with distinction." (jargon; says nothing concrete)
+GOOD: "The taxidermy wink and the one-word 'I crochet' do the real work here — this is the most alive the voice gets."
+GOOD: "Compresses three generations into nine tight sentences, but the grandmother stays a symbol — we see what she represents, never her."`;
+
+/**
  * L4a (legacy combined): North Star + Score Matrix in a single call.
  * Replaced by two focused sequential calls — kept for reference.
  */
@@ -155,8 +279,14 @@ const L4A_SCORE_MATRIX_TIMEOUT_MS = 120_000;
  * L4b: Interpretive layer — prioritizedImprovements + coachingMap + coherenceReport.
  * Receives L4a output as context. NON-FATAL — graceful degradation on failure.
  */
-const L4B_MAX_OUTPUT_TOKENS = 6000;
-const L4B_TIMEOUT_MS = 180_000;
+// 2026-05-30: raised 6000→7500 / 180s→240s. The mentor-grade priorities
+// directive makes coachingMap.priorities legitimately richer (~150w each, at the
+// reference bar). In the shared Mode C call those priorities zero-sum against the
+// coherenceReport emitted LAST in the JSON; at 6000 the report truncated (resolutions
+// dropped, jsonrepair-salvaged). The call also generated to the 6000 cap at 162s of
+// the 180s budget, so the token ceiling AND the timeout both had to rise together.
+const L4B_MAX_OUTPUT_TOKENS = 7500;
+const L4B_TIMEOUT_MS = 240_000;
 
 /**
  * L4 composite (Phase 3): single Sonnet call emitting NorthStar + ScoreMatrix +
@@ -391,9 +521,7 @@ ${scoringCalibration}
       - Below 30: Actively problematic for this dimension
       If all paragraphs cluster in the 70-85 range for any dimension, you have FAILED to differentiate.
 
-   verdict: A single sentence capturing the paragraph's architectural assessment.
-   BAD: "Good paragraph with strong writing."
-   GOOD: "Carries the essay's emotional load but underearns P4's revelation by telling rather than showing the grandmother's gesture."
+${VERDICT_DIRECTIVE}
 
    priorityForImprovement: 1 (fine) to 5 (urgent). Load-bearing paragraphs with low scores get highest priority.
 
@@ -602,9 +730,7 @@ Before assigning scores, you MUST:
 
 ${buildScoreMatrixAnchorsBlock()}
 
-verdict: A single sentence capturing the paragraph's architectural assessment.
-BAD: "Good paragraph with strong writing."
-GOOD: "Carries the essay's emotional load but underearns P4's revelation by telling rather than showing the grandmother's gesture."
+${VERDICT_DIRECTIVE}
 
 priorityForImprovement: 1 (fine) to 5 (urgent). Load-bearing paragraphs with low scores get highest priority.
 
@@ -710,8 +836,8 @@ YOUR THREE OUTPUTS:
 1. PRIORITIZED IMPROVEMENTS — Consolidate candidates into 3-7 priorities. Reference North Star structural roles in \`architecturalReason\` (re-derive this framing from the North Star — candidates don't carry it). Each priority MUST have non-empty \`consolidatedFrom\`.
 
 PRESERVE THE SIGNATURE MOVE: If \`craftAssessment.signatureMove != null\`, prioritize improvements that PRESERVE its cited instances; rank improvements that would erase them as net-negative. Where possible, frame near-the-move improvements as "preserve X while doing Y" rather than as replacements.
-   BAD: "Improve the opening paragraph." (ungrounded, no consolidatedFrom)
-   GOOD: "P1 is the frame of economic risk that makes P3's emotional stakes legible — but its current effectiveness (62) means the reader hasn't internalized the appraiser's logic before being asked to feel the ring's non-market value." consolidatedFrom: ["CAND_L3_P0S1_abc123", "CAND_L3_5_P0S2_def456"]
+   BAD: "Improve the opening paragraph." (ungrounded — no consolidatedFrom; invents an issue no candidate raised)
+   GOOD: ONE priority that MERGES "P1 frames the economic risk" (CAND_L3_P0S1_abc123) and "P1's appraiser logic lands too late for the reader" (CAND_L3_5_P0S2_def456) into a single entry. consolidatedFrom: ["CAND_L3_P0S1_abc123", "CAND_L3_5_P0S2_def456"]. For the VOICE of the \`priority\` string itself, follow the priorities spec below — it is a student-facing mentor block, not a restated diagnosis.
 
 2. COHERENCE REPORT — ACTIVE INVESTIGATION of contradictions ACROSS profile sections.
    You are not passively checking for problems. You are ACTIVELY INVESTIGATING coherence.
@@ -747,20 +873,10 @@ ${COHERENCE_RESOLUTION_DIRECTIVE}
 3. COACHING MAP — structured improvement hierarchy.
    Beyond the flat prioritizedImprovements, produce a coachingMap with 5 sections:
 
-   transformativeInsight: The SINGLE most important thing about this essay — the insight that,
-   if the student understood it, would unlock the most improvement. Include evidence locations
-   and explain WHY this transforms understanding. Set requiresStudentAwareness if the student
-   must understand this before any specific feedback makes sense.
+${TRANSFORMATIVE_INSIGHT_DIRECTIVE}
 
-   priorities: Ordered list of improvements. Each has:
-   - priority: what to do
-   - target: { paragraphs: [...], description: "..." }
-   - architecturalReason: WHY this matters to the essay's architecture (not just the paragraph)
-   - unlocksNext: what becomes possible AFTER this improvement
-   - expectedImpact: "transformative" | "significant" | "incremental"
-
-   protectedStrengths: Things that MUST NOT be damaged during improvement.
-   These are the essay's current assets. Include locations and WHY they must be protected.
+${PRIORITIES_DIRECTIVE}
+${PROTECTED_STRENGTHS_DIRECTIVE}
 
    emergentPatterns: Max 3 items. Each ≤20 words, single line. Format: "Pattern: {name} — {observation with P refs}".
    Example: "Pattern: voice strongest in physical scenes (P1, P3), retreats to abstraction in reflection (P2, P4)".
@@ -1224,9 +1340,7 @@ Before assigning scores, you MUST:
 
 ${buildScoreMatrixAnchorsBlock()}
 
-verdict: A single sentence capturing the paragraph's architectural assessment.
-BAD: "Good paragraph with strong writing."
-GOOD: "Carries the essay's emotional load but underearns P4's revelation by telling rather than showing the grandmother's gesture."
+${VERDICT_DIRECTIVE}
 
 priorityForImprovement: 1 (fine) to 5 (urgent). Load-bearing paragraphs with low scores get highest priority.
 
@@ -1248,24 +1362,17 @@ If two candidates point at the same architectural theme (e.g., "P2 summarizes" f
 If a candidate doesn't make it into any priority, that's fine — it will be marked \`superseded\` in the lifecycle. Be intentional: pick the 3-7 highest-leverage priorities, let the rest supersede. Do NOT list every candidate as a separate priority — that's the opposite of consolidation.
 
 PRESERVE THE SIGNATURE MOVE: If \`craftAssessment.signatureMove != null\` in the profile, prioritize improvements that PRESERVE its cited instances; rank improvements that would erase them as net-negative. Where possible, frame near-the-move improvements as "preserve X while doing Y" rather than as replacements.
-BAD: "Improve the opening paragraph." (ungrounded, no consolidatedFrom)
-GOOD: "P1 is the frame of economic risk that makes P3's emotional stakes legible — but its current effectiveness (62) means the reader hasn't internalized the appraiser's logic before being asked to feel the ring's non-market value." consolidatedFrom: ["CAND_L3_P0S1_abc123", "CAND_L3_5_P0S2_def456"]
+BAD: "Improve the opening paragraph." (ungrounded — no consolidatedFrom; invents an issue no candidate raised)
+GOOD: ONE priority that MERGES "P1 frames the economic risk" (CAND_L3_P0S1_abc123) and "P1's appraiser logic lands too late for the reader" (CAND_L3_5_P0S2_def456) into a single entry. consolidatedFrom: ["CAND_L3_P0S1_abc123", "CAND_L3_5_P0S2_def456"]. For the VOICE of the \`priority\` string itself, follow the priorities spec below — it is a student-facing mentor block, not a restated diagnosis.
 
 prioritizedImprovements (legacy flat shape, kept for backward compat): 3-7 entries, paralleling coachingMap.priorities. Each carries \`paragraph\`, \`improvement\`, \`whyThisMatters\`, \`expectedImpact\`.
 
 coachingMap (the structured coaching surface — five sections):
 
-  transformativeInsight: The SINGLE most important thing about this essay — the insight that, if the student understood it, would unlock the most improvement. Include evidence locations and explain WHY this transforms understanding. Set requiresStudentAwareness if the student must understand this before any specific feedback makes sense.
+  ${TRANSFORMATIVE_INSIGHT_DIRECTIVE}
 
-  priorities: Ordered list of improvements. Each has:
-  - priority: what to do
-  - target: { paragraphs: [...], description: "..." }
-  - architecturalReason: WHY this matters to the essay's architecture (not just the paragraph). Reference the North Star structural roles from Section 1.
-  - unlocksNext: what becomes possible AFTER this improvement
-  - expectedImpact: "transformative" | "significant" | "incremental"
-  - consolidatedFrom: [candidate IDs] (non-empty, required)
-
-  protectedStrengths: Things that MUST NOT be damaged during improvement. These are the essay's current assets. Include locations and WHY they must be protected.
+${PRIORITIES_DIRECTIVE}
+  ${PROTECTED_STRENGTHS_DIRECTIVE}
 
   emergentPatterns: Max 3 items. Each ≤20 words, single line. Format: "Pattern: {name} — {observation with P refs}".
   Example: "Pattern: voice strongest in physical scenes (P1, P3), retreats to abstraction in reflection (P2, P4)".
@@ -1626,9 +1733,7 @@ Before assigning scores, you MUST:
 
 ${buildScoreMatrixAnchorsBlock()}
 
-verdict: A single sentence capturing the paragraph's architectural assessment.
-BAD: "Good paragraph with strong writing."
-GOOD: "Carries the essay's emotional load but underearns P4's revelation by telling rather than showing the grandmother's gesture."
+${VERDICT_DIRECTIVE}
 
 priorityForImprovement: 1 (fine) to 5 (urgent). Load-bearing paragraphs with low scores get highest priority.
 
@@ -1667,8 +1772,8 @@ If two candidates point at the same architectural theme (e.g., "P2 summarizes" f
 If a candidate doesn't make it into any priority, that's fine — it will be marked \`superseded\` in the lifecycle. Be intentional: pick the 3-7 highest-leverage priorities, let the rest supersede. Do NOT list every candidate as a separate priority — that's the opposite of consolidation.
 
 PRESERVE THE SIGNATURE MOVE: If \`craftAssessment.signatureMove != null\` in the profile, prioritize improvements that PRESERVE its cited instances; rank improvements that would erase them as net-negative. Where possible, frame near-the-move improvements as "preserve X while doing Y" rather than as replacements.
-BAD: "Improve the opening paragraph." (ungrounded, no consolidatedFrom)
-GOOD: "P1 is the frame of economic risk that makes P3's emotional stakes legible — but its current effectiveness (62) means the reader hasn't internalized the appraiser's logic before being asked to feel the ring's non-market value." consolidatedFrom: ["CAND_L3_P0S1_abc123", "CAND_L3_5_P0S2_def456"]
+BAD: "Improve the opening paragraph." (ungrounded — no consolidatedFrom; invents an issue no candidate raised)
+GOOD: ONE priority that MERGES "P1 frames the economic risk" (CAND_L3_P0S1_abc123) and "P1's appraiser logic lands too late for the reader" (CAND_L3_5_P0S2_def456) into a single entry. consolidatedFrom: ["CAND_L3_P0S1_abc123", "CAND_L3_5_P0S2_def456"]. For the VOICE of the \`priority\` string itself, follow the priorities spec below — it is a student-facing mentor block, not a restated diagnosis.
 
 YOUR THREE OUTPUTS:
 
@@ -1706,17 +1811,10 @@ ${COHERENCE_RESOLUTION_DIRECTIVE}
 
 3. COACHING MAP — structured improvement hierarchy. Five sections:
 
-   transformativeInsight: The SINGLE most important thing about this essay — the insight that, if the student understood it, would unlock the most improvement. Include evidence locations and explain WHY this transforms understanding. Set requiresStudentAwareness if the student must understand this before any specific feedback makes sense.
+   ${TRANSFORMATIVE_INSIGHT_DIRECTIVE}
 
-   priorities: Ordered list of improvements. Each has:
-   - priority: what to do
-   - target: { paragraphs: [...], description: "..." }
-   - architecturalReason: WHY this matters to the essay's architecture (not just the paragraph). Reference North Star structural roles.
-   - unlocksNext: what becomes possible AFTER this improvement
-   - expectedImpact: "transformative" | "significant" | "incremental"
-   - consolidatedFrom: [candidate IDs] (non-empty, required)
-
-   protectedStrengths: Things that MUST NOT be damaged during improvement. These are the essay's current assets. Include locations and WHY they must be protected.
+${PRIORITIES_DIRECTIVE}
+   ${PROTECTED_STRENGTHS_DIRECTIVE}
 
    emergentPatterns: Max 3 items. Each ≤20 words, single line. Format: "Pattern: {name} — {observation with P refs}".
    Example: "Pattern: voice strongest in physical scenes (P1, P3), retreats to abstraction in reflection (P2, P4)".

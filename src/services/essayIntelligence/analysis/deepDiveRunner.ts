@@ -19,7 +19,7 @@
  * The router's deep_dive rule exists for future consumers that need router-style
  * context assembly for deep-dive-like operations (e.g., re-reads, focused analysis).
  *
- * Spec: PLAN2.md (deep dive runner section)
+ * Spec: docs/specs/PLAN2.md (deep dive runner section)
  * Types: src/services/essayIntelligence/profileTypes.ts (DeepDiveRequest, DeepDiveResult)
  */
 

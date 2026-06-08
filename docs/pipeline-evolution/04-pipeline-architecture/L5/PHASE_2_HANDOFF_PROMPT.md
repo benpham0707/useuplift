@@ -38,8 +38,8 @@ a new aggregator that deduplicates emissions into the question queue.
 4. `~/.claude/projects/-Users-tuepham-uplift-final-final-18698-62030/memory/feedback_planning_preferences.md`
 5. `~/.claude/projects/-Users-tuepham-uplift-final-final-18698-62030/memory/feedback_llm-first-design.md` — **6 rules; especially Rule 1 (LLM owns judgment, system tracks) and Rule 4 (no whack-a-mole pattern matching)**
 6. `docs/audit/phase-1-integrity-audit.md` — Phase 1 closure verdict + 7 OPEN deferred items
-7. `docs/audit/d1-15-mock-llm-integration.md` — D-1.15 audit doc; lists architectural decisions ratified during build
-8. `docs/audit/d1-18-phase1-cost-closure.md` — Phase 1 cost ledger closure
+7. `docs/archived/audit/d1-15-mock-llm-integration.md` — D-1.15 audit doc; lists architectural decisions ratified during build
+8. `docs/archived/audit/d1-18-phase1-cost-closure.md` — Phase 1 cost ledger closure
 9. `docs/pipeline-evolution/04-pipeline-architecture/L5/L5_IMPLEMENTATION_PLAN.md` §D-2.1–§D-2.14 (literal contracts for the 14 deliverables)
 10. `docs/pipeline-evolution/04-pipeline-architecture/L5/L5_ITERATION_LOOP_DESIGN.md` §6 (SpecificsNeed contract; what each layer emits)
 

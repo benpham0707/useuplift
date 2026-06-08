@@ -1,5 +1,5 @@
 # Edit Understanding, Two-Pathway Edit Handling & Analysis Modes (Updated)
-> Replaces PLAN.md "Incremental Update" (lines ~2116-2201) and "Analysis Modes" (lines ~2390-2608).
+> Replaces docs/specs/PLAN.md "Incremental Update" (lines ~2116-2201) and "Analysis Modes" (lines ~2390-2608).
 > Incorporates LLM-nuanced edit understanding, conversational edit workshop, version-based re-analysis, and updated analysis modes.
 
 ---
@@ -8,7 +8,7 @@
 
 ### Vision
 
-The old PLAN.md design had two approaches to edit handling, both wrong in different directions. The original 1D asked a cheap Haiku call to PREDICT impact — unreliable guesswork disconnected from real understanding. The v1 correction swung the other way, making everything deterministic — word count ratios, syntactic pattern matching, mechanical graph traversal. But essay editing is a meaning-making activity. When a student changes one word, the significance depends entirely on context that only an LLM reading the actual words can understand.
+The old docs/specs/PLAN.md design had two approaches to edit handling, both wrong in different directions. The original 1D asked a cheap Haiku call to PREDICT impact — unreliable guesswork disconnected from real understanding. The v1 correction swung the other way, making everything deterministic — word count ratios, syntactic pattern matching, mechanical graph traversal. But essay editing is a meaning-making activity. When a student changes one word, the significance depends entirely on context that only an LLM reading the actual words can understand.
 
 The Edit Understanding Pipeline holds the middle: a structured pipeline (Detect -> Understand -> Classify -> Map -> Scope) that provides discipline and predictability, with Sonnet-level LLM intelligence at each interpretive step. The pipeline tells the system WHAT to do at each stage. The LLM brings the judgment of HOW significant, WHAT kind, and HOW FAR the impact reaches.
 
@@ -310,7 +310,7 @@ This is the payoff of LLM-powered edit understanding. The workshop does not just
 
 ### The Paradigm Shift
 
-The old PLAN.md treated every edit as a trigger for analysis. The system was always reacting — detecting a change, classifying its impact, re-walking, re-analyzing. This creates three fundamental problems:
+The old docs/specs/PLAN.md treated every edit as a trigger for analysis. The system was always reacting — detecting a change, classifying its impact, re-walking, re-analyzing. This creates three fundamental problems:
 
 **Waste.** Most edits during active writing are exploratory. The student tries something, decides against it, tries something else. Analyzing each attempt burns cost and latency on versions that will not survive five minutes.
 

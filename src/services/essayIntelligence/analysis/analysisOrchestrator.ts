@@ -102,8 +102,6 @@ import type { StepResult } from './growthEngine';
 import { QuestionQueueManager } from './questionQueueManager';
 import { runDeepDive } from './deepDiveRunner';
 import { analysisPassService } from './analysisPass';
-import { runAOFirstRead } from './aoFirstRead';
-import type { AOFirstReadResult } from './aoFirstRead';
 import type { L35AnalysisResult } from './analysisPass';
 import { crystallizerService } from './crystallizer';
 import type { L4CrystallizationResult } from './crystallizer';
@@ -431,90 +429,25 @@ export class AnalysisOrchestrator {
     );
 
     // ═══════════════════════════════════════════════════════════════════════
-    // PHASE 1: Foundation (L1 + AO First Read parallel → L2 + L2.5 parallel)
+    // PHASE 1: Foundation (L1 → L2 + L2.5 parallel)
     // ═══════════════════════════════════════════════════════════════════════
 
-    // ── L1: First Impressions (FATAL) + AO First Read (non-fatal) — PARALLEL ──
-    // GAP-4: AO First Read runs alongside L1 at zero added latency.
-    // L1 failure is FATAL. AO First Read failure is non-fatal BY DESIGN —
-    // every downstream consumer is null-guarded (profileTypes.ts:2354 types
-    // aoFirstRead as optional+nullable; coachingService.ts:2799/2876,
-    // edgeProtocol.ts:157, presentation/renderAnalysisForStudent.ts:151
-    // all skip cleanly when absent). On rejection we emit a structured
-    // telemetry event for the audit trail and push to layersFailed[] —
-    // this is NOT charter-banned graceful degradation, because no
-    // fake/placeholder data is injected; consumers see the genuine
-    // "AO read absent" state. [F-2 closure 2026-04-29.]
+    // ── L1: First Impressions (FATAL) ──
     let l1Result: FirstImpressionsResult;
-    let aoFirstReadResult: AOFirstReadResult | null = null;
-
-    const [l1Settled, aoSettled] = await Promise.allSettled([
-      firstImpressionsService.analyze(input.essayText),
-      runAOFirstRead(input.essayText),
-    ]);
-
-    // Handle L1 (FATAL on failure)
-    if (l1Settled.status === 'rejected') {
-      const msg = l1Settled.reason instanceof Error ? l1Settled.reason.message : String(l1Settled.reason);
+    try {
+      l1Result = await firstImpressionsService.analyze(input.essayText);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       console.error('[Orchestrator] L1 FATAL:', msg);
-      layersFailed.push(this.buildLayerError('L1', l1Settled.reason, 0));
+      layersFailed.push(this.buildLayerError('L1', error, 0));
       return await this.buildPartialResult(null, layersCompleted, layersFailed, costTracker, startTime, iterationStartedAt, triggeredBy, input);
     }
-    l1Result = l1Settled.value;
     costTracker.record('L1', l1Result.cost, l1Result.tokenUsage, l1Result.timingMs);
     layersCompleted.push('L1');
     console.log(
       `[Orchestrator] L1 complete: ${l1Result.impressions.length} paragraphs, ` +
       `cost=$${l1Result.cost.toFixed(4)}, time=${l1Result.timingMs}ms`,
     );
-
-    // Handle AO First Read (non-fatal by design — see block comment above).
-    if (aoSettled.status === 'fulfilled') {
-      aoFirstReadResult = aoSettled.value;
-      costTracker.record('AOFirstRead', aoFirstReadResult.cost, aoFirstReadResult.tokenUsage, aoFirstReadResult.timingMs);
-      console.log(
-        `[Orchestrator] AO First Read complete: putDownRisk=${aoFirstReadResult.firstRead.putDownRisk}, ` +
-        `cost=$${aoFirstReadResult.cost.toFixed(4)}, time=${aoFirstReadResult.timingMs}ms`,
-      );
-    } else {
-      // [F-2 closure 2026-04-29] Pre-fix this branch only `console.warn`-ed
-      // and silently set aoFirstReadResult=null — invisible to the audit
-      // trail and to the orchestrator's own layersFailed ledger. Now we:
-      //   1. Emit a structured `status:'failed'` telemetry event so the
-      //      iterationLedger / external observers see the rejection.
-      //   2. Push to layersFailed[] for parity with L1's failure path
-      //      (see line 449), so PipelineResult.layersFailed callers get
-      //      a uniform shape regardless of which layer rejected.
-      //   3. Preserve the existing `aoFirstReadResult = null` semantic
-      //      (no assignment — it was already null at declaration).
-      // iteration=-1 is the documented sentinel for "pre-iteration step"
-      // (matches emitStepFailure's removed sentinel pattern). AO First
-      // Read runs before incrementIteration (line 521) and before the
-      // coordinator is constructed (line 493), so no live iteration
-      // counter exists yet. The telemetry consumer can filter iteration
-      // < 1 if it only cares about per-iteration steps; the audit trail
-      // still has the rejection on record.
-      const errMsg = aoSettled.reason instanceof Error
-        ? aoSettled.reason.message
-        : String(aoSettled.reason);
-      console.warn(`[Orchestrator] AO First Read failed (non-fatal): ${errMsg}`);
-      emitIterationEvent(input.essayId, {
-        iteration: -1,
-        step: 'AOFirstRead',
-        status: 'failed',
-        error: {
-          message: errMsg,
-          code: 'ao_first_read_rejected',
-          context: {
-            nonFatal: true,
-            downstreamBehavior:
-              'profile.aoFirstRead remains null; all consumers null-guarded.',
-          },
-        },
-        timestamp: new Date().toISOString(),
-      });
-      layersFailed.push(this.buildLayerError('AOFirstRead', aoSettled.reason, 0));
-    }
 
     // ── Parse essay structure from L1 output ──
     // Fix A3.3: Derive paragraph texts from the original essay text to preserve formatting.
@@ -589,12 +522,6 @@ export class AnalysisOrchestrator {
 
     // ── Apply L1 impressions to profile ──
     coordinator.applyFirstImpressions(l1Result.impressions);
-
-    // ── Apply AO First Read to profile (if available) ──
-    if (aoFirstReadResult) {
-      const profile = coordinator.getProfile();
-      (profile as { aoFirstRead?: typeof aoFirstReadResult.firstRead | null }).aoFirstRead = aoFirstReadResult.firstRead;
-    }
 
     // ── L2 + L2.5 in parallel (FAIL-FAST: abort if either fails) ──
     let structuralMap: StructuralCartography;
@@ -1435,8 +1362,7 @@ export class AnalysisOrchestrator {
               l5Result,
             });
             if (brief !== null) {
-              // Mirror the aoFirstRead write pattern at :595-597: direct
-              // mutation through the coordinator-owned profile reference.
+              // Direct mutation through the coordinator-owned profile reference.
               const briefProfile = coordinator.getProfile() as EssayProfile;
               briefProfile.executiveBrief = brief;
               costTracker.record('ExecutiveBrief', brief.cost, {
@@ -2611,58 +2537,7 @@ export class AnalysisOrchestrator {
       }
     }
 
-    // ── Source 3: AO First Read Red Flags ──
-    if (profile.aoFirstRead) {
-      sources.push('ao_first_read');
-      const ao = profile.aoFirstRead;
-
-      // People absence
-      if (ao.gutReaction?.includes('no named individuals') ||
-          ao.gutReaction?.includes('people absence') ||
-          ao.gutReaction?.toLowerCase().includes('no teacher') ||
-          ao.gutReaction?.toLowerCase().includes('no mentor')) {
-        items.push({
-          id: `IMP_${priority}`,
-          paragraph: -1,
-          observation: 'No named individuals appear in the essay. Every experience is described in isolation.',
-          action: 'Add ONE named person — teacher, teammate, mentor — with one physical detail. Show them in one sentence.',
-          stakes: 'People absence is a red flag AOs catch in 30 seconds. It makes the essay feel like a philosophy paper, not a personal statement.',
-          technique: 'NAMED CHARACTER',
-          demonstration: null,
-          wordEconomyCut: null,
-          source: 'red_flag',
-          sourceRef: null,
-          priority: priority++,
-          impact: 'significant',
-          conversatorEnrichments: [],
-        });
-      }
-
-      // Put-down risk
-      if (ao.putDownRisk === 'high' && ao.committeeOneLiner) {
-        const alreadyHasHookItem = items.some(i =>
-          i.observation.toLowerCase().includes('opening') || i.observation.toLowerCase().includes('hook'));
-        if (!alreadyHasHookItem) {
-          items.push({
-            id: `IMP_${priority}`,
-            paragraph: 0,
-            observation: `AO committee one-liner: "${ao.committeeOneLiner}". Put-down risk: HIGH.`,
-            action: 'The opening must stop the AO from skimming in 3 sentences. Replace abstract opening with a physical moment.',
-            stakes: `The AO will reduce this essay to "${ao.committeeOneLiner}" in committee. The opening must force them to stop and read.`,
-            technique: 'COLD OPEN / SENSORY TIMESTAMP',
-            demonstration: null,
-            wordEconomyCut: null,
-            source: 'ao_first_read',
-            sourceRef: null,
-            priority: priority++,
-            impact: 'transformative',
-            conversatorEnrichments: [],
-          });
-        }
-      }
-    }
-
-    // ── Source 4: L3.75 Craft Assessment Growth Edges ──
+    // ── Source 3: L3.75 Craft Assessment Growth Edges ──
     const growthEdges = profile.craftAssessment?.growthEdges;
     if (growthEdges && growthEdges.length > 0) {
       sources.push('l375_growth_edges');

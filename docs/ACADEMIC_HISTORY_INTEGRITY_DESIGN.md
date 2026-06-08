@@ -470,8 +470,8 @@ function getMajorSpecificExpectations(interest: string) {
 - [ ] CDS Section C7 factor ratings (schools occasionally reclassify factors)
 
 ### Verification Tools Available
-- `tests/verify-ap-stats.ts` — Validates all 40 AP courses against canonical data (run: `npx tsx tests/verify-ap-stats.ts`)
-- `tests/test-major-resolution-comprehensive.ts` — Tests all 119 resolution cases (run: `npx tsx tests/test-major-resolution-comprehensive.ts`)
+- `tests/harness/verify-ap-stats.ts` — Validates all 40 AP courses against canonical data (run: `npx tsx tests/harness/verify-ap-stats.ts`)
+- `tests/academic/test-major-resolution-comprehensive.ts` — Tests all 119 resolution cases (run: `npx tsx tests/academic/test-major-resolution-comprehensive.ts`)
 
 ---
 
@@ -521,8 +521,8 @@ Auxiliary Layer (conversation support) — HARDCODED DATA VIOLATIONS
 ## Part 6: Testing Strategy (Updated Feb 2026)
 
 ### Existing Tests (Passing)
-- `tests/verify-ap-stats.ts` — 40/40 AP courses verified ✅
-- `tests/test-major-resolution-comprehensive.ts` — 119/119 resolution cases ✅
+- `tests/harness/verify-ap-stats.ts` — 40/40 AP courses verified ✅
+- `tests/academic/test-major-resolution-comprehensive.ts` — 119/119 resolution cases ✅
 
 ### Tests Needed for P0/P1 Fixes
 

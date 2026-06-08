@@ -1,5 +1,5 @@
 # Profile Manager Architecture (Updated)
-> Replaces PLAN.md Profile Manager references. Incorporates coordinator + domain mutators split, staleness tracking, validation, readiness scoring, and circuit breaker.
+> Replaces docs/specs/PLAN.md Profile Manager references. Incorporates coordinator + domain mutators split, staleness tracking, validation, readiness scoring, and circuit breaker.
 
 ---
 

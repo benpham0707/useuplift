@@ -384,7 +384,7 @@ class ConnectionGraph {
 | `src/services/essayIntelligence/analysis/structuralCartographer.ts` | MODIFY | L2.5 scout produces V2 connections (scout-level, tentative) |
 | `src/services/essayIntelligence/profileManager/mutators/connectionMutator.ts` | MODIFY | Update to work with V2 Connection type |
 | `src/services/essayIntelligence/analysis/reanalysisOrchestrator.ts` | MODIFY | Use connection strength for revalidation triage |
-| `tests/test-connection-graph.ts` | CREATE | Connection graph integration tests |
+| `tests/essay-intelligence/test-connection-graph.ts` | CREATE | Connection graph integration tests |
 
 ---
 

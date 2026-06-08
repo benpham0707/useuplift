@@ -277,7 +277,7 @@ Key fields:
 #### P8: Stage 0 Missing Fields in E2E Output
 **Problem:** E2E test was referencing wrong field names (`centralTheme`, `coreStrengths`, `contextSignals`).
 **Fix:** Updated to correct names: `primaryTheme`, `secondaryThemes`, `contextualFactors`. Added rendering for narrative threads, activity story roles.
-**File:** `tests/test-full-pipeline-e2e-output.ts`
+**File:** `tests/portfolio/test-full-pipeline-e2e-output.ts`
 
 #### P9: Portfolio Teaching Quality — Generic/Templated
 **Problem:** `generatePortfolioTeaching()` was producing generic recommendations.
@@ -287,7 +287,7 @@ Key fields:
 #### P10: No Projected Score Improvement
 **Problem:** No way to see estimated impact of applying transformations.
 **Fix:** Added per-activity projected score improvement rendering in E2E test. Shows `currentScore → projectedScore (+delta)` per activity and portfolio-level aggregate estimate.
-**File:** `tests/test-full-pipeline-e2e-output.ts`
+**File:** `tests/portfolio/test-full-pipeline-e2e-output.ts`
 
 ---
 
@@ -423,7 +423,7 @@ These are critical for quality — they handle the unpredictable LLM output form
 
 ### E2E Test
 ```bash
-ANTHROPIC_API_KEY="..." npx tsx tests/test-full-pipeline-e2e-output.ts
+ANTHROPIC_API_KEY="..." npx tsx tests/portfolio/test-full-pipeline-e2e-output.ts
 ```
 
 Output includes:

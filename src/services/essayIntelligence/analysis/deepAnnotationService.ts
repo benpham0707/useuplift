@@ -29,6 +29,7 @@ import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
 import type { ClaudeResponse } from '../../../lib/llm/claude';
 import { buildFabricationGuardBlock } from '../../../lib/llm/fabricationGuard';
 import { parseLlmJsonArray } from './llmJsonParser';
+import { L5_GENERATIVE_DOOR_DIRECTIVE } from './l5RewriteDirectives';
 import type {
   EssayProfile,
   ParagraphProfile,
@@ -61,6 +62,8 @@ import {
   type CorpusRetrievalTelemetry,
 } from './corpusRetrievalBlocks';
 import { buildCorpusTelemetryRecord, persistCorpusTelemetry } from './corpusTelemetryPersistence';
+import { effectivenessToTier } from './sentenceTier';
+import type { SentenceEffectivenessTier } from './sentenceTier';
 
 // ============================================================================
 // CONSTANTS
@@ -489,6 +492,21 @@ export interface L5Annotation {
    *                from the corpus) showing the principle in action
    */
   askPayload: AskPayload | null;
+
+  /**
+   * AnnotationV2 §4.3 6-tier visual convenience: the effectiveness score
+   * (0-100) of the sentence this annotation anchors to, if any.
+   *
+   * Null when `location.sentenceIndex` is null (paragraph-anchored
+   * annotation), or when the anchored sentence has no L3.5 analysis
+   * (walk-skipped paragraph).
+   *
+   * Identical to looking the anchor up in
+   * `L5AnnotationResult.sentenceEffectiveness` by
+   * (paragraphIndex, sentenceIndex) — exposed here so popup rendering is
+   * a field read rather than a grid lookup. Populated post-assembly.
+   */
+  anchorEffectiveness: number | null;
 }
 
 /**
@@ -553,6 +571,32 @@ export interface CutCandidate {
 }
 
 /**
+ * AnnotationV2 §4.3 + §8 Q1 6-tier visual: a single per-sentence
+ * effectiveness score, sourced from L3.5
+ * `AnalysisPassOutput.sentenceAnalyses[].effectiveness` and exposed on
+ * the L5 result envelope.
+ */
+export interface SentenceEffectivenessEntry {
+  paragraphIndex: number;
+  sentenceIndex: number;
+  /** 0-100, clamped. Same value as the stored `SentenceAnalysis.effectiveness`. */
+  effectiveness: number;
+  /**
+   * The 6-tier band this score maps to. Computed deterministically from
+   * `effectiveness` via `effectivenessToTier()` — backend owns the
+   * thresholds, the UI consumes this label as-is.
+   */
+  tier: SentenceEffectivenessTier;
+  /**
+   * Routing-grade confidence from L3.5 `SentenceAnalysisConfidence`.
+   * Defaults to 'high' for analyses predating confidence propagation
+   * and for the focused-analysis synthetic path. UI dims tier rendering
+   * at 'low'.
+   */
+  confidence: 'high' | 'moderate' | 'low';
+}
+
+/**
  * Annotations grouped by paragraph.
  */
 export interface ParagraphAnnotations {
@@ -596,6 +640,28 @@ export interface L5AnnotationResult {
    * structural-review directive, not inline cuts.
    */
   cutCandidates: CutCandidate[];
+
+  /**
+   * AnnotationV2 §11.5 iteration loop: celebratory copy for the phase-up
+   * beat modal. LLM-generated 15-40 word italic line referencing this
+   * essay's specific moves.
+   *
+   * Non-null only when this run crossed a phase boundary, the transition
+   * was assessed genuine (`ImprovementPhase.transition.isGenuineShift`),
+   * and the LLM produced a line. Null on first-ever analysis, unchanged
+   * phase, non-genuine shift, or LLM decline — the UI falls back to a
+   * static registry.
+   */
+  phaseTransitionLine: string | null;
+
+  /**
+   * AnnotationV2 §4.3 + §8 Q1 6-tier visual: flat per-sentence
+   * effectiveness grid sourced from L3.5. One entry per analyzed
+   * sentence; sentences with no L3.5 analysis (walk-skipped paragraphs)
+   * are omitted. Essay-level and structural annotations have no sentence
+   * tier and are not represented here.
+   */
+  sentenceEffectiveness: SentenceEffectivenessEntry[];
 
   cost: number;
   tokenUsage: {
@@ -1215,6 +1281,75 @@ class DeepAnnotationService {
       );
     }
 
+    // ── AnnotationV2 Ask 2: per-sentence effectiveness grid ──────────────
+    // Walk the profile once and expose every analyzed sentence's L3.5
+    // effectiveness score on the result envelope. Zero new LLM cost — the
+    // scores already exist on `profile.paragraphs[*].sentences[*].analysis`.
+    const sentenceEffectiveness: SentenceEffectivenessEntry[] = [];
+    const effectivenessByAnchor = new Map<string, number>();
+    for (const para of profile.paragraphs) {
+      for (const sent of para.sentences) {
+        const a = sent.analysis;
+        if (!a) continue; // sentence not analyzed (e.g., walk-skipped paragraph)
+        sentenceEffectiveness.push({
+          paragraphIndex: para.index,
+          sentenceIndex: sent.index,
+          effectiveness: a.effectiveness,
+          tier: effectivenessToTier(a.effectiveness),
+          confidence: a.confidence?.level ?? 'high',
+        });
+        effectivenessByAnchor.set(`${para.index}:${sent.index}`, a.effectiveness);
+      }
+    }
+
+    // ── AnnotationV2 Ask 2: per-annotation anchor convenience ────────────
+    // Fill `anchorEffectiveness` on every sentence-anchored annotation from
+    // the grid built above. Null stays for paragraph-anchored annotations
+    // and anchors whose sentence has no analysis.
+    for (const pa of allAnnotations.paragraphAnnotations) {
+      for (const ann of pa.annotations) {
+        if (ann.location.sentenceIndex !== null) {
+          ann.anchorEffectiveness =
+            effectivenessByAnchor.get(
+              `${ann.location.paragraphIndex}:${ann.location.sentenceIndex}`,
+            ) ?? null;
+        }
+      }
+    }
+    for (const ann of [...allAnnotations.essayLevelAnnotations, ...crossParagraphAnnotations]) {
+      if (ann.location.sentenceIndex !== null) {
+        ann.anchorEffectiveness =
+          effectivenessByAnchor.get(
+            `${ann.location.paragraphIndex}:${ann.location.sentenceIndex}`,
+          ) ?? null;
+      }
+    }
+
+    // ── AnnotationV2 Ask 1: phase-up celebratory line ────────────────────
+    // Surface the celebratory line only on a genuine phase shift. Null is
+    // the explicit "use the static UI registry" signal.
+    const phaseTransitionLine =
+      phase.transition?.isGenuineShift === true
+        ? phase.transition.celebratoryLine ?? null
+        : null;
+
+    // §6 telemetry: emitted/distribution lines for the calibration checks.
+    const tierDist = sentenceEffectiveness.reduce<Record<SentenceEffectivenessTier, number>>(
+      (acc, e) => { acc[e.tier]++; return acc; },
+      { critical: 0, needs_work: 0, functional: 0, strong: 0, exceptional: 0, masterful: 0 },
+    );
+    console.log(
+      `[L5] phaseTransitionLine: emitted=${phaseTransitionLine !== null} ` +
+      `length=${phaseTransitionLine?.split(/\s+/).filter(Boolean).length ?? 0} ` +
+      `priorPhase=${phase.transition?.priorLevel ?? 'none'} newPhase=${phase.level}`,
+    );
+    console.log(
+      `[L5] sentenceEffectiveness: count=${sentenceEffectiveness.length} ` +
+      `tier_dist={critical:${tierDist.critical},needs_work:${tierDist.needs_work},` +
+      `functional:${tierDist.functional},strong:${tierDist.strong},` +
+      `exceptional:${tierDist.exceptional},masterful:${tierDist.masterful}}`,
+    );
+
     return {
       paragraphAnnotations: allAnnotations.paragraphAnnotations,
       essayLevelAnnotations: allAnnotations.essayLevelAnnotations,
@@ -1224,6 +1359,8 @@ class DeepAnnotationService {
       surfacedCount,
       densityDiagnostics,
       cutCandidates: finalCutCandidates,
+      phaseTransitionLine,
+      sentenceEffectiveness,
       cost: totalCost,
       tokenUsage: totalTokenUsage,
       timingMs: Date.now() - startTime,
@@ -1437,6 +1574,8 @@ REWRITE QUALITY BAR:
 - The rewrite must demonstrate the specific improvement being taught.
 - 2-4 sentences max. Not a complete paragraph replacement.
 - When detected phrases exist in this paragraph, use the exact quoted phrase as the implicit BEFORE.
+
+${L5_GENERATIVE_DOOR_DIRECTIVE}
 
 AO STAKES GROUNDING (the stakes field):
 When the HOLISTIC UNDERSTANDING includes AO Archetype + pool density + differentiator (rendered earlier in this prompt), use them to ground the "stakes" field in AO phenomenology — what the reader actually experiences at this sentence.
@@ -2617,6 +2756,9 @@ ${buildFabricationGuardBlock()}`;
         // pre-feature behavior is preserved.
         revisionMode: resolveRevisionMode(raw.revisionMode, teachingMode, raw.priority ?? 3),
         askPayload: null, // set below alongside mutual-exclusion enforcement
+        // AnnotationV2 §4.3: filled by the post-assembly pass in generate()
+        // from the sentenceEffectiveness grid. Null until then.
+        anchorEffectiveness: null,
       });
 
       // Stage 2.D (Item 8): mutual-exclusion enforcement. When the LLM picked
@@ -2650,6 +2792,7 @@ ${buildFabricationGuardBlock()}`;
 
     return valid;
   }
+
 
   /**
    * Stage 2.F: validate per-paragraph cutCandidates raw emissions against the

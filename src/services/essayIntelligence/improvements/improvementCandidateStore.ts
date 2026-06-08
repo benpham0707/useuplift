@@ -16,7 +16,7 @@
  * The LLM assigns `coachingValue`, `technique`, and decides consolidation.
  * The store only validates referential integrity and lifecycle transitions.
  *
- * Scope 2 Phase 4. Reference: FORGE_PLAN_SCOPE2.md Item 1.
+ * Scope 2 Phase 4. Reference: docs/specs/FORGE_PLAN_SCOPE2.md Item 1.
  */
 
 import type {

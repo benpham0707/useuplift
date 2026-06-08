@@ -179,25 +179,6 @@ function renderPipelineOverview(result: PipelineResult, essayText: string, pipel
   return lines.join('\n') + '\n';
 }
 
-function renderAOFirstRead(profile: EssayProfile): string {
-  const lines: string[] = [];
-  lines.push('## 2. AO First Read\n');
-
-  if (!profile.aoFirstRead) {
-    lines.push('(not available — AO First Read call may have failed)\n');
-    return lines.join('\n');
-  }
-
-  const ao = profile.aoFirstRead;
-  lines.push(`- **Hook moment**: ${safe(ao.hookMoment)}`);
-  lines.push(`- **Committee one-liner**: ${safe(ao.committeeOneLiner)}`);
-  lines.push(`- **Distinctiveness signal**: ${safe(ao.distinctivenessSignal)}`);
-  lines.push(`- **Put-down risk**: ${safe(ao.putDownRisk)}`);
-  lines.push(`\n**Gut Reaction:**\n`);
-  lines.push(`> ${ao.gutReaction}`);
-
-  return lines.join('\n') + '\n';
-}
 
 function renderNorthStar(profile: EssayProfile): string {
   const lines: string[] = [];
@@ -692,8 +673,15 @@ function renderHolisticUnderstanding(profile: EssayProfile): string {
       }
       lines.push('');
     } else {
-      lines.push('*No single defining move identified for this essay.*\n');
-      lines.push('Your essay\'s craft is distributed across multiple strengths rather than concentrated in one identity-defining technique. Both shapes can succeed — some essays earn admission through one unforgettable move, others through sustained competence across many craft elements. See your **Strength Signatures** below for the full picture of your craft.\n');
+      // Report the HONEST reason. Only 'llm_null' is a genuine verdict about the
+      // essay (no single dominant move = distributed craft). The other reasons
+      // are pipeline gaps and must NOT be dressed up as a flattering craft story.
+      const reason = ca.signatureMoveNullReason;
+      if (reason == null || reason === 'llm_null') {
+        lines.push('*No single dominant signature move — this essay\'s craft is distributed across multiple strengths (see Strength Signatures below).*\n');
+      } else {
+        lines.push(`*Signature move not available (reason: \`${reason}\`). This is a pipeline gap — the move was not produced or could not be grounded — NOT a verdict that the essay lacks a defining move. Do not read this as "distributed craft."*\n`);
+      }
     }
 
     if (ca.strengthSignatures.length > 0) {
@@ -1417,8 +1405,6 @@ async function main(): Promise<void> {
   sections.push('');
 
   sections.push(renderPipelineOverview(pipelineResult, essayText, pipelineTimeMs));
-  sections.push('---\n');
-  sections.push(renderAOFirstRead(profile));
   sections.push('---\n');
   sections.push(renderNorthStar(profile));
   sections.push('---\n');
