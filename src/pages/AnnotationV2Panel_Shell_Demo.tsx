@@ -20,8 +20,8 @@ import {
   usePanelMode,
   type InsightTabId,
   type PanelMode,
-} from '@/components/annotation-v2/panel';
-import { sampleProfile } from '@/components/annotation-v2/fixtures/sampleProfile';
+} from '@/components/annotation-v2-engine/panel';
+import { sampleProfile } from '@/components/annotation-v2-engine/fixtures/sampleProfile';
 import '@/components/annotation-v2/workshop.css';
 
 // Strongest sentence in the fixture (p3s5, MASTERFUL) and a CRITICAL

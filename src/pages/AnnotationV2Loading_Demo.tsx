@@ -25,8 +25,8 @@ import {
   type LoadingStatus,
   type UseLoadingState,
   SLOW_PATH_THRESHOLDS,
-} from '@/components/annotation-v2/loading';
-import { TYPOGRAPHY } from '@/components/annotation-v2';
+} from '@/components/annotation-v2-engine/loading';
+import { TYPOGRAPHY } from '@/components/annotation-v2-engine';
 import '@/components/annotation-v2/workshop.css';
 
 // ---------------------------------------------------------------------------

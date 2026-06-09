@@ -31,9 +31,9 @@ import {
   usePanelMode,
   type InsightTabId,
   type NavStackEntry,
-} from '@/components/annotation-v2/panel';
-import { sampleProfile } from '@/components/annotation-v2/fixtures/sampleProfile';
-import type { Tier } from '@/components/annotation-v2/tokens';
+} from '@/components/annotation-v2-engine/panel';
+import { sampleProfile } from '@/components/annotation-v2-engine/fixtures/sampleProfile';
+import type { Tier } from '@/components/annotation-v2-engine/tokens';
 import '@/components/annotation-v2/workshop.css';
 
 // ---------------------------------------------------------------------------

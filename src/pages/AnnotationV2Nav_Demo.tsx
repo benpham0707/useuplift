@@ -27,8 +27,8 @@ import {
   usePanelMode,
   useNavStack,
   type PanelMode,
-} from '@/components/annotation-v2/panel';
-import { sampleProfile } from '@/components/annotation-v2/fixtures/sampleProfile';
+} from '@/components/annotation-v2-engine/panel';
+import { sampleProfile } from '@/components/annotation-v2-engine/fixtures/sampleProfile';
 import {
   useSmartOrder,
   useViewedState,
@@ -37,8 +37,8 @@ import {
   ProgressBar,
   NavButtons,
   EndOfReview,
-} from '@/components/annotation-v2/nav';
-import { TIER_META, TYPOGRAPHY } from '@/components/annotation-v2';
+} from '@/components/annotation-v2-engine/nav';
+import { TIER_META, TYPOGRAPHY } from '@/components/annotation-v2-engine';
 import '@/components/annotation-v2/workshop.css';
 
 export default function AnnotationV2NavDemo() {

@@ -26,19 +26,19 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   CopyDelayToast,
   RewriteCard,
-} from '@/components/annotation-v2/panel';
-import { sampleProfile } from '@/components/annotation-v2/fixtures/sampleProfile';
+} from '@/components/annotation-v2-engine/panel';
+import { sampleProfile } from '@/components/annotation-v2-engine/fixtures/sampleProfile';
 import type {
   Annotation,
   RewriteSuggestion,
   SentenceProfile,
-} from '@/components/annotation-v2/types/profile';
+} from '@/components/annotation-v2-engine/types/profile';
 import {
   TIER_CSS_VAR,
   TIER_META,
   TYPOGRAPHY,
   type Tier,
-} from '@/components/annotation-v2/tokens';
+} from '@/components/annotation-v2-engine/tokens';
 import '@/components/annotation-v2/workshop.css';
 
 // ---------------------------------------------------------------------------

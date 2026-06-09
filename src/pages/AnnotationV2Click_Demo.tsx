@@ -26,18 +26,18 @@ import {
   AnnotationEditor,
   type ParagraphTintPhase,
   type UnderlinePhase,
-} from '@/components/annotation-v2/editor';
+} from '@/components/annotation-v2-engine/editor';
 import {
   PanelShell,
   usePanelMode,
-} from '@/components/annotation-v2/panel';
+} from '@/components/annotation-v2-engine/panel';
 import {
   useClickManager,
   SentenceRing,
   HoverTooltip,
   type ClickTimelineState,
-} from '@/components/annotation-v2/click';
-import { sampleProfile } from '@/components/annotation-v2/fixtures/sampleProfile';
+} from '@/components/annotation-v2-engine/click';
+import { sampleProfile } from '@/components/annotation-v2-engine/fixtures/sampleProfile';
 import '@/components/annotation-v2/workshop.css';
 
 // A handful of sentences spread across tiers, for the rapid-click stress
@@ -247,8 +247,8 @@ export default function AnnotationV2ClickDemo() {
 
 function DomRing(props: {
   readonly sentenceId: string;
-  readonly tier: import('@/components/annotation-v2').Tier;
-  readonly phase: import('@/components/annotation-v2/click').SentenceRingPhase;
+  readonly tier: import('@/components/annotation-v2-engine').Tier;
+  readonly phase: import('@/components/annotation-v2-engine/click').SentenceRingPhase;
   readonly container: HTMLElement;
   readonly reducedMotion: boolean;
 }) {

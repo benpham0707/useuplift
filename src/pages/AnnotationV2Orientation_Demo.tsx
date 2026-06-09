@@ -40,10 +40,10 @@ import {
   useScreenReaderOrientation,
   type HintAnchor,
   type HintId,
-} from '@/components/annotation-v2/orientation';
-import { StartHereChip } from '@/components/annotation-v2/bloom';
-import type { PanelMode } from '@/components/annotation-v2/panel';
-import { TYPOGRAPHY, Z_LAYER } from '@/components/annotation-v2';
+} from '@/components/annotation-v2-engine/orientation';
+import { StartHereChip } from '@/components/annotation-v2-engine/bloom';
+import type { PanelMode } from '@/components/annotation-v2-engine/panel';
+import { TYPOGRAPHY, Z_LAYER } from '@/components/annotation-v2-engine';
 import '@/components/annotation-v2/workshop.css';
 
 // ---------------------------------------------------------------------------

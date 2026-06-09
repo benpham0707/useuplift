@@ -21,7 +21,7 @@ import {
   type EssayProfile,
   type ParagraphTintPhase,
   type UnderlinePhase,
-} from '@/components/annotation-v2/editor';
+} from '@/components/annotation-v2-engine/editor';
 
 // ---------------------------------------------------------------------------
 // Hardcoded fixture

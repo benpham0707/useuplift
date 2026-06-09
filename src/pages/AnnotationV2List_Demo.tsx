@@ -19,19 +19,19 @@ import {
   PanelShell,
   usePanelMode,
   type PanelMode,
-} from '@/components/annotation-v2/panel';
+} from '@/components/annotation-v2-engine/panel';
 import {
   ListView,
   ListToolbarToggle,
   Minimap,
-} from '@/components/annotation-v2/list';
+} from '@/components/annotation-v2-engine/list';
 import type {
   FilterState,
   ListGrouping,
   ListSorting,
   ViewedState,
-} from '@/components/annotation-v2/types/navigation';
-import { sampleProfile } from '@/components/annotation-v2/fixtures/sampleProfile';
+} from '@/components/annotation-v2-engine/types/navigation';
+import { sampleProfile } from '@/components/annotation-v2-engine/fixtures/sampleProfile';
 import '@/components/annotation-v2/workshop.css';
 
 const EMPTY_FILTER: FilterState = {

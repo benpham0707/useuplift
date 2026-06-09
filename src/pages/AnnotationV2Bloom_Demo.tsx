@@ -35,26 +35,26 @@ import {
 import {
   AnnotationEditor,
   type ParagraphTintPhase as EditorParagraphTintPhase,
-} from '@/components/annotation-v2/editor';
-import type { UnderlinePhase } from '@/components/annotation-v2/editor';
+} from '@/components/annotation-v2-engine/editor';
+import type { UnderlinePhase } from '@/components/annotation-v2-engine/editor';
 import {
   PanelShell,
   usePanelMode,
   type InsightTabId,
-} from '@/components/annotation-v2/panel';
+} from '@/components/annotation-v2-engine/panel';
 import {
   useLoadingState,
   VaporScan,
   LayerRibbon,
-} from '@/components/annotation-v2/loading';
+} from '@/components/annotation-v2-engine/loading';
 import {
   HeaderNarrative,
   StartHereChip,
   useBloomChoreography,
   BLOOM_TIMELINE,
-} from '@/components/annotation-v2/bloom';
-import { sampleProfile } from '@/components/annotation-v2/fixtures/sampleProfile';
-import { TYPOGRAPHY } from '@/components/annotation-v2';
+} from '@/components/annotation-v2-engine/bloom';
+import { sampleProfile } from '@/components/annotation-v2-engine/fixtures/sampleProfile';
+import { TYPOGRAPHY } from '@/components/annotation-v2-engine';
 import '@/components/annotation-v2/workshop.css';
 
 // ---------------------------------------------------------------------------
