@@ -7,6 +7,7 @@
  */
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from './types';
+import { clerkAuthFetch } from './clerkAuthFetch';
 
 // Hard-coded fallback values (these are publishable/public keys, safe to embed)
 const FALLBACK_URL = 'https://wrppjajhxiftzddeeqsk.supabase.co';
@@ -31,6 +32,11 @@ export function getSupabase(): SupabaseClient<Database> {
         storage: localStorage,
         persistSession: true,
         autoRefreshToken: true,
+      },
+      // Authenticate Data API requests as the Clerk user so RLS
+      // (auth.jwt() ->> 'sub') applies. Falls back to anon when logged out.
+      global: {
+        fetch: clerkAuthFetch,
       },
     });
   }
