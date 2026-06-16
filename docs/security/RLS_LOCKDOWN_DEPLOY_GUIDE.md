@@ -10,13 +10,36 @@ from here. Do them **in order**.
 
 ---
 
-## ⏱️ Why this is time-sensitive
+## 🚨 P0 — Logged-in users are degraded RIGHT NOW until this deploys
 
-The DB is locked **now**. The frontend currently in production still uses the
-old anon client, so its `profiles` reads (credits display, onboarding, profile
-widgets) now return **empty** until the client change in this PR ships. There is
-**no data leak** in the interim — only empty reads in those legacy spots.
-**Merging + deploying this PR closes that gap.**
+The DB is locked **now**, but the frontend currently in production still uses the
+old **anon** client (no Clerk JWT). With `profiles` locked, those anon reads return
+**empty**, and the impact is **worse than "empty widgets"**:
+
+- `RequireTermsAccepted` wraps the entire `DashboardLayout` (App.tsx). It reads
+  `profiles.terms_accepted_at` via the anon client → now gets `null` → shows the
+  **terms-acceptance gate to every logged-in user**, including those who already
+  accepted. Clicking "Accept" then does an anon `UPDATE`/`INSERT` on `profiles`,
+  which RLS now blocks → the user is **stuck behind the gate and cannot enter the
+  dashboard.** In effect, **authenticated users are locked out of the app** until
+  the client fix (PR #36) is deployed.
+- Same cause degrades credits display, onboarding status, and profile widgets.
+
+There is **no PII data leak** in this window — reads return empty and writes are
+denied — but it is a **functional outage for logged-in users**. This is the
+unavoidable cost of closing an active breach (134 PII rows were world-readable)
+*before* the client fix could ship.
+
+**There is no safe DB-side interim mitigation:** the deployed client sends no user
+identity to Supabase, so nothing server-side can scope to the user without
+reopening the hole. The **only** fix is shipping the client change.
+
+**Therefore the #1 priority is deploying PR #36 (which requires the Vercel build to
+be fixed first — see §1).** If that cannot happen quickly, this is a conscious
+incident trade-off for an owner to make: **accept the logged-in degradation
+(recommended — no data leak)** vs. temporarily reverting the security migration
+(**not recommended** — reopens the PII breach). Do **not** revert without a hard
+plan to re-secure within the hour.
 
 ---
 
