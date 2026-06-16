@@ -10,29 +10,32 @@
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/safeClient';
 
-// Hard-coded fallback values (publishable/public keys, safe to embed)
-const FALLBACK_URL = 'https://wrppjajhxiftzddeeqsk.supabase.co';
-const FALLBACK_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndycHBqYWpoeGlmdHpkZGVlcXNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExMTI2NTcsImV4cCI6MjA4NjY4ODY1N30.cFgyAcfDn6e15KYr_xpiLwfgyUJyOSlE9PoHD3aXhhs';
-
-// Guard `import.meta.env` access for server-side (tsx/node) imports where
-// Vite is not the loader. Client builds still resolve these at compile time.
+// Resolve Supabase config from the environment. NO cross-project fallback: a
+// hardcoded default would silently connect to the WRONG project when env is
+// missing (e.g. a misconfigured deploy), masking the misconfig. Fail closed.
 const VITE_ENV: Record<string, string | undefined> =
   (typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: Record<string, string | undefined> }).env) ||
   {};
 const SUPABASE_URL =
   VITE_ENV.VITE_SUPABASE_URL ||
-  (typeof process !== 'undefined' ? process.env?.VITE_SUPABASE_URL : undefined) ||
-  FALLBACK_URL;
+  (typeof process !== 'undefined' ? process.env?.VITE_SUPABASE_URL : undefined);
 const SUPABASE_PUBLISHABLE_KEY =
   VITE_ENV.VITE_SUPABASE_ANON_KEY ||
-  (typeof process !== 'undefined' ? process.env?.VITE_SUPABASE_ANON_KEY : undefined) ||
-  FALLBACK_KEY;
+  (typeof process !== 'undefined' ? process.env?.VITE_SUPABASE_ANON_KEY : undefined);
 
 /**
- * Create an authenticated Supabase client using Clerk JWT token
- * Uses the anon key for API access but overrides the Authorization header with the Clerk JWT
+ * Create an authenticated Supabase client using Clerk JWT token.
+ * Uses the anon key for API access but overrides the Authorization header with
+ * the Clerk JWT so Postgres RLS resolves the caller via auth.jwt() ->> 'sub'.
+ * Throws (fail closed) if Supabase env config is missing.
  */
 function getAuthenticatedClient(token: string) {
+  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+    throw new Error(
+      '[creditsService] Missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY — ' +
+      'refusing to create a Supabase client with no configuration.'
+    );
+  }
   return createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     global: {
       headers: {
@@ -171,12 +174,11 @@ export async function deductCredits(
   token: string
 ): Promise<CreditDeductionResult> {
   try {
-    // Use authenticated client for the update
+    // Use authenticated client so the RPC resolves the caller via the Clerk JWT.
     const client = getAuthenticatedClient(token);
-    
-    // First, get current balance to check if sufficient
+
+    // Friendly early-out: avoid an RPC round-trip for the obvious zero-balance case.
     const currentBalance = await getCredits(userId, token);
-    
     if (currentBalance < amount) {
       return {
         success: false,
@@ -185,40 +187,31 @@ export async function deductCredits(
       };
     }
 
-    const newBalance = currentBalance - amount;
+    // Deduct via the SECURITY DEFINER RPC. The caller identity is derived
+    // server-side from auth.jwt() ->> 'sub' (NOT the passed userId), the balance
+    // is decremented atomically with a `credits >= amount` guard, and the
+    // credit_transactions row is logged in the same transaction. Direct UPDATE
+    // of profiles.credits is revoked from `authenticated`, so this is the only
+    // path — a user cannot inflate their own balance.
+    const { data, error } = await client.rpc('deduct_credits', {
+      p_amount: amount,
+      p_type: type,
+      p_description: description,
+    });
 
-    // Update the credits balance using authenticated client
-    const { error: updateError, count } = await client
-      .from('profiles')
-      .update({ credits: newBalance })
-      .eq('user_id', userId)
-      .select();
-
-    if (updateError) {
+    if (error) {
+      // RPC raises on insufficient balance (race) or any failure.
+      const insufficient = /insufficient/i.test(error.message);
       return {
         success: false,
         newBalance: currentBalance,
-        error: `Failed to update credits: ${updateError.message}`,
+        error: insufficient
+          ? `Insufficient credits. Current: ${currentBalance}, Required: ${amount}`
+          : `Failed to deduct credits: ${error.message}`,
       };
     }
 
-    // Log the transaction (negative amount for usage)
-    // Note: This may fail if credit_transactions table has wrong schema for Clerk
-    try {
-      const { error: transactionError } = await client
-        .from('credit_transactions')
-        .insert({
-          user_id: userId,
-          amount: -amount, // Negative because it's a deduction
-          type,
-          description,
-        });
-
-      if (transactionError) {
-        // Log but don't fail - the deduction succeeded
-      }
-    } catch (txErr) {
-    }
+    const newBalance = Number(data);
 
     // Dispatch event to update UI components
     if (typeof window !== 'undefined') {
@@ -227,7 +220,7 @@ export async function deductCredits(
 
     return {
       success: true,
-      newBalance,
+      newBalance: Number.isFinite(newBalance) ? newBalance : currentBalance - amount,
     };
   } catch (err) {
     return {
