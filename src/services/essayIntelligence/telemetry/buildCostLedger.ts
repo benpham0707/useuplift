@@ -31,8 +31,12 @@
 // parse failure on init halts the caller. We do not soft-fail the cap
 // to keep a caller's API call going.
 
-import { existsSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
-import { resolve } from 'path';
+// Default-imported (not named) so this Node-only module stays browser-COMPILABLE:
+// claude.ts lazy-loads it via dynamic import (Node-only at runtime), but Vite still
+// has to compile the resulting chunk for the browser, and named imports of Node
+// builtins hard-fail browser externalization. Default imports externalize cleanly.
+import fs from 'fs';
+import path from 'path';
 
 import type { IterationTelemetryEvent } from '../profileTypes';
 import { emitIterationEvent } from './iterationTelemetry';
@@ -51,7 +55,7 @@ export const HARD_CAP_USD = 15.0;
 export const WARN_THRESHOLD_USD = 13.0;
 
 /** Path to the markdown ledger at repo root. */
-export const LEDGER_PATH = resolve(process.cwd(), 'BUILD_COST_LEDGER.md');
+export const LEDGER_PATH = path.resolve(process.cwd(), 'BUILD_COST_LEDGER.md');
 
 /** Header row format. Order matches `appendEntryToLedger`'s row layout. */
 const LEDGER_HEADER = `# Build Cost Ledger
@@ -150,13 +154,13 @@ let warnCrossed = false;
  */
 export function initLedger(): void {
   if (initialized) return;
-  if (!existsSync(LEDGER_PATH)) {
-    writeFileSync(LEDGER_PATH, LEDGER_HEADER, 'utf-8');
+  if (!fs.existsSync(LEDGER_PATH)) {
+    fs.writeFileSync(LEDGER_PATH, LEDGER_HEADER, 'utf-8');
     cumulativeUsd = 0;
     initialized = true;
     return;
   }
-  const content = readFileSync(LEDGER_PATH, 'utf-8');
+  const content = fs.readFileSync(LEDGER_PATH, 'utf-8');
   cumulativeUsd = parseCumulativeFromLedger(content);
   warnCrossed = cumulativeUsd >= WARN_THRESHOLD_USD;
   initialized = true;
@@ -308,7 +312,7 @@ function appendEntryToLedger(entry: BuildCostEntry & { timestamp: string }): voi
     entry.outputUsd != null ? entry.outputUsd.toFixed(4) : ' ',
   ];
   const row = `| ${cells.join(' | ')} |\n`;
-  appendFileSync(LEDGER_PATH, row, 'utf-8');
+  fs.appendFileSync(LEDGER_PATH, row, 'utf-8');
 }
 
 // ─── Test-only ─────────────────────────────────────────────────────────
