@@ -1,5 +1,12 @@
 # Essay #10 — Marcus — "The Zoo" (Harvard 2028)
 
+> **✅ CORRECTED (2026-06-20, FOUNDATION_AUDIT truth-pass):** An earlier draft called the hinge "Until I
+> became one." a *one-sentence / single-sentence paragraph*. That was FALSE — in the raw essay it is the
+> SECOND sentence of a two-sentence paragraph ("I didn't think much of the otters after that. Until I
+> became one."). The prose below has been rewritten to the verified move: *a short, set-apart hinge
+> paragraph (here two sentences) ending on a compact fragment pivot*. Enforced by
+> `tests/calibration/verifyGoldClaims.ts` (pins paragraph 2 as NOT a one-sentence paragraph).
+
 **Review methodology**: v2.1 (sentence-level close reading, replication-focused, cross-topic transplantation required, weakness-analysis minimized).
 
 **Source**: Harvard Crimson Brand Studio sponsored feature, consultant commentary by MR. MBA® (Val Misra).
@@ -78,7 +85,7 @@ This is the sentence that converts the entire opening paragraph from memory-scen
 
 Let's name what this sentence does structurally:
 
-1. **The turn is placed in its own paragraph.** A one-sentence paragraph is a structural flare; it signals "everything is about to change." Placing this sentence inside paragraph 1 would weaken it; placing it at the start of paragraph 3 would make it feel like another opening. The isolated paragraph-2-as-hinge is the right architecture.
+1. **The turn closes a short, two-sentence hinge paragraph.** Paragraph 2 is just two sentences — "I didn't think much of the otters after that. Until I became one." — and the three-word fragment lands at its end. The brevity of the whole paragraph (after paragraph 1's long memory-scene) is a structural flare; it signals "everything is about to change." Folding the hinge into paragraph 1 would bury it; making it the start of paragraph 3 would make it feel like another opening. A short stand-alone hinge paragraph, with the flat first sentence releasing the memory and the fragment pivoting the frame, is the right architecture. (The hinge is the second sentence of this paragraph, not a one-sentence paragraph on its own.)
 
 2. **The sentence is grammatically incomplete.** "Until I became one" is a fragment — a dependent clause that extends paragraph 1's sentence. This produces continuity AND rupture at once: the grammar reaches back into the previous paragraph, but the meaning leaps forward.
 
@@ -296,17 +303,17 @@ Nineteen named moves. Each includes: what it is, how to detect it, and a transpl
 
 ---
 
-### Move 7 — The one-sentence hinge paragraph
+### Move 7 — The short-fragment hinge closing a brief hinge paragraph
 
-**What**: "Until I became one." — a single-sentence paragraph that pivots the entire essay from memory-mode to present-mode. Grammatically incomplete (it's a dependent clause), which creates continuity AND rupture.
+**What**: "Until I became one." — a three-word fragment that pivots the entire essay from memory-mode to present-mode. It is the *second* sentence of a short two-sentence hinge paragraph ("I didn't think much of the otters after that. Until I became one."), not a paragraph on its own. The flat first sentence releases the memory; the fragment turns the frame. Grammatically incomplete (a dependent clause that extends the prior sentence), which creates continuity AND rupture.
 
-**How to detect**: Does your essay have a turn — a moment where the entire frame of the essay shifts? Is that turn given its own paragraph? Is it as short as possible?
+**How to detect**: Does your essay have a turn — a moment where the entire frame of the essay shifts? Is that turn isolated in a SHORT paragraph (one or two sentences) that stands apart from the long scene before it? Is the pivot sentence itself as compact as possible?
 
-**Transplant test — illness essay**: After a paragraph describing a character trait (e.g., punctuality, reliability): *Until the seizures started.* (Short fragment; its own paragraph.)
+**Transplant test — illness essay**: After a paragraph describing a character trait (e.g., punctuality, reliability), a short hinge paragraph that ends on a fragment: *I never thought it would change. Until the seizures started.*
 
-**Transplant test — identity essay**: After a paragraph establishing childhood normalcy: *Then my parents got divorced.* (Too flat — give it rhythm.) Better: *Then it was just us.* (Short fragment; fewer words; more work per word.)
+**Transplant test — identity essay**: After a paragraph establishing childhood normalcy: *Then my parents got divorced.* (Too flat — give it rhythm.) Better, as the close of a short hinge paragraph: *Then it was just us.* (Short fragment; fewer words; more work per word.)
 
-**Craft note**: The one-sentence hinge works best when the sentence itself is compact, is grammatically connected to the previous paragraph, and is emotionally neutral in its phrasing. Drama in the hinge sentence ("and then my whole world came crashing down") is ALWAYS worse than the flat version.
+**Craft note**: The hinge works best when the pivot sentence itself is compact, is grammatically connected to the sentence before it, sits in a short paragraph set off from the longer scene that precedes it, and is emotionally neutral in its phrasing. Drama in the hinge sentence ("and then my whole world came crashing down") is ALWAYS worse than the flat version.
 
 ---
 
@@ -534,7 +541,7 @@ Ten principles drawn from the 19 moves:
 Val Misra's "MR. MBA®" commentary reads the essay paragraph-by-paragraph as a narrative arc with labeled stages ("A-ha moment," "victory lap"). The framing is MBA-pitch-style — the essay as a story of challenge-to-triumph. This is commercial consultant framing; it is not how an admissions officer would read.
 
 The commentary NAMES that the metaphor works, NAMES that the bullying scene is effective, NAMES that the closing list is emotionally resonant. The commentary does NOT name:
-- The one-sentence hinge paragraph ("Until I became one") as a structural choice
+- The short two-sentence hinge paragraph closing on the fragment "Until I became one" as a structural choice
 - The double-naming of the metaphor (paragraph 2 oblique, paragraph 5 direct)
 - The anti-dramatic transition ("I didn't think much of the otters after that")
 - The refusal of external resolution
@@ -607,9 +614,9 @@ Current scoring may not distinguish between "metaphor gestured at" and "metaphor
 
 ### L4 Crystallizer — Hinge-Paragraph Detection
 
-A one-sentence paragraph (especially a grammatically dependent one) is a strong structural signal. The crystallizer should flag one-sentence paragraphs and check whether they function as hinges (converting essay's frame) or as throwaways.
+A short hinge paragraph (one or two sentences, set off from a longer surrounding scene — here, the two-sentence "I didn't think much of the otters after that. Until I became one.") is a strong structural signal, especially when its pivot sentence is a grammatically dependent fragment. The crystallizer should flag such short hinge paragraphs and check whether they function as hinges (converting the essay's frame) or as throwaways. Note: the signal is the *short, set-apart paragraph ending on a compact pivot*, not strictly a single-sentence paragraph — Marcus's hinge is a two-sentence paragraph.
 
-**Candidate check**: `oneSentenceParagraph: { present: boolean, functionsAsHinge: boolean, frameConversion: string }`
+**Candidate check**: `shortHingeParagraph: { sentenceCount: number, pivotSentenceIsFragment: boolean, functionsAsHinge: boolean, frameConversion: string }`
 
 ### L5 Deep Annotation — Claim-Discipline Audit
 

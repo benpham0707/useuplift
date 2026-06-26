@@ -1,0 +1,37 @@
+{
+  "id": "essays-supplement-expectations-005",
+  "domain": "essays",
+  "subtopic": "supplement-expectations",
+  "claim": "MIT (2025-26) replaces a single long essay with five short responses (~100-200 words each). Two are directly relevant to this subtopic: a 'Why this field at MIT' prompt ('What field of study appeals to you the most right now?' + explain your interest at MIT) and a collaboration/community prompt ('MIT brings people with diverse backgrounds together to collaborate... Describe one way you have collaborated with others to learn from them, with them, or contribute to your community together.').",
+  "application": [
+    {
+      "kind": "how-to",
+      "content": "For the MIT 'field of study' short response, do not write a why-major manifesto in 200 words - show a concrete hook into the field (a problem, a build, a question) and one specific reason MIT is where to pursue it (a lab, a class like 6.x, UROP, a maker culture detail). For the collaboration prompt, pick a real instance of working WITH others (not leading over them); MIT's framing rewards mutual learning and contribution, so center the relationship and what was built together, not the writer's individual achievement.",
+      "dimensionTags": ["school_program_fit", "intellectual_vitality_curiosity"]
+    },
+    {
+      "kind": "diagnostic-signal",
+      "content": "Because each MIT response is ~100-200 words, the failure mode is trying to do too much - a generic 'I love STEM' field answer or a collaboration story that is really a solo leadership brag. Strong signal: one tight, concrete scene per prompt. Weak signal: abstractions and lists compressed into the word limit.",
+      "dimensionTags": ["originality_specificity_voice", "school_program_fit"]
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Essays, activities & academics - MIT Admissions (five short-response prompts, ~100-200 words, 2025-26)",
+      "url": "https://mitadmissions.org/apply/firstyear/essays-activities-academics/",
+      "tier": 1,
+      "authorRole": "MIT Admissions (institution)",
+      "publishedDate": "2025-08-01",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2025-08-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "volatile",
+  "connections": [
+    { "toId": "essays-supplement-expectations-006", "relation": "instance-of", "note": "MIT's field-of-study prompt is a Why-Us/Why-Major instance; the fit-evidence rule applies in miniature." },
+    { "toId": "essays-supplement-expectations-008", "relation": "supports", "note": "MIT's collaboration prompt is part of the broader community/collaboration prompt trend post-2023." }
+  ],
+  "provenanceTrail": "Prompt text, count (five), and ~100-200 word range pulled verbatim from MIT Admissions' official essays page (WebFetch 2026-06-18), which self-labels as the 2025-26 cycle. Tier-1 institution source. Volatile; re-verify each cycle (MIT revises its short-prompt set periodically)."
+}

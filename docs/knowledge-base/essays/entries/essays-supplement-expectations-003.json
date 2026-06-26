@@ -1,0 +1,46 @@
+{
+  "id": "essays-supplement-expectations-003",
+  "domain": "essays",
+  "subtopic": "supplement-expectations",
+  "claim": "Stanford's intellectual-vitality essay (2025-26, 100-250 words) is: 'The Stanford community is deeply curious and driven to learn in and out of the classroom. Reflect on an idea or experience that makes you genuinely excited about learning.' Stanford's own holistic-review guidance describes the trait it is testing as students 'brimming with curiosity, openness, and imagination' and looks for evidence of how an applicant 'expanded your perspective and sought new opportunities.'",
+  "application": [
+    {
+      "kind": "decision-rule",
+      "content": "Answer the intellectual-vitality prompt with a SPECIFIC idea or learning experience and the writer's authentic relationship to it - not with a topic chosen because it sounds prestigious. The trait being measured is unforced curiosity ('learning in and out of the classroom'), so a non-academic obsession pursued with real depth beats a textbook-sounding 'I love physics.' Litmus test: could the writer talk about this for an hour unprompted? If not, pick a different idea.",
+      "dimensionTags": ["intellectual_vitality_curiosity"]
+    },
+    {
+      "kind": "diagnostic-signal",
+      "content": "Weak signal: the essay asserts curiosity ('I have always been intellectually curious') and then lists achievements - this is the exact pattern Stanford's prompt screens against ('not the same as good grades or a lot of extracurriculars'). Strong signal: the essay SHOWS a moment of getting pulled into an idea and following it past where school required, demonstrating learning for its own sake.",
+      "dimensionTags": ["intellectual_vitality_curiosity", "originality_specificity_voice"]
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Application and Essays - Stanford Undergraduate Admission (three short essays, 100-250 words; intellectual-vitality prompt)",
+      "url": "https://admission.stanford.edu/apply/first-year/apply.html",
+      "tier": 1,
+      "authorRole": "Stanford Undergraduate Admission (institution)",
+      "publishedDate": "2025-08-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Holistic Admission - Stanford Undergraduate Admission (what Stanford looks for; curiosity/openness/imagination)",
+      "url": "https://admission.stanford.edu/apply/overview/index.html",
+      "tier": 1,
+      "authorRole": "Stanford Undergraduate Admission (institution)",
+      "publishedDate": "2025-08-01",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2025-08-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "volatile",
+  "connections": [
+    { "toId": "essays-supplement-expectations-007", "relation": "supports", "note": "Reinforces the cross-school principle that idea-essays reward engagement over credential." },
+    { "toId": "essays-supplement-expectations-002", "relation": "same-pattern", "note": "Parallel to Yale's academic-topic essay - both reward a genuine exciting idea." },
+    { "toId": "essays-supplement-expectations-004", "relation": "same-school-companion", "note": "Evaluated alongside Stanford's contribution essay; together they map curiosity + community fit." }
+  ],
+  "provenanceTrail": "Prompt verbatim and 100-250 word range from Stanford's official /apply page (WebFetch 2026-06-18); the 'curiosity, openness, imagination' framing corroborated from Stanford's official Holistic Admission overview page. Tier-1 institution source x2 (both Stanford official). Volatile wording; re-verify each cycle."
+}

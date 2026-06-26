@@ -1,0 +1,71 @@
+{
+  "id": "essays-rhythm-005",
+  "domain": "essays",
+  "subtopic": "rhythm",
+  "claim": "Onomatopoeic repetition can do two jobs at once: it ENACTS the sound of the action it names, and the COUNT of the repetition can predict the count of the structural list that follows, priming the reader's ear for the sentence's architecture. Michelle's 'Swipe, swipe, swipe' makes the sentence perform the scrolling it describes; Sarika's 'tap tap tapping' both mimics keystrokes AND sets up a three-item list of projects that the sentence then delivers. The expert layer is sound-count↔list-length matching: three taps → three items, so the reader's ear is primed for a triad and feels the sentence resolve cleanly when it arrives. This is far past the surface 'use onomatopoeia' — it is using the repetition's NUMBER as a structural promise the sentence keeps.",
+  "application": [
+    {
+      "kind": "before-after",
+      "content": "RHYTHM MOVE — sound-count and list-length matching (onomatopoeic patterning). When an action has a characteristic sound that repeats (swiping, tapping, knocking, dripping, clapping, a stamp), and the sentence is about to deliver a LIST, open with the repeated sound and let its COUNT equal the count of the list: three 'swipe's for three things found, three 'tap's for three projects, four 'knock's for four doors. Two effects compound: (1) the repeated sound ENACTS the action (the sentence sounds like the thing) and (2) the count PRIMES the reader for the list-length, so when the triad/quartet arrives it feels pre-promised and lands with a click of resolution. Use it on ONE sentence where an action-sound and a list naturally co-occur; it is a spice, not a staple. Empirical anchors: Michelle's 'Swipe, swipe, swipe, and there it was' (review: 'the tripled verb mimics the motion… the sentence ENACTS the scrolling'); Sarika's 'tap tap tapping an article… ; a Spanish poem… ; and the story of a girl…' (review names 'sound-count and list-length matching': 'three taps → three items… the reader's ear primes their structural expectation, and the sentence delivers'). Authority: Le Guin (Steering the Craft) — sound and rhythm are physical and 'where it all begins'; repetition is a primary rhythmic device. NOT 'add a sound word' — the expert move ties the sound's NUMBER to the structure.",
+      "dimensionTags": [
+        "voice",
+        "specificity"
+      ],
+      "surfaceVsExpert": "expert",
+      "workedExample": {
+        "before": "I spent that whole rainy Saturday at the laundromat folding clothes and listening to the dryers, and while I waited I thought about a lot of different things, like the essay I had due, my sister's upcoming recital, and whether I had remembered to call my dad back.",
+        "after": "Tumble, tumble, tumble — the dryer kept time while I folded, and my mind folded with it: the essay due Monday, my sister's recital, the call to my dad I still hadn't made.",
+        "exemplarProvenance": "illustrative-synthetic",
+        "sourceRef": "Composed to instantiate the VERIFIED sound-count/list-length match (Michelle 'Swipe, swipe, swipe' #11 + Sarika 'tap tap tapping' #05, review 'Move' on sound-count matching; Le Guin on sound/repetition). The AFTER opens with the dryer's tripled 'Tumble' (enacting the sound) whose count of three primes — and is delivered by — the three-item list of worries. NOT a quoted admit essay.",
+        "usage": "private-teaching-aid — DO NOT SURFACE and DO NOT MIMIC 'Tumble, tumble, tumble' or the laundromat scaffold. It teaches the SYSTEM the sound-count↔list-length mechanic; the generated sentence must use the STUDENT'S own action-sound and own list."
+      },
+      "mechanics": "Two levers in one sentence. (1) ENACTMENT: the repeated onomatopoeic word reproduces the action's sound so the sentence is audible (the dryer tumbles, the phone swipes, the keys tap). (2) COUNT-MATCHING: the NUMBER of repetitions equals the number of items in the list that follows, so the ear is primed — three 'Tumble's promise a triad, and the three worries deliver it; the reader feels the sentence 'resolve' because a structural promise made at the sound-level is kept at the list-level. The BEFORE has the sound-source (dryers) and the list (three thoughts) but joins them flatly ('a lot of different things, like…') so neither effect fires. The AFTER fuses them: the onomatopoeia's count IS the list's count. To transfer: find a sentence where a repeating action-sound and a short list coincide; render the sound as a counted repetition; make that count equal the list length; add a small pivot ('and my mind folded with it') so the sound's domain and the list's domain connect. Sub-lever: the repetition can be comma-separated identical words (Michelle) or a morphing repetition (Sarika's 'tap tap tapping') — the latter is softer and more lyric.",
+      "transfer": [
+        "Knocking on doors, canvassing (four-count): 'Knock, knock, knock, knock — four doors before anyone answered, and when one finally did it was an old man who wanted to talk about the weather, the bus route, his late wife, and, eventually, why he'd stopped voting.' (Four knocks prime, and the sentence delivers a four-item arc.)",
+        "Stamping passports / a ritual (three-count, morphing like Sarika): 'Stamp, stamp, stamping my way through the line, I rehearsed the three things I'd practiced saying in Portuguese: hello, I'm here to study, please be patient with me.' (The morphing onomatopoeia is lyric; three stamps → three rehearsed lines.)"
+      ],
+      "failureModes": [
+        "Count mismatch — three 'tap's followed by a five-item list breaks the primed expectation and the sentence feels lopsided; the whole point is that the counts AGREE.",
+        "Onomatopoeia with no list to resolve into — a tripled sound that leads nowhere is just a sound effect; the expert layer is the structural promise-and-payoff, so there must BE a matched list.",
+        "Overuse — onomatopoeic openers on multiple sentences turn the essay into a comic strip; one well-placed instance is striking, three is a gimmick.",
+        "Forcing a sound the action doesn't really make (a silent activity given a fake noise) — the enactment only works if the sound is real to the action; invented noise reads as cute."
+      ],
+      "antiTemplate": "The MOVE (onomatopoeia whose count predicts a matched list, enacting the action) transfers; the realization must vary. Do NOT default to a comma-separated identical triple ('Swipe, swipe, swipe') every time — Sarika's morphing 'tap tap tapping' is softer and lyric; some actions want a four-count, some a duple. Vary identical-repetition vs morphing-repetition, vary the count (match it to a genuine list, not always three), vary whether the sound opens the sentence or sits mid-sentence. Do NOT make every essay's signature a sound-opener. The invariant is only: the sound enacts the action AND its number keeps a structural promise; never let it become 'the essay that starts paragraphs with triple sound-words.'"
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Harvard 'Essays That Worked' corpus (Michelle, 'Fish Out of Water'; Sarika, 'I, Too, Can Dance') + Uplift editorial reviews #11 and #05 — Michelle 'Swipe, swipe, swipe, and there it was': 'the tripled verb mimics the motion… the sentence ENACTS the scrolling it describes'; Sarika 'tap tap tapping an article… ; a Spanish poem… ; and the story…': named strategy 'sound-count and list-length matching' — 'Three taps → three items… The reader's ear primes their structural expectation, and the sentence delivers.'",
+      "url": "https://www.thecrimson.com/topic/sponsored-successful-harvard-essays-2024/",
+      "tier": 2,
+      "authorRole": "Sponsored consultant feature (Crimson, admission unverified) + Uplift internal review — self-citation, Tier-2",
+      "publishedDate": "2024-01-01",
+      "accessedDate": "2026-06-19"
+    },
+    {
+      "citation": "Ursula K. Le Guin, 'Steering the Craft,' ch. 'The Sound of Your Writing' — 'The basic elements of language are physical: the noise words make, the sounds and silences that make the rhythms'; the sound of language is 'where it all begins'; repetition is treated (in the adjacent 'Repetition' chapter) as a primary device of prose rhythm. Grounds onomatopoeia/repetition as load-bearing rhythm, not decoration.",
+      "url": "https://lithub.com/a-writing-lesson-from-ursula-k-leguin/",
+      "tier": 2,
+      "authorRole": "Named master author / craft-handbook",
+      "publishedDate": "2015-08-25",
+      "accessedDate": "2026-06-19"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2015-08-25",
+  "lastVerified": "2026-06-19",
+  "freshnessClass": "stable",
+  "connections": [
+    {
+      "toId": "essays-rhythm-001",
+      "relation": "related-to",
+      "note": "Sibling 'form enacts content' moves: 001 makes the STRESS pattern enact the subject; 005 makes a repeated SOUND enact the action and predict the structure."
+    },
+    {
+      "toId": "essays-rhythm-006",
+      "relation": "related-to",
+      "note": "Both 005 and 006 set up a formal promise and keep it (sound-count→list / first-half→mirrored-second-half); both reward the reader's ear with felt resolution."
+    }
+  ],
+  "provenanceTrail": "rhythm row, cycle-2 taxonomy. TWO independent empirical anchors (raises confidence): Michelle #11 'Swipe, swipe, swipe' and Sarika #05 'tap tap tapping.' BOTH VERIFIED against raw text — tests/calibration/.../essays/11-harvard-2028-fish-out-of-water.txt ('Swipe, swipe, swipe, and there it was: Illinois, as I later learned.') and .../05-harvard-2028-i-too-can-dance.txt ('Late at night, my fingers tap dance across the keys of my laptop, tap tap tapping an article… ; a Spanish poem… ; and the story of a girl in a wheelchair who learned how to dance.'). Confirmed Sarika's three 'tap's match exactly three semicolon-separated list items (the count-diagnostic re-checked against raw text per standard #8). Tier-2 = Le Guin on sound/repetition as physical rhythm. surfaceVsExpert=expert: a base model volunteers 'use onomatopoeia,' not 'let the sound's COUNT predict the list-length so the ear is primed for the structure.'"
+}

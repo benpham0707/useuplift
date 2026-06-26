@@ -1,0 +1,46 @@
+{
+  "id": "essays-supplement-expectations-006",
+  "domain": "essays",
+  "subtopic": "supplement-expectations",
+  "claim": "Across top schools, the dominant 'Why Us' supplement failure mode is the copy-paste/swap-the-name essay: praise for prestige and a list of programs with no demonstrated engagement, sometimes literally naming the wrong school. Practitioners (incl. a former Pomona associate dean of admissions) and University of Michigan's own prompt agree a strong 'Why Us' is bidirectional - specific institutional fit AND what the student will contribute - not flattery.",
+  "application": [
+    {
+      "kind": "decision-rule",
+      "content": "The copy-paste test: if a sentence in a 'Why Us' essay would remain TRUE after swapping in a peer school's name, delete or replace it. Every retained claim should be (a) specific to this institution and (b) tied to something real about the student (a goal, a habit, a prior project). Aim for a two-way street - what the student will do WITH the resource and contribute, not just admiration of it. Michigan's prompt makes this explicit: 'How would that curriculum support your interests?'",
+      "dimensionTags": ["school_program_fit", "originality_specificity_voice"]
+    },
+    {
+      "kind": "before-after",
+      "content": "Before (weak): 'Michigan's world-class faculty and vibrant community will help me achieve my dreams.' (Swap-able; flattery; no contribution.) After (strong): names a specific Michigan program/curriculum feature, states the writer's concrete interest it serves, and what the writer would do or build there - so it answers 'how would that curriculum support your interests' and shows engagement, not prestige-worship.",
+      "dimensionTags": ["school_program_fit"]
+    }
+  ],
+  "sources": [
+    {
+      "citation": "What Do Admissions Officers Really Want in a College Essay? - Top Tier Admissions (Dr. Tina Brooks, former Associate Dean of Admissions, Pomona College)",
+      "url": "https://toptieradmissions.com/what-do-admissions-officers-really-want-in-a-college-essay/",
+      "tier": 2,
+      "authorRole": "Former Associate Dean of Admissions, Pomona College (named on-record)",
+      "publishedDate": "2024-08-05",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Essay Questions - University of Michigan Office of Undergraduate Admissions ('Why this College' prompt: 'How would that curriculum support your interests?')",
+      "url": "https://admissions.umich.edu/apply/first-year-applicants/essay-questions",
+      "tier": 1,
+      "authorRole": "University of Michigan Office of Undergraduate Admissions (institution)",
+      "publishedDate": "2024-08-01",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2024-01-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "semi-stable",
+  "connections": [
+    { "toId": "essays-supplement-expectations-001", "relation": "generalizes", "note": "Yale's 'Why Yale' is a concrete instance of this rule." },
+    { "toId": "essays-supplement-expectations-005", "relation": "generalizes", "note": "MIT's field-of-study prompt is a miniature Why-Us subject to the same fit-evidence rule." },
+    { "toId": "essays-supplement-expectations-007", "relation": "sibling", "note": "Why-Us (institution fit) and Why-Major (intellectual engagement) are paired but distinct failure modes." }
+  ],
+  "provenanceTrail": "Craft claim verified at the Tier-2 bar (x2 independent): named former Pomona associate dean (Dr. Tina Brooks via Top Tier Admissions, on-record, dated Aug 2024) on authenticity/fit-evidence/no-resume-recap, plus University of Michigan's official prompt language operationalizing the two-way 'how would that curriculum support your interests' framing (Tier-1 institution, mirrored via CollegeVine for word count). The 'wrong school name' / copy-paste failure mode is widely attested practitioner knowledge; framed here as semi-stable craft, not a volatile single-prompt fact."
+}

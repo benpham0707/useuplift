@@ -1,0 +1,38 @@
+{
+  "id": "essays-supplement-expectations-004",
+  "domain": "essays",
+  "subtopic": "supplement-expectations",
+  "claim": "Stanford's contribution essay (2025-26, 100-250 words) is: 'Please describe what aspects of your life experiences, interests and character would help you make a distinctive contribution as an undergraduate to Stanford University.' This is a contribution/community-fit prompt that is open enough to carry post-SFFA identity material, and it asks what the student will GIVE, not what Stanford will give them.",
+  "application": [
+    {
+      "kind": "decision-rule",
+      "content": "Answer this as a contribution essay, not a 'why Stanford' essay: lead with a specific aspect of the writer's life experience / interest / character and the DISTINCTIVE thing it lets them bring to a dorm, lab, class, or club. Per the SFFA carve-out, identity or lived experience (including race, where it shaped the student) is fair game here ONLY when tied to how it shaped the person and what they'd contribute - not as a demographic label.",
+      "dimensionTags": ["school_program_fit", "originality_specificity_voice"]
+    },
+    {
+      "kind": "diagnostic-signal",
+      "content": "Strong signal: a reader can name one concrete thing the campus gains by admitting this student. Weak signal: the essay describes the student's qualities in the abstract ('I am hardworking and open-minded') without connecting them to a distinctive contribution - the prompt's operative word is 'distinctive,' so generic virtues fail it.",
+      "dimensionTags": ["school_program_fit"]
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Application and Essays - Stanford Undergraduate Admission (contribution essay, 100-250 words)",
+      "url": "https://admission.stanford.edu/apply/first-year/apply.html",
+      "tier": 1,
+      "authorRole": "Stanford Undergraduate Admission (institution)",
+      "publishedDate": "2025-08-01",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2025-08-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "volatile",
+  "connections": [
+    { "toId": "essays-supplement-expectations-008", "relation": "instance-of", "note": "Stanford's contribution prompt is one instance of the post-SFFA community/contribution-prompt surge documented across the top 65 schools." },
+    { "toId": "essays-post-sffa-identity-001", "relation": "cross-subtopic-implies", "note": "This prompt is a primary vehicle for the SFFA 'how race affected your life' carve-out; see the post-SFFA-identity subtopic for the legal frame and how-to. (Link target may not exist yet.)" },
+    { "toId": "essays-supplement-expectations-003", "relation": "same-school-companion", "note": "Paired with Stanford's intellectual-vitality essay." }
+  ],
+  "provenanceTrail": "Prompt verbatim and word range from Stanford's official /apply page (WebFetch 2026-06-18). Tier-1 institution. The post-SFFA framing is cross-linked, not asserted from this source alone (see entry 008 for the journalism source). Volatile wording; re-verify each cycle."
+}

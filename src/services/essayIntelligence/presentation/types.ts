@@ -54,16 +54,21 @@ export interface AnnotatedParagraph {
 export interface InlineAnnotation {
   /** The exact text span to highlight */
   spanText: string;
-  /** Headline — the move (✓) or the issue (△), in a few words. Student-facing. */
+  /** Headline — the move (✓) or the issue (△), anchored to the span above. */
   observation: string;
-  /** Optional elaboration: why it matters + the concrete fix. Carries the growth
-   *  edge's coaching so the annotation reads observation → why → fix, not a label. */
+  /** Optional elaboration (used by the paragraph-summary fallback when no
+   *  per-span L5 annotation exists). */
   detail?: string;
+  /** Why this specific span matters to the essay (L5 teachingRationale). */
+  whyItMatters?: string;
+  /** A concrete model sentence in the student's own voice they can react to and
+   *  improve — the heart of the inline annotation (L5 rewriteExample). The point
+   *  is to better THIS sentence, not summarize the paragraph. */
+  rewrite?: string;
   /** Strength or growth area */
   nature: 'strength' | 'growth';
   /** Rank of the revision priority that addresses this in depth, if one covers
-   *  this paragraph — so the inline note links to the full coaching instead of
-   *  re-deriving it. null when no priority covers it. */
+   *  this paragraph. null when no priority covers it. */
   priorityRef: number | null;
 }
 

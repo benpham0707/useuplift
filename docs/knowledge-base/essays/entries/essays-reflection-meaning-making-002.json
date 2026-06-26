@@ -1,0 +1,53 @@
+{
+  "id": "essays-reflection-meaning-making-002",
+  "domain": "essays",
+  "subtopic": "reflection-meaning-making",
+  "claim": "In the challenge/growth essay, the proportion of text matters: only about one-third should narrate the challenge itself, with the remaining two-thirds devoted to what the writer DID and what they LEARNED — i.e. 'who you've become because of them.' Reflection that occupies a minority of the essay reads as a tacked-on moral; meaning-making earns its weight by occupying as much space as the event.",
+  "application": [
+    {
+      "kind": "decision-rule",
+      "content": "REVISION MOVE — the one-third / two-thirds audit. Mark up your draft in three colors: (1) describing the challenge/event, (2) what you DID about it, (3) what you LEARNED / how you changed. If the 'challenge' color exceeds ~one-third of the essay, you have a narration-heavy draft (often a 'sob story' read); cut event detail and expand the 'did' and 'learned' sections until the event is roughly one-third and growth is roughly two-thirds. Sawyer's framing: 'Notice that two-thirds of your essay doesn't focus on the challenges you're facing — you focus on who you've become because of them.'",
+      "dimensionTags": ["reflection_meaning_making", "character_interiority_vulnerability"],
+      "surfaceVsExpert": "expert",
+      "workedExample": {
+        "before": "When I was fourteen my dad lost his job and we lost the house. We moved into my aunt's two-bedroom apartment, six of us. I shared a pull-out couch with my sister. Some nights I could hear my mom crying through the wall. Money was tight and we ate a lot of rice and beans. I worried constantly about whether we'd have to move again. It was the hardest year of my life. But I got through it, and it made me stronger and taught me to appreciate what I have.",
+        "after": "The year my dad lost his job, six of us moved into my aunt's two-bedroom apartment and I started sleeping on a pull-out couch. [event — one-third, compressed.] So I made the couch my office: homework finished by 9 so my sister could have the cushions, scholarship forms filled out at the kitchen table after everyone slept. I learned to cook the cheap things well — I can make rice-and-beans four ways now, and I started doing it on purpose, packing extra for a friend whose situation I recognized because it used to embarrass me to admit it was mine. [did — expanded.] What that year actually rewired was my radar: I notice the kid who skips lunch, the one who 'isn't hungry,' because I was that kid and I learned exactly how a person hides it. I don't appreciate-what-I-have so much as I refuse to let scarcity be invisible. That's the part of me my aunt's apartment built, and it's the part I'll bring to a hall full of people I don't yet know are struggling. [learned — the two-thirds, growth-weighted.]",
+        "exemplarProvenance": "illustrative-synthetic",
+        "sourceRef": "Composed to instantiate Sawyer's one-third/two-thirds proportion ('who you've become because of them') and Brooks's 'what you learned, not how extraordinary it was'; not a quoted essay.",
+        "usage": "private-teaching-aid — DO NOT SURFACE to the student and DO NOT MIMIC its phrasing OR its rhetorical structure. It exists to teach the SYSTEM the move; generated output must be lexically and structurally distinct from it."
+      },
+      "mechanics": "Compress the event to its load-bearing facts (one situation-setting beat, no dwelling on the sad imagery — the crying-through-the-wall line is cut because it sells suffering, not growth). Then physically grow sections (2) and (3): replace each sentence of hardship-description with a sentence of concrete ACTION ('made the couch my office,' 'packing extra for a friend') and a sentence of CHANGED stance ('my radar,' 'refuse to let scarcity be invisible'). The proportion is the diagnostic — if cutting event detail leaves the essay short, the draft was narration-heavy and the missing two-thirds was never written. Land the 'learned' beat on a forward-facing, community-pointed claim, not the generic 'appreciate what I have.'",
+      "transfer": ["A draft on a sports injury that spends 250 of 300 words on the MRI, the surgery, and the pain is the same failure. Cut to: 'I tore my ACL in the fall final' (event, one-third), then two-thirds on what the writer DID (learned to coach from the bench, charted teammates' footwork) and how they CHANGED (discovered they read a game better standing still than sprinting through it, and now want to coach). Same proportion rule; topic is injury, not poverty."],
+      "failureModes": ["Trimming the event but never expanding 'did/learned' — you get a shorter sob story, not a growth essay; the proportion is right only because the whole thing shrank.", "Inflating the two-thirds with restated emotion ('it was so hard, but I grew so much') instead of concrete actions and a specific changed stance — color (3) is full of words but contains no demonstrated change.", "Keeping a vivid suffering image (the crying mother) because it's 'powerful writing' — it tips the proportion back toward narration and reads as bidding for sympathy."],
+      "antiTemplate": "The MOVE is mandatory; the FRAMING must vary. Do NOT default to the 'I used to think X → I realized the opposite → [aphorism] → it shows up elsewhere → I'm still learning' arc, and do NOT require a standalone aphorism sentence. Rotate rhetorical forms across users: a present-tense scene with no stated prior belief; an unresolved question the writer can't answer; a flat declarative observation with the transfer left implicit; embedded dialogue; a list that breaks pattern; etc. The transfer-to-a-surprising-domain insight is the technique and stays; the packaging around it must differ each time."
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Ethan Sawyer (College Essay Guy), 'How to Write an Overcoming Challenges Essay' — three-part structure (Challenges+Effects / What I Did / What I Learned) and the 'two-thirds' principle",
+      "url": "https://www.collegeessayguy.com/blog/overcoming-challenges-essay",
+      "tier": 2,
+      "authorRole": "Named college-essay author/coach (College Essay Guy)",
+      "publishedDate": "2023-01-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Dr. Tina Brooks (former Associate Dean of Admissions, Pomona College; Top Tier Admissions), 'What Do Admissions Officers Really Want in a College Essay?' — 'focus on what you learned from the experience; not how extraordinary it was.'",
+      "url": "https://toptieradmissions.com/what-do-admissions-officers-really-want-in-a-college-essay/",
+      "tier": 2,
+      "authorRole": "On-record former Associate Dean of Admissions (Pomona College)",
+      "publishedDate": "2024-01-01",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2020-01-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "stable",
+  "connections": [
+    { "toId": "essays-reflection-meaning-making-001", "relation": "supported-by", "note": "The 'what I learned' two-thirds is built by the 'so what' ladder." },
+    { "toId": "essays-reflection-meaning-making-003", "relation": "supports", "note": "Spending two-thirds on the response is how you show internal change rather than narrate an event." },
+    { "toId": "essays-reflection-meaning-making-007", "relation": "related-to", "note": "Sawyer warns the weak-challenge case still needs the same growth-weighted proportion." }
+  ],
+  "provenanceTrail": "WebFetch of College Essay Guy's overcoming-challenges guide captured the explicit one-third / two-thirds structure and the verbatim 'who you've become because of them' line (Sawyer, named practitioner). Independently agreed by Dr. Tina Brooks (on-record former Pomona Associate Dean via Top Tier Admissions), who states essays should center 'what you learned... not how extraordinary it was.' Two independent named Tier-2 sources agreeing → VERIFIED."
+}

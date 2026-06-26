@@ -1,0 +1,38 @@
+{
+  "id": "essays-supplement-expectations-002",
+  "domain": "essays",
+  "subtopic": "supplement-expectations",
+  "claim": "Yale's academic-interest supplement (2025-26) asks students to first name up to three academic areas, then write up to 200 words on 'a topic or idea that excites you and is related to one or more academic areas you selected above. Why are you drawn to it?' The unit of evaluation is intellectual engagement with a specific idea, not a list of accomplishments or a major-justification resume.",
+  "application": [
+    {
+      "kind": "how-to",
+      "content": "Anchor the 200 words on ONE specific idea/topic/question (e.g. a particular problem, text, phenomenon, or unresolved tension) rather than the field at large. Show the thinking: what drew the student in, what they did with the curiosity, and what question is still open. Do NOT recap activities/awards in that field - the activities list already does that, and Yale explicitly wants 'why are you drawn to it,' i.e. the engagement, not the credential.",
+      "dimensionTags": ["intellectual_vitality_curiosity"]
+    },
+    {
+      "kind": "diagnostic-signal",
+      "content": "Strong signal: a reader who knows nothing about the student could, after 200 words, predict what they'd lose track of time thinking about. Weak signal: the essay names the field ('I love biology because it explains life') and lists evidence of being good at it, but never lands on a single concrete idea that excites the writer - that reads as a major-justification, which this prompt is not asking for.",
+      "dimensionTags": ["intellectual_vitality_curiosity", "originality_specificity_voice"]
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Essays - Yale College Undergraduate Admissions (academic-interest short answer + topic essay, 2025-26 cycle)",
+      "url": "https://admissions.yale.edu/essays",
+      "tier": 1,
+      "authorRole": "Yale College Undergraduate Admissions (institution)",
+      "publishedDate": "2025-08-01",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2025-08-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "volatile",
+  "connections": [
+    { "toId": "essays-supplement-expectations-007", "relation": "instance-of", "note": "Yale's topic essay is a concrete instance of the cross-school 'Why Major = intellectual engagement, not resume' rule." },
+    { "toId": "essays-supplement-expectations-001", "relation": "same-school-companion", "note": "Should not duplicate the 'Why Yale' essay; one is about the idea, the other about Yale-specific fit." },
+    { "toId": "essays-supplement-expectations-003", "relation": "same-pattern", "note": "Mirrors Stanford's intellectual-vitality prompt: both reward a genuine idea that excites the writer." }
+  ],
+  "provenanceTrail": "Prompt text and 200-word limit pulled verbatim from Yale's official /essays page (WebFetch 2026-06-18). Tier-1 institution source. Wording is volatile; re-verify each August."
+}

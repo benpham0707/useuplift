@@ -1,0 +1,53 @@
+{
+  "id": "essays-reflection-meaning-making-003",
+  "domain": "essays",
+  "subtopic": "reflection-meaning-making",
+  "claim": "On-record admissions officers reward demonstrated internal change and active processing of experience over narration of the experience. Committees explicitly credit the writer's reflection and analysis — the 'how they learned' and 'how it shaped what they value/do' — as the thing that lets them picture the applicant in their community, not the impressiveness of the event.",
+  "application": [
+    {
+      "kind": "diagnostic-signal",
+      "content": "DIAGNOSTIC — the 'before vs after self' test. A passage qualifies as reflection (not narration) only if it names a concrete shift in how the writer thinks, judges, or acts as a result of the experience. Apply Johns Hopkins' committee lens verbatim: a strong essay lets the reader 'understand how [the applicant] would contribute his personal qualities and skills to our campus community' — through 'his reflection and analysis,' i.e. showing HOW he learned values and how he now APPLIES them, 'rather than simply describing' the circumstances. Revision cue: if you cannot point to a sentence where your post-experience self does/thinks something the pre-experience self would not, the passage is still narration — add the changed-action or changed-belief.",
+      "dimensionTags": ["reflection_meaning_making", "character_interiority_vulnerability"],
+      "surfaceVsExpert": "surface",
+      "workedExample": {
+        "before": "Volunteering at the food bank every Saturday was eye-opening. I met people from all walks of life and saw how many families in my own town struggle to get by. It really showed me the importance of giving back to my community.",
+        "after": "Before the food bank, I sorted people into 'us' and 'them' without noticing I did it — 'them' being whoever needed the help I was generously providing. Then a man I'd been handing cans to recognized my jacket: he'd coached my middle-school soccer team. I didn't have a category for that, and the category was the problem. Now I catch myself doing it everywhere — in class, when I assume who'll struggle with a problem set — and I stop. The shift isn't that I 'value giving back'; it's that I stopped narrating other people's lives for them. I ask first now.",
+        "exemplarProvenance": "illustrative-synthetic",
+        "sourceRef": "Composed to instantiate JHU's 'reflection and analysis... rather than simply describing' standard and Hamilton's 'demonstrate internal change'; not a quoted essay.",
+        "usage": "private-teaching-aid — DO NOT SURFACE to the student and DO NOT MIMIC its phrasing OR its rhetorical structure. It exists to teach the SYSTEM the move; generated output must be lexically and structurally distinct from it."
+      },
+      "mechanics": "The test is a pointable sentence: name a BEFORE belief/judgment/habit explicitly ('I sorted people into us and them'), then name an AFTER action the before-self would not do ('I ask first now' / 'I catch myself and stop'). The change must be in cognition or behavior, not in vocabulary — 'eye-opening' and 'showed me the importance of' are narration labels, not demonstrated shifts. Anchor the pivot to one concrete moment that forced the change (the recognized coach) so the shift has a cause, not just an assertion. The AFTER must transfer to a NEW domain (the writer now catches the same bias in class), which proves the change is internalized, not scene-bound.",
+      "transfer": ["BEFORE: 'My internship at the lab taught me that science is collaborative.' AFTER (passes the test): 'I used to think asking a question in the lab meant admitting I wasn't smart enough to be there. The day I stayed silent and ruined a two-week cell culture by guessing, I learned the cost of that pride in petri dishes. Now I'm the first one to say \"I don't follow\" — in lab, in class, anywhere — because I've measured what silence costs.' Same before/after pivot anchored to a concrete failure; topic is research, not service."],
+      "failureModes": ["Naming a feeling-change instead of a behavior/judgment-change: 'it made me more grateful' has no pointable after-action the before-self wouldn't do.", "Asserting the after-self without a before-self: jumping straight to 'I ask first now' with no admitted prior habit — the reader can't measure distance traveled (this is also why entry 007's 'name the prior deficit' is its complement).", "Stating the change as an abstract value ('I value empathy now') rather than a specific operationalized shift ('I stopped narrating other people's lives for them') — the abstract version is interchangeable across thousands of food-bank essays."],
+      "antiTemplate": "The MOVE is mandatory; the FRAMING must vary. Do NOT default to the 'I used to think X → I realized the opposite → [aphorism] → it shows up elsewhere → I'm still learning' arc, and do NOT require a standalone aphorism sentence. Rotate rhetorical forms across users: a present-tense scene with no stated prior belief; an unresolved question the writer can't answer; a flat declarative observation with the transfer left implicit; embedded dialogue; a list that breaks pattern; etc. The transfer-to-a-surprising-domain insight is the technique and stays; the packaging around it must differ each time."
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Johns Hopkins University Admissions, 'Essays That Worked' — committee commentary on Zerubabel's 'Lessons Learned' essay: 'Through his reflection and analysis, the admissions committee is able to understand how Zerubabel would contribute his personal qualities and skills to our campus community.'",
+      "url": "https://apply.jhu.edu/hopkins-insider/lessons-learned/",
+      "tier": 1,
+      "authorRole": "Johns Hopkins University Admissions committee (on-record)",
+      "publishedDate": "2023-01-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Hamilton College Admissions, 'Tips for a Good College Essay' — 'The most effective essays demonstrate internal change' and 'writing about growth and mistakes is good (perhaps even welcomed).'",
+      "url": "https://www.hamilton.edu/admission/apply/college-essays-that-worked/tips-for-a-good-college-essay",
+      "tier": 1,
+      "authorRole": "Hamilton College Admissions (university's own guidance)",
+      "publishedDate": "2024-01-01",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2020-01-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "stable",
+  "connections": [
+    { "toId": "essays-reflection-meaning-making-002", "relation": "supported-by", "note": "The two-thirds growth weighting is how this 'changed self' becomes visible on the page." },
+    { "toId": "essays-reflection-meaning-making-004", "relation": "contrasts-with", "note": "A stated 'and that's when I learned X' is NOT a changed action; this is the failure mode this diagnostic catches." },
+    { "toId": "essays-reflection-meaning-making-008", "relation": "related-to", "note": "Conn College AO commentary independently frames reflection as the thing that shows 'what kind of community member' you'd be." }
+  ],
+  "provenanceTrail": "Two Tier-1 university sources. JHU committee commentary captured verbatim via WebFetch of the official Hopkins Insider 'Lessons Learned' page — the committee explicitly attributes the essay's value to 'reflection and analysis' over 'describing.' Hamilton College's own admissions guidance independently states 'the most effective essays demonstrate internal change.' Tier-1 ×2 → VERIFIED."
+}

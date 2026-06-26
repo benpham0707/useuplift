@@ -1,0 +1,45 @@
+{
+  "id": "essays-supplement-expectations-001",
+  "domain": "essays",
+  "subtopic": "supplement-expectations",
+  "claim": "Yale's 'Why Yale' supplement is deliberately short (125 words or fewer) and is framed around the student, not the school: the official 2025-26 prompt is 'Reflect on how your interests, values, and/or experiences have drawn you to Yale.' Yale's stated reader questions are 'Who is likely to make the most of Yale's resources?' and 'Who will contribute most significantly to the Yale community?'",
+  "application": [
+    {
+      "kind": "decision-rule",
+      "content": "Treat Yale's 'Why Yale' as a 125-word fit-evidence essay, not a flattery essay. Allocate the few words to a SPECIFIC named Yale resource (a residential-college feature, a named program, a course/professor, a research or study-abroad path) AND a concrete reason it maps to the student's already-stated interests/values. Cut every sentence praising Yale's prestige or ranking - at 125 words there is no room for it and it answers neither reader question ('make the most of resources' / 'contribute to the community').",
+      "dimensionTags": ["school_program_fit"]
+    },
+    {
+      "kind": "diagnostic-signal",
+      "content": "Weak signal: the 125 words could be pasted under any other Ivy's name (generic 'world-class faculty', 'vibrant community'). Strong signal: at least one detail is Yale-only AND is tied back to something the student already established in the academic-topic essay - so the supplement reads as continuation of a real person, not a brochure summary.",
+      "dimensionTags": ["school_program_fit", "originality_specificity_voice"]
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Essays - Yale College Undergraduate Admissions (Yale-specific essay prompts, 2025-26 cycle)",
+      "url": "https://admissions.yale.edu/essays",
+      "tier": 1,
+      "authorRole": "Yale College Undergraduate Admissions (institution)",
+      "publishedDate": "2025-08-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "What Yale Looks For - Yale College Undergraduate Admissions",
+      "url": "https://admissions.yale.edu/what-yale-looks-for",
+      "tier": 1,
+      "authorRole": "Yale College Undergraduate Admissions (institution)",
+      "publishedDate": "2025-08-01",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2025-08-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "volatile",
+  "connections": [
+    { "toId": "essays-supplement-expectations-006", "relation": "instance-of", "note": "Yale's 'Why Yale' is a concrete instance of the cross-school 'Why Us' craft rule (fit evidence, not flattery)." },
+    { "toId": "essays-supplement-expectations-002", "relation": "same-school-companion", "note": "Yale evaluates this alongside the academic-topic essay; the two should not be redundant." }
+  ],
+  "provenanceTrail": "Prompt text and word limit pulled verbatim from Yale's official /essays page (WebFetch 2026-06-18) and corroborated by Yale's /what-yale-looks-for page for the two reader questions and the authenticity guidance. Tier-1 institution source x2 (both Yale official). Prompt wording is volatile (re-verify each August when Yale posts the new cycle)."
+}

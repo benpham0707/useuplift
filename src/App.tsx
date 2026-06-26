@@ -34,16 +34,13 @@ import TestTeachingUnitSimple from "./pages/TestTeachingUnitSimple";
 const WorkshopDemo = lazy(() => import("./pages/WorkshopDemo"));
 const VaporChatDemoPage = lazy(() => import("./pages/VaporChatDemo"));
 const AnnotationV2Demo = lazy(() => import("./pages/AnnotationV2Demo"));
-const AnnotationV2EditorFoundationDemo = lazy(() => import("./pages/AnnotationV2Editor_Foundation_Demo"));
-const AnnotationV2LoadingDemo = lazy(() => import("./pages/AnnotationV2Loading_Demo"));
-const AnnotationV2PanelShellDemo = lazy(() => import("./pages/AnnotationV2Panel_Shell_Demo"));
-const AnnotationV2BloomDemo = lazy(() => import("./pages/AnnotationV2Bloom_Demo"));
-const AnnotationV2InsightDemo = lazy(() => import("./pages/AnnotationV2Insight_Demo"));
-const AnnotationV2ClickDemo = lazy(() => import("./pages/AnnotationV2Click_Demo"));
-const AnnotationV2ListDemo = lazy(() => import("./pages/AnnotationV2List_Demo"));
-const AnnotationV2RewriteDemo = lazy(() => import("./pages/AnnotationV2Rewrite_Demo"));
-const AnnotationV2NavDemo = lazy(() => import("./pages/AnnotationV2Nav_Demo"));
-const AnnotationV2OrientationDemo = lazy(() => import("./pages/AnnotationV2Orientation_Demo"));
+// NOTE: 10 annotation-v2-engine sub-demo harnesses (foundation/loading/panel/bloom/
+// insight/click/list/rewrite/nav/orientation) are intentionally unrouted from the
+// production build. They import the PARKED engine (src/components/annotation-v2-engine/),
+// which transitively pulls Node-only backend code (buildCostLedger -> fs/path) into the
+// browser bundle and breaks `vite build`. Page files are kept as dev/regression
+// harnesses per annotation-v2-engine/PARKED.md; re-route once adapted for the browser
+// (annotation-v2-engine/ADAPTER_GUIDE.md). The polished /annotation-v2-demo + /library stay routed.
 const AnnotationV2LibraryDemo = lazy(() => import("./pages/AnnotationV2Library_Demo"));
 const ActivityWorkshop = lazy(() => import("./pages/ActivityWorkshop"));
 import Pricing from "./pages/Pricing";
@@ -89,86 +86,6 @@ const AuthFreeRoutes = () => (
         element={
           <Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading workshop...</div>}>
             <AnnotationV2Demo />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/annotation-v2-demo/foundation"
-        element={
-          <Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading editor foundation...</div>}>
-            <AnnotationV2EditorFoundationDemo />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/annotation-v2-demo/loading"
-        element={
-          <Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading analysis harness...</div>}>
-            <AnnotationV2LoadingDemo />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/annotation-v2-demo/panel"
-        element={
-          <Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading panel shell...</div>}>
-            <AnnotationV2PanelShellDemo />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/annotation-v2-demo/bloom"
-        element={
-          <Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading bloom choreography...</div>}>
-            <AnnotationV2BloomDemo />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/annotation-v2-demo/insight"
-        element={
-          <Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading insight card...</div>}>
-            <AnnotationV2InsightDemo />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/annotation-v2-demo/click"
-        element={
-          <Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading click harness...</div>}>
-            <AnnotationV2ClickDemo />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/annotation-v2-demo/list"
-        element={
-          <Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading list view...</div>}>
-            <AnnotationV2ListDemo />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/annotation-v2-demo/rewrite"
-        element={
-          <Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading rewrite card...</div>}>
-            <AnnotationV2RewriteDemo />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/annotation-v2-demo/nav"
-        element={
-          <Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading navigation harness...</div>}>
-            <AnnotationV2NavDemo />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/annotation-v2-demo/orientation"
-        element={
-          <Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading orientation harness...</div>}>
-            <AnnotationV2OrientationDemo />
           </Suspense>
         }
       />

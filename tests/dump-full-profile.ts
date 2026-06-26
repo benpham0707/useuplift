@@ -1368,7 +1368,10 @@ async function main(): Promise<void> {
     essayId: `full-profile-dump-${ESSAY_LABEL}`,
     essayText,
     essayType: 'common_app',
-    includeAnnotations: false,
+    // L5 ON: generate the per-span inline annotations (the real annotated-essay
+    // experience — each anchored to a sentence with a model rewrite). Without this
+    // the student doc falls back to a paragraph-level summary.
+    includeAnnotations: true,
   });
 
   const pipelineTimeMs = Date.now() - pipelineStart;
@@ -1460,7 +1463,7 @@ async function main(): Promise<void> {
   // The renderer reads only EssayProfile (no LLM); failure here surfaces
   // as a non-fatal log so the analytical dump still lands.
   try {
-    const studentDoc = renderAnalysisForStudent(profile, { mode: 'initial' });
+    const studentDoc = renderAnalysisForStudent(profile, { mode: 'initial' }, pipelineResult.annotations);
     fs.writeFileSync(OUTPUT_STUDENT_JSON, JSON.stringify(studentDoc, null, 2), 'utf-8');
     fs.writeFileSync(OUTPUT_STUDENT_MD, renderStudentDocumentMarkdown(studentDoc), 'utf-8');
     console.log(`[Profile Dump] Student render JSON: ${OUTPUT_STUDENT_JSON}`);

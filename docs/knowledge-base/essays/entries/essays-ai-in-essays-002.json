@@ -1,0 +1,48 @@
+{
+  "id": "essays-ai-in-essays-002",
+  "domain": "essays",
+  "subtopic": "ai-in-essays",
+  "claim": "Yale College's undergraduate-admissions AI Policy (in force for the 2024-2026 cycles) adopts the Common App fraud language and draws an explicit safe/unsafe line: using AI 'to review one's grammar or spelling, or to seek general advice or topic suggestions at the start of the writing process does not constitute application fraud,' but submitting 'the substantive content or output of an artificial intelligence platform' may result in 'admission revocation or expulsion.' Yale requires applicants to attest the work is their 'own work, factually true, and honestly presented,' but does NOT require disclosure of permitted AI use (grammar, brainstorming).",
+  "application": [
+    {
+      "kind": "decision-rule",
+      "content": "For Yale (and the many schools that mirror its framing), apply the 'start vs. substance' line: AI is safe at the START of the process (topic suggestions, grammar check) and unsafe for the SUBSTANCE (sentences, paragraphs, core ideas, structure). A student does not need to disclose grammar/brainstorm-stage AI use to Yale -- but the moment AI authored content that survives into the draft, the attestation is false. Coach students to log where in their process AI touched the work, so they can honestly sign the attestation.",
+      "dimensionTags": ["originality_specificity_voice"]
+    }
+  ],
+  "sources": [
+    {
+      "citation": "AI Policy | Yale College Undergraduate Admissions",
+      "url": "https://admissions.yale.edu/ai-policy",
+      "tier": 1,
+      "authorRole": "Yale College Office of Undergraduate Admissions (official policy)",
+      "publishedDate": "2024-08-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "AI Policy Statement | Yale College Undergraduate Admissions",
+      "url": "https://admissions.yale.edu/ai-policy-statement",
+      "tier": 1,
+      "authorRole": "Yale College Office of Undergraduate Admissions (official policy)",
+      "publishedDate": "2024-08-01",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2024-08-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "volatile",
+  "connections": [
+    {
+      "toId": "essays-ai-in-essays-001",
+      "relation": "specializes",
+      "note": "Yale adopts the Common App 'substantive content or output' wording and adds an explicit permitted-use carve-out."
+    },
+    {
+      "toId": "essays-ai-in-essays-007",
+      "relation": "supports",
+      "note": "Yale's 'start vs. substance' line is the operational form of the cross-school expert consensus on safe vs. risky AI use."
+    }
+  ],
+  "provenanceTrail": "Two Yale admissions URLs fetched 2026-06-18; one (admissions.yale.edu/ai-policy) returned policy text directly, the other (ai-policy-statement) initially 404'd via direct fetch but was captured via WebSearch snippet returning identical language. Permitted-use carve-out ('grammar or spelling ... topic suggestions at the start') and prohibition ('substantive content or output ... admission revocation or expulsion') both confirmed. Note: College Essay Advisors' top-30 roundup (2025) listed Yale as 'no formal policy' -- a data-staleness artifact; Yale's own page is authoritative and supersedes that classification. Publish date estimated to 2024 admissions cycle (page undated); flagged volatile for re-verify."
+}

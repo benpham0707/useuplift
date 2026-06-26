@@ -1,0 +1,38 @@
+{
+  "id": "essays-post-sffa-identity-002",
+  "domain": "essays",
+  "subtopic": "post-sffa-identity",
+  "claim": "The same SFFA majority opinion that preserved the essay carve-out also bounded it: 'universities may not simply establish through application essays or other means the regime we hold unlawful today,' because 'what cannot be done directly cannot be done indirectly.' This means the essay cannot function as a covert demographic signal; the consideration must attach to the individual's experiences and the qualities they evidence, not to race as a proxy.",
+  "application": [
+    {
+      "kind": "diagnostic-signal",
+      "content": "Flag a passage as legally hollow (it asks the reader to do something the ruling forbids) when the only 'work' the identity does is announce group membership so the reader can mentally re-weight the file. Signal: the paragraph would lose nothing if you deleted every sentence about the student's individual actions, choices, or growth and kept only the demographic label. A strong post-SFFA identity passage is the inverse — delete the label and the scene of character still stands on its own.",
+      "dimensionTags": ["context_constraints_disclosure", "reflection_meaning_making"]
+    },
+    {
+      "kind": "how-to",
+      "content": "Build the passage so a reader could honestly credit it under the carve-out: (1) anchor in one concrete experience, not a category; (2) name the specific quality or capacity it produced; (3) show that quality operating elsewhere (transfer). This structure gives the reader something they are permitted to value — the demonstrated quality — rather than asking them to silently reward the demographic.",
+      "dimensionTags": ["reflection_meaning_making", "originality_specificity_voice"]
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Students for Fair Admissions v. Harvard majority opinion — 'universities may not simply establish through application essays or other means the regime we hold unlawful today' / 'what cannot be done directly cannot be done indirectly,' quoted in Stanford Center for Racial Justice FAQ",
+      "url": "https://law.stanford.edu/2023/12/12/students-for-fair-admissions-v-harvard-faq-navigating-the-evolving-implications-of-the-courts-ruling/",
+      "tier": 1,
+      "authorRole": "U.S. Supreme Court (quoted by Stanford Law School)",
+      "publishedDate": "2023-06-29",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2023-06-29",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "semi-stable",
+  "supersedes": [],
+  "connections": [
+    { "toId": "essays-post-sffa-identity-001", "relation": "bounds", "note": "001 is the carve-out; 002 is the anti-circumvention limit on it." },
+    { "toId": "essays-post-sffa-identity-005", "relation": "explains", "note": "The anti-circumvention rule is why AOs now operate behind redaction/non-transmission of race data." }
+  ],
+  "provenanceTrail": "Quotation reproduced verbatim by Stanford Law School's Center for Racial Justice FAQ (legal-academic Tier 1-adjacent) and independently by Congress.gov CRS LSB10893 (the CRS page 403'd to the fetcher but its title and the quoted language surfaced in search corroboration). The supremecourt.gov primary PDF 403'd to the fetcher; the phrase 'what cannot be done directly cannot be done indirectly' is distinctive and appears identically across multiple Tier-1/Tier-2 reproductions, so the claim clears the bar."
+}

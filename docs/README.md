@@ -10,6 +10,7 @@
 | Area | Path | What's there |
 |------|------|--------------|
 | Essay Intelligence | [`essay-intelligence/`](./essay-intelligence/) | Current Essay Intelligence pipeline design |
+| Knowledge / eval / integration | [`knowledge-base/`](./knowledge-base/) — start at [`FOUNDATION_STATE_AND_HANDOFF.md`](./knowledge-base/FOUNDATION_STATE_AND_HANDOFF.md) | The essay-intelligence knowledge base (schema/ops in `README.md`), the win-condition loop (`KNOWLEDGE_SCALING_LOOP.md`), KB→generation architecture (`INTEGRATION_BLUEPRINT.md`), and the editorial eval gate |
 | Pipeline evolution | [`pipeline-evolution/`](./pipeline-evolution/) | Active L3–L6 architecture work, cost recovery, RAG, conversator ground-truth |
 | Writing-quality analysis | [`analysis/`](./analysis/) | Writing improvement roadmap, success criteria, per-workshop writing analyses, cost/output cut lists |
 | Research | [`research/`](./research/) | Numbered research taxonomy (sections 1–6: activities, awards, character, red-flags, academic history), counseling-system, extracurricular databases, synthesis |

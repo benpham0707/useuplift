@@ -1,0 +1,73 @@
+{
+  "id": "essays-restraint-001",
+  "domain": "essays",
+  "subtopic": "restraint",
+  "claim": "When an essay is fundamentally ABOUT one hard central fact (a disability, a death, an immigration, an illness, a family situation), the high-craft move is to name that fact AT MOST ONCE OR TWICE — and NEVER as the grammatical subject of a sentence or as a declared identity — then let every other paragraph orbit the fact through its consequences and adjustments rather than re-naming it. The discipline is not a literal one-count; it is the refusal to let the label become the subject. Repeating the label as subject (\"my wheelchair did X,\" \"my grief was Y,\" \"my disability taught me Z\") makes the essay become ABOUT the label; naming the fact sparingly and obliquely lets it be felt without becoming the theme. Empirical anchor: Sarika's wheelchair essay names \"wheelchair\" exactly TWICE — once in a rhetorical question (\"injure them with my wheelchair before the story even began\") and once in a closing self-referential image (\"the story of a girl in a wheelchair who learned how to dance\") — and NEVER as \"my disability\" or as the sentence's subject; the words \"disability\" and \"difference\" never appear at all. This is the application of Hemingway's theory of omission to the personal statement: what the writer leaves unsaid, the reader feels as strongly as if it were stated — because the writer has shown enough of its effects that the reader supplies the rest.",
+  "application": [
+    {
+      "kind": "decision-rule",
+      "content": "RESTRAINT MOVE — name-the-central-fact-at-most-once-or-twice-and-never-as-subject-then-orbit-via-effects. Identify the single hardest fact your essay is built on. Write the whole essay assuming the reader already knows it. Permit yourself to NAME it at most once or twice, always inside a sentence whose grammatical main job is something else (a rhetorical question, an action, a consequence, a self-referential image) so the naming arrives sideways rather than as an announcement — and NEVER as the grammatical subject and NEVER as a declared identity (\"my disability,\" \"as a wheelchair user\"). Everywhere else, render the fact only through its effects — the accommodations it forces, the absences it creates, the specific friction it produces in ordinary moments. Diagnostic (NOT a literal count): for every appearance of the central label, check that it is (a) oblique — riding inside a sentence about something else — and (b) never the subject and never an identity claim. Any appearance that is the grammatical subject, or that announces the fact as a category of person, is a candidate for conversion-to-effect or deletion; the count itself can be one or two, but each surviving naming must pass the oblique-and-not-subject test, and the meaning must survive (it almost always strengthens). Empirical anchor: Sarika's wheelchair essay names \"wheelchair\" exactly TWICE — once inside a rhetorical question (\"How could I share my stories... if I... injure them with my wheelchair before the story even began?\") and once inside a closing self-referential image (\"the story of a girl in a wheelchair who learned how to dance\") — never as the subject and never as \"my disability\"; the words \"disability\" and \"difference\" never appear at all; the fact is present everywhere else as its effect on specific moments of action. Authority anchor: Hemingway's theory of omission — \"If a writer of prose knows enough of what he is writing about he may omit things that he knows and the reader... will have a feeling of those things as strongly as though the writer had stated them.\"",
+      "dimensionTags": [
+        "reflection_meaning_making"
+      ],
+      "surfaceVsExpert": "expert",
+      "workedExample": {
+        "before": "I have severe asthma, and my asthma has shaped my whole life. Because of my asthma I couldn't play sports like the other kids. My asthma meant I spent a lot of time indoors. Living with asthma taught me that I am not defined by my asthma. Despite my asthma, I found my own path.",
+        "after": "On the team roster I was the kid with the inhaler taped inside her locker, the one who got waved off the field at the first cold snap. I learned the dining hall by its exits — which door let out near the nurse, which stairwell I could take slowly without anyone behind me. The inhaler is in my bag right now, in the third class of the day I have never once raised my hand in, because raising it means standing, and standing means the room watching me wait for my own lungs.",
+        "exemplarProvenance": "illustrative-synthetic",
+        "sourceRef": "Composed to instantiate the VERIFIED principle: Sarika's name-the-central-fact-sparingly-and-never-as-subject move (review #05, Move 14) + Hemingway's theory of omission (Death in the Afternoon). The AFTER names the condition obliquely ('asthma'/'lungs', never as subject) and renders it through effects; not a quoted admit essay. NOTE: Sarika names 'wheelchair' TWICE (count re-verified against raw essay text 2026-06-19, per standard #8), not once; the transferable discipline is oblique/never-as-subject naming, not a literal one-count.",
+        "usage": "private-teaching-aid — DO NOT SURFACE to the student and DO NOT MIMIC its phrasing OR its rhetorical structure. It teaches the SYSTEM the move; generated output must be lexically and structurally distinct from it."
+      },
+      "mechanics": "Two levers make the AFTER work. (1) The label is demoted from subject to passing detail: 'asthma' is no longer the grammatical subject of sentence after sentence ('My asthma meant...') — it appears once, low in a sentence whose real subject is the room watching. (2) The fact is converted into specific, scene-bound CONSEQUENCES the reader must assemble (inhaler taped in locker, learning a building by its exits, never raising a hand because standing is exposure). The reader infers the weight of the condition from the precision of the adjustments, which is more intimate than being told the weight. Transfer the move by asking of any sentence that NAMES the central fact: 'Could I instead show one concrete adjustment the fact forces, and cut the naming?' — keep exactly one naming, convert the rest to effects.",
+      "transfer": [
+        "BEFORE (a loss essay over-naming): 'After my father died, grief was everywhere. My grief affected my grades. I was consumed by grief for months.' — AFTER, named once and orbited: 'I still set two cups by the kettle some mornings before I catch myself and put one back. For a whole semester my teachers wrote the same three words in the margins — see me, please — and I never did. The second toothbrush stayed in the cup by the sink until spring; nobody in the house was the one to move it.' (The death is named zero-to-once; its weight arrives entirely through the unmoved toothbrush, the uncrossed margin note, the extra cup.)"
+      ],
+      "failureModes": [
+        "Naming the fact once but then explaining its significance anyway ('...my wheelchair. Being in a wheelchair has taught me resilience.') — the explanatory follow-on re-centers the label and undoes the restraint; cut the follow-on.",
+        "Orbiting through GENERIC effects instead of specific ones ('it made everyday things harder') — vague consequences don't let the reader feel the fact; the effect must be one over-specified, scene-bound adjustment (the taped inhaler, the unmoved toothbrush).",
+        "Omitting the fact entirely so the reader genuinely cannot infer it — Hemingway's warning: 'A writer who omits things because he does not know them only makes hollow places in his writing.' The one naming, plus reliably-inferable effects, must let the reader actually reconstruct the fact. Restraint is controlled omission, not vagueness."
+      ],
+      "antiTemplate": "The MOVE is mandatory; the FRAMING must vary. Do NOT default to a fixed register or arc. Rotate the insight register across users: sometimes the orbiting is sensory (objects, rooms, the body); sometimes relational (how others adjust around the fact); sometimes flatly observational with no stated feeling; sometimes the single naming lands in a rhetorical question, sometimes inside an action, sometimes inside a list that breaks pattern. Do NOT require a closing reflection on the fact, and do NOT require the fact to be named in any particular position. The technique that transfers is 'name once, orbit via concrete effects'; the choreography around it must differ each time and must not become its own template."
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Ernest Hemingway, 'Death in the Afternoon' (1932), ch. 16 — the Theory of Omission / Iceberg Theory: 'If a writer of prose knows enough of what he is writing about he may omit things that he knows and the reader, if the writer is writing truly enough, will have a feeling of those things as strongly as though the writer had stated them. The dignity of movement of an ice-berg is due to only one-eighth of it being above water. A writer who omits things because he does not know them only makes hollow places in his writing.'",
+      "url": "https://en.wikipedia.org/wiki/Iceberg_theory",
+      "tier": 2,
+      "authorRole": "Named-practitioner craft authority (Nobel laureate author; primary craft statement in his own book)",
+      "publishedDate": "1932-01-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Harvard Crimson Brand Studio 'Essays That Worked' (consultant: PrepMaven) + Uplift sentence-level review #05 (Sarika, 'I, Too, Can Dance') Move 14 'Name-the-central-fact sparingly' — the word 'wheelchair' appears exactly TWICE in the essay (rhetorical question + closing self-referential image), never as the grammatical subject and never as 'my disability'; 'disability'/'difference' never appear; the fact is present otherwise only as its effect on specific moments. (Count re-verified against raw essay text 2026-06-19 per standard #8; review #05 is self-contradictory — see provenanceTrail.)",
+      "url": "https://www.thecrimson.com/topic/sponsored-successful-harvard-essays-2024/",
+      "tier": 2,
+      "authorRole": "Sponsored consultant feature (Crimson, admission unverified) + Uplift internal review — self-citation, Tier-2",
+      "publishedDate": "2024-01-01",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "1932-01-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "stable",
+  "connections": [
+    {
+      "toId": "essays-restraint-002",
+      "relation": "supports",
+      "note": "Naming once is the macro form; reveal-through-consequence is the sentence-level form of the same omission discipline — both make the reader infer the fact."
+    },
+    {
+      "toId": "essays-restraint-006",
+      "relation": "supported-by",
+      "note": "Both rest on Hemingway's omission principle and the subtext/trust-the-reader stance; entry 006 is the imply-don't-state form."
+    },
+    {
+      "toId": "essays-reflection-meaning-making-001",
+      "relation": "contrasts-with",
+      "note": "Reflection ADDS an earned insight; restraint CUTS the over-labeling — the two disciplines must be balanced: orbit the fact, but still land one 'so-what'."
+    }
+  ],
+  "provenanceTrail": "Hemingway's omission passage captured verbatim via WebFetch of the Iceberg-theory primary-quote source (Death in the Afternoon, ch. 16, 1932) — a named-practitioner craft statement, the foundational authority for controlled omission. Cross-checked against the multiply-cited 'Hills Like White Elephants' exemplar of the technique. Empirical grounding from the Uplift sentence-level review of Sarika's Harvard-2028 admit essay (#05), which identifies 'name-the-central-fact sparingly' as the essay's signature restraint move (wheelchair named obliquely, never as subject; disability/difference never). Two independent kinds of evidence (named craft authority + real admit instance) converge. COUNT RE-VERIFIED 2026-06-19 (per standard #8 — verify against raw essay text, do not trust the review): grep of the raw essay body (tests/calibration/top-tier-reference/essays/05-harvard-2028-i-too-can-dance.txt) returns 'wheelchair' = 2 (P3 rhetorical question + P6 closing self-referential image 'the story of a girl in a wheelchair who learned how to dance'), 'disability' = 0, 'difference' = 0. The earlier 'exactly once' claim was a FALSE count-diagnostic; corrected to at-most-once-or-twice-and-never-as-subject. The source review #05 is SELF-CONTRADICTORY — it asserts 'The word appears once in the whole essay' (review line 209/221) while elsewhere quoting and discussing the second occurrence ('the story of a girl in a wheelchair who learned how to dance', review lines 417/447) — FLAGGED. The Hemingway principle is general prose craft; its application to the personal-statement central-fact is the Uplift-corpus contribution, empirically grounded but not separately attested by a college-essay practitioner — flagged for a named-practitioner cross-source at next cycle."
+}

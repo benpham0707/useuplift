@@ -42,7 +42,7 @@ Let's count what this sentence does:
 
 4. **"Alone" as keyword.** The essay's single most important word is already in the first sentence. Everything that follows will be about what alone means here — it is not loss, not abandonment; it is a specific kind of enforced separation that is also a sacrifice.
 
-**The one-sentence paragraph form.** This is the same move as Marcus's three-word hinge ("Until I became one") — a single sentence isolated as a paragraph, given structural weight. Michael uses it at the opening, where it functions as both hook and thesis-seed. The essay will circle back to "alone" in its closing — "I have almost gotten used to being alone. But I won't let my story end here."
+**The one-sentence paragraph form** (verified 2026-06-20: Michael's opening line "I've been alone for three years now." is a genuine standalone single-sentence paragraph in the raw essay). A single sentence isolated as a paragraph, given structural weight. Michael uses it at the opening, where it functions as both hook and thesis-seed. (Note: Marcus's "Until I became one" achieves a related hinge effect, but is NOT itself a one-sentence paragraph — it is the second sentence of a two-sentence paragraph; see review 10. Michael's opener is the cleaner example of the isolated-sentence-as-paragraph form.) The essay will circle back to "alone" in its closing — "I have almost gotten used to being alone. But I won't let my story end here."
 
 ### Paragraph 2 — The setup
 
