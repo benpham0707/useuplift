@@ -1,0 +1,48 @@
+{
+  "id": "essays-ai-in-essays-008",
+  "domain": "essays",
+  "subtopic": "ai-in-essays",
+  "claim": "Automated AI-text detection is too unreliable to be a safe basis for action on application essays, and it is biased against the students with the most to lose. The peer-reviewed Stanford study (Liang et al., Patterns, 2023) ran 91 non-native-English TOEFL essays through 7 commercial GPT detectors and found ~61% were misflagged as AI-written, versus ~5% false-positive rate on native-English writing -- a bias rooted in non-native writers' lower lexical variability ('low perplexity'). Turnitin disabled or warned on its AI detector at major universities (e.g. Vanderbilt disabled it August 2023) over false-positive risk, and Turnitin's tool requires ~300+ words and can miss ~15% of AI text -- yet many supplemental essays are only 150-250 words, below the reliable threshold.",
+  "application": [
+    {
+      "kind": "calibrated-heuristic",
+      "content": "Do NOT treat any AI-detector score as ground truth for the student OR against them. For the student's protection: a genuinely human-written essay -- especially from a non-native English writer or a plain-style writer -- can be falsely flagged, so the defense is process evidence (drafts, version history, brainstorm notes) demonstrating authorship, not a low detector score. For Uplift's own pipeline: never gate or accuse based on a detector number; if 'sounds like AI' is a concern, redirect to the craft signal (concrete, irreplaceable voice per entry 007), which is both more reliable and more useful than a probabilistic detector. Counsel non-native English students to KEEP their drafts precisely because they are at 2-3x higher false-flag risk.",
+      "dimensionTags": ["originality_specificity_voice"]
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Liang, Yuksekgonul, Mao, Wu, Zou -- 'GPT detectors are biased against non-native English writers,' Patterns 4(7):100779",
+      "url": "https://www.cell.com/patterns/fulltext/S2666-3899(23)00130-7",
+      "tier": 1,
+      "authorRole": "Stanford University researchers, peer-reviewed (Cell Press / Patterns)",
+      "publishedDate": "2023-07-10",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Turnitin admits there are some cases of higher false positives in AI writing detection tool | K-12 Dive",
+      "url": "https://www.k12dive.com/news/turnitin-false-positives-AI-detector/652221/",
+      "tier": 2,
+      "authorRole": "K-12 Dive (established education journalism) reporting Turnitin's own admission + Vanderbilt's disabling",
+      "publishedDate": "2023-08-01",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2023-07-10",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "semi-stable",
+  "connections": [
+    {
+      "toId": "essays-ai-in-essays-007",
+      "relation": "complements",
+      "note": "Because detectors are unreliable, AOs fall back on reading voice/specificity -- the craft signal in entry 007 is what actually drives human judgment."
+    },
+    {
+      "toId": "essays-ai-in-essays-006",
+      "relation": "contextualizes",
+      "note": "Detector unreliability is one reason most schools (the 68% with no policy) have not built enforcement around detection."
+    }
+  ],
+  "provenanceTrail": "Liang et al. is a peer-reviewed Patterns (Cell Press) article -- Tier-1 -- with the 61.3% vs 5.1% TOEFL/native false-positive figures and the low-perplexity mechanism quoted directly; corroborated across PubMed, PMC, ScienceDaily mirrors. Vanderbilt's Aug-2023 disabling of Turnitin's detector and Turnitin's own false-positive admission reported by K-12 Dive (Tier-2 established ed journalism); the ~750-wrongful-accusations-per-75,000-papers and 300-word-minimum / 15%-miss figures appeared across multiple 2023-2026 secondary sources but the load-bearing claims here rest on the peer-reviewed study + Turnitin's own admission. Marked semi-stable: bias direction is durable, but specific detector accuracy numbers and which tools admissions use will move."
+}

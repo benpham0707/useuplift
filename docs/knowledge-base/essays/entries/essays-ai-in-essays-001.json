@@ -1,0 +1,48 @@
+{
+  "id": "essays-ai-in-essays-001",
+  "domain": "essays",
+  "subtopic": "ai-in-essays",
+  "claim": "The Common App Fraud Policy (updated 2023, in force for 2024-2026 cycles) explicitly classifies as fraud the act of 'intentionally misrepresenting as one's own original work ... the substantive content or output of an artificial intelligence platform, technology, or algorithm.' Because the Common App serves 1,000+ member colleges, this single policy is the binding AI baseline for nearly every applicant who uses the platform, regardless of whether the individual college has its own AI statement.",
+  "application": [
+    {
+      "kind": "decision-rule",
+      "content": "Treat the Common App fraud attestation as the floor for every Common App school: AI may NOT supply the 'substantive content' of any essay or written response. Grammar/spelling cleanup and early topic brainstorming are not, by themselves, fraud under this policy. If a student let an AI generate sentences, paragraphs, or the core ideas of the personal statement, the submission violates the attestation they sign at submit time -- counsel a full rewrite in the student's own words before submission, not a paraphrase of AI output.",
+      "dimensionTags": ["originality_specificity_voice"]
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Common App Fraud Policy",
+      "url": "https://www.commonapp.org/fraud-policy/",
+      "tier": 1,
+      "authorRole": "Common Application (official platform policy)",
+      "publishedDate": "2023-09-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Common App Applicant Support: How does Common App handle fraud?",
+      "url": "https://appsupport.commonapp.org/applicantsupport/s/article/How-does-Common-App-handle-fraud",
+      "tier": 1,
+      "authorRole": "Common Application (official support documentation)",
+      "publishedDate": "2024-01-01",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2023-09-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "volatile",
+  "connections": [
+    {
+      "toId": "essays-ai-in-essays-002",
+      "relation": "implies",
+      "note": "Multiple top schools (Yale, Brown) adopt the Common App's exact 'substantive content or output' language verbatim, so the baseline propagates into named-school policy."
+    },
+    {
+      "toId": "essays-ai-in-essays-006",
+      "relation": "contextualizes",
+      "note": "The Common App baseline exists alongside the reality that most individual colleges have NO standalone policy -- this entry is what fills that vacuum."
+    }
+  ],
+  "provenanceTrail": "Exact policy phrase ('substantive content or output of an artificial intelligence platform, technology, or algorithm') captured via WebSearch snippet of commonapp.org/fraud-policy and corroborated by the Common App applicant-support fraud article; the same phrasing was independently observed echoed verbatim in Yale's and Brown's admissions AI policy pages (see entries 002, 005), confirming it is the canonical wording. JS-rendered policy page resisted full WebFetch extraction; phrase verified across three independent surfaces. Tier-1 official."
+}

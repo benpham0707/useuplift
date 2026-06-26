@@ -1,0 +1,45 @@
+{
+  "id": "essays-post-sffa-identity-005",
+  "domain": "essays",
+  "subtopic": "post-sffa-identity",
+  "claim": "Institutions now operate under a guardrail that they may welcome identity content but cannot let race itself tip the decision. Harvard's official guidance: 'applicants and those writing on behalf of applicants should feel welcome to write about any aspect of the applicant's identity or background, including race and/or ethnicity,' while the demographic race/ethnicity data 'will not be shared in the transmission of application data for review.' The essay's narrative reaches the reader; the bare category is withheld. The carve-out is the only legitimate channel through which an applicant's race can inform a decision.",
+  "application": [
+    {
+      "kind": "decision-rule",
+      "content": "Treat the essay as the only place racial identity can actually do work in the file — but only in its qualitative, experience-tied form, never as a checkbox the reader will weight. Practical consequence: if a student wants their background to matter, it must be EARNED in narrative (a specific experience evidencing a quality), because the demographic checkbox is redacted before the reader sees it. Don't spend the essay restating what a (withheld) box would have said; spend it on what only a story can convey.",
+      "dimensionTags": ["context_constraints_disclosure", "reflection_meaning_making", "originality_specificity_voice"]
+    },
+    {
+      "kind": "diagnostic-signal",
+      "content": "Warning sign that a student is mis-modeling the new system: a draft that 'reports' identity for the record (as if confirming a demographic) rather than dramatizing it. Under redaction, reportage is invisible; only the lived, transferable quality survives. Redirect the student from 'telling the reader what I am' to 'showing the reader who that made me and what I'll bring.'",
+      "dimensionTags": ["character_interiority_vulnerability", "reflection_meaning_making"]
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Harvard College Admissions official FAQ — 'Can I (as an applicant) write about my race/ethnicity in my application materials?'",
+      "url": "https://college.harvard.edu/resources/faq/can-i-applicant-write-about-my-raceethnicity-my-application-materials-can-i-counselor",
+      "tier": 1,
+      "authorRole": "Harvard College Admissions (institutional official guidance)",
+      "publishedDate": "2023-08-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Stanford Center for Racial Justice SFFA FAQ — colleges may consider how race shaped a personal journey but must treat the student 'based on his or her experiences as an individual—not on the basis of race,' and may not use essays to restore race-conscious admissions",
+      "url": "https://law.stanford.edu/2023/12/12/students-for-fair-admissions-v-harvard-faq-navigating-the-evolving-implications-of-the-courts-ruling/",
+      "tier": 2,
+      "authorRole": "Stanford Law School legal-academic analysis",
+      "publishedDate": "2023-12-12",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2023-06-29",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "semi-stable",
+  "connections": [
+    { "toId": "essays-post-sffa-identity-002", "relation": "implements", "note": "Data-redaction is the operational answer to the ruling's anti-circumvention warning." },
+    { "toId": "essays-post-sffa-identity-001", "relation": "depends-on", "note": "The carve-out is what makes essay-borne identity admissible at all once the checkbox is withheld." }
+  ],
+  "provenanceTrail": "Harvard's institutional FAQ (Tier 1) fetched directly and quoted verbatim for the 'feel welcome to write about... including race and/or ethnicity' and 'will not be shared in the transmission' language. Cross-checked against Stanford Law's FAQ describing the same can/cannot boundary at the system level. The two sources are independent (one institutional, one legal-academic) and agree."
+}

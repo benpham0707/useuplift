@@ -1,0 +1,73 @@
+{
+  "id": "essays-restraint-002",
+  "domain": "essays",
+  "subtopic": "restraint",
+  "claim": "A central fact lands harder when it is disclosed through a CONSEQUENCE the reader must decode than when it is stated outright. Instead of declaring the fact ('I was in a wheelchair'), the writer names a specific ACTION whose cause the reader infers ('I even ran over my friends' toes' → wheel → wheelchair). The inference IS the reveal: readers trust and feel conclusions they reach themselves far more than conclusions handed to them. This is reveal-through-consequence — the body/fact enters the essay via its effect on the world, not as a declared category of person.",
+  "application": [
+    {
+      "kind": "before-after",
+      "content": "RESTRAINT MOVE — reveal-through-consequence (disclose the fact as the cause the reader must infer). Take the central fact you would normally STATE and ask: what concrete, specific action or consequence does this fact produce that has exactly ONE plausible cause? Write that action plainly; delete the declarative statement of the fact. The reader runs a one-step backward-causal search and arrives at the fact themselves — and because they did the work, they feel it. Calibration constraints from the admit corpus: (1) the inference path must be NARROW — the action's cause must be reliably reconstructable ('ran over my friends' toes' reliably implies a wheel; 'I made things harder for everyone' implies nothing). (2) Frame the action MEEKLY, not dramatically — Sarika's 'Sometimes, I even ran over my friends' toes' uses a soft adverb ('sometimes') and a small concessive ('even') so the disclosure slips past the reader's defenses and ambushes them with the implication; a braced, dramatic frame ('Then came the devastating truth: I was disabled') telegraphs the reveal and kills it. (3) Place the short consequence-sentence after one or two longer neutral sentences so it lands as a drop. Authority: this is Hemingway's omission at the sentence level, and Palahniuk's rule — 'present the details that allow the reader to know... allow your reader to do the thinking and knowing.'",
+      "dimensionTags": [
+        "specificity"
+      ],
+      "surfaceVsExpert": "expert",
+      "workedExample": {
+        "before": "I have a stutter, which has always made speaking in class really hard for me. Because of my stutter, I avoided raising my hand whenever I could. My speech impediment made me feel different from everyone else.",
+        "after": "The teacher learned to call on me only for yes-or-no. My friends learned to order for me at the drive-through, leaning across from the passenger seat before the speaker could ask twice. I had a system for the word 'water' that involved pointing.",
+        "exemplarProvenance": "illustrative-synthetic",
+        "sourceRef": "Composed to instantiate the VERIFIED move: Sarika's 'ran over my friends' toes' reveal-through-consequence (review #05, Move 'reveal-through-consequence-via-short-punchline-sentence') + Palahniuk 'Thought Verbs' + Hemingway omission. The stutter is never named; it is inferred from the yes-or-no questions, the drive-through workaround, the system for one word. Not a quoted admit essay.",
+        "usage": "private-teaching-aid — DO NOT SURFACE to the student and DO NOT MIMIC its phrasing OR its rhetorical structure. It teaches the SYSTEM the move; generated output must be lexically and structurally distinct from it."
+      },
+      "mechanics": "The lever is substituting an EFFECT-with-one-cause for a STATED-cause. 'I have a stutter' (stated cause) becomes three consequences — calls on me only for yes-or-no; friends order for me; a pointing-system for 'water' — each of which has essentially one explanation, so the reader reconstructs the stutter without it ever being named. Two sub-levers tune it: (a) inference narrowness — each consequence is specific enough ('a system for the word water that involved pointing') that the cause is unambiguous; (b) meek framing — the consequences are reported as ordinary logistics, not as wounds, so the reader is ambushed by the weight rather than braced for it. Transfer the move by listing the concrete things that are TRUE BECAUSE of the fact, picking the one(s) with the narrowest single cause, and cutting the fact's name.",
+      "transfer": [
+        "BEFORE (family-situation essay, stated): 'My parents got divorced when I was ten, and after that I had to grow up fast and take care of my little sister.' — AFTER, revealed through consequence: 'I knew which nights were Dad's by whose handwriting was on the permission slips. By eleven I could sign my sister's reading log in a cursive that passed for an adult's, and I kept the spare key on a shoelace under my shirt so I'd never be the reason we were locked out.' (The divorce is never stated; it is reconstructed from the alternating handwriting, the forged log, the latchkey on a shoelace.)"
+      ],
+      "failureModes": [
+        "Choosing an action whose cause is ambiguous ('I made things harder for everyone,' 'life got complicated') — the reader can't reliably infer the fact, so the reveal fails and just reads as vague. The inference path must be narrow.",
+        "Framing the consequence dramatically so the reveal is telegraphed ('In a heartbreaking moment, I ran over my best friend's foot with the wheelchair I was confined to') — naming the fact inside the 'reveal' destroys the inference; and the braced framing removes the ambush. Keep it meek and unnamed.",
+        "Stating the fact AND the consequence ('Because I was in a wheelchair, I ran over my friends' toes') — the causal clause hands the reader the answer they were supposed to derive. Cut the because-clause; let the action stand alone."
+      ],
+      "antiTemplate": "The MOVE is mandatory; the FRAMING must vary. Do NOT default to the three-parallel-consequences shape shown above, and do NOT always use a short punchline sentence (that is Sarika's specific rhythm, not a template). Sometimes one consequence is enough; sometimes the consequence is embedded mid-paragraph; sometimes it is dialogue or an object rather than an action. Vary the register — logistical, comic, sensory, relational. The transferable technique is 'disclose the fact as a narrowly-inferable effect and delete the declaration'; the number, rhythm, and tone of the effects must differ each time."
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Harvard Crimson Brand Studio 'Essays That Worked' (consultant: Ivy Institute) + Uplift sentence-level review #05 (Sarika, 'I, Too, Can Dance'): 'Sometimes, I even ran over my friends' toes' — the wheelchair is disclosed 'through consequence, not declaration'; 'the inference IS the reveal'; meek framing ('sometimes,' 'even') lets the disclosure ambush the reader.",
+      "url": "https://www.thecrimson.com/topic/sponsored-successful-harvard-essays-2024/",
+      "tier": 2,
+      "authorRole": "Sponsored consultant feature (Crimson, admission unverified) + Uplift internal review — self-citation, Tier-2",
+      "publishedDate": "2024-01-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Chuck Palahniuk, 'Nuts and Bolts: \"Thought\" Verbs' (LitReactor) — 'Instead of characters knowing anything, you must now present the details that allow the reader to know them... Your story will always be stronger if you just show the physical actions and details of your characters and allow your reader to do the thinking and knowing.'",
+      "url": "https://litreactor.com/essays/chuck-palahniuk/nuts-and-bolts-%E2%80%9Cthought%E2%80%9D-verbs",
+      "tier": 2,
+      "authorRole": "Named-practitioner craft authority (best-selling novelist; widely-taught craft essay)",
+      "publishedDate": "2013-07-12",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "1932-01-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "stable",
+  "connections": [
+    {
+      "toId": "essays-restraint-001",
+      "relation": "supports",
+      "note": "Reveal-through-consequence is the sentence-level instance of name-sparingly-and-never-as-subject-then-orbit: the fact enters via an effect rather than as a labeled subject."
+    },
+    {
+      "toId": "essays-restraint-003",
+      "relation": "related-to",
+      "note": "Both replace a STATED interior/fact with a concrete external rendering the reader decodes (Palahniuk's 'thought verbs' rule underlies both)."
+    },
+    {
+      "toId": "essays-restraint-006",
+      "relation": "supported-by",
+      "note": "Same trust-the-reader / subtext principle; here applied to disclosing a fact rather than to ending on an image."
+    }
+  ],
+  "provenanceTrail": "Empirical anchor: the Uplift sentence-level review of Sarika's Harvard-2028 admit essay (#05) treats 'Sometimes, I even ran over my friends' toes' at length as 'the single most discussed craft move in the essay,' naming reveal-through-consequence, the narrow-inference constraint, and the meek-framing constraint — captured directly from the corpus review. Authority anchor: Palahniuk's 'Thought Verbs' primary text captured verbatim via WebFetch of the LitReactor essay (the 'present the details that allow the reader to know them' instruction), a named-practitioner craft authority; the underlying omission principle is Hemingway (see entry 001). The narrow-inference and meek-framing calibrations are empirically derived from the corpus review and corroborated by Palahniuk's show-physical-actions rule. COUNT RE-VERIFIED 2026-06-19 (per standard #8 — verify against raw essay text, do not trust the review): this entry's reveal-through-consequence move rests on the P3 sentence 'Sometimes, I even ran over my friends' toes', which correctly does NOT name the wheelchair — that remains accurate. For the record, grep of the raw essay body (tests/calibration/top-tier-reference/essays/05-harvard-2028-i-too-can-dance.txt) shows 'wheelchair' = 2 (NOT once: P3 rhetorical question + P6 closing self-referential image), 'disability' = 0, 'difference' = 0 — see corrected sibling entry essays-restraint-001. The source review #05 is SELF-CONTRADICTORY on the count — it asserts 'The word appears once in the whole essay' (review line 209/221) while elsewhere quoting/discussing the second occurrence ('the story of a girl in a wheelchair who learned how to dance', review lines 417/447) — FLAGGED."
+}

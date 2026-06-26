@@ -1,0 +1,48 @@
+{
+  "id": "essays-ai-in-essays-005",
+  "domain": "essays",
+  "subtopic": "ai-in-essays",
+  "claim": "Brown University sits at the strict end of the spectrum: its application-integrity policy states 'the use of artificial intelligence by an applicant is not permitted under any circumstances in conjunction with application content,' with the sole carve-out that AI may be used for 'spelling and grammar review, in the same way as any other platform that supports basic proofreading.' Brown explicitly affirms the Common App fraud language prohibiting 'the substantive content or output of an artificial intelligence platform.' Georgetown similarly forbids AI use in applications.",
+  "application": [
+    {
+      "kind": "decision-rule",
+      "content": "When a student is applying to a school with a maximalist ban (Brown, Georgetown), restrict AI to literal proofreading only -- no brainstorming chat, no idea-generation, no outlining -- because Brown's wording ('not permitted under any circumstances') is stricter than the Common App baseline and stricter than permissive schools like Yale/Caltech that allow brainstorming. Per-school policy can be MORE restrictive than the Common App floor, so the safe move for a multi-school applicant is to write to the strictest policy among their list, then they are compliant everywhere.",
+      "dimensionTags": ["originality_specificity_voice"]
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Integrity in the Application Process | Brown University Undergraduate Admission",
+      "url": "https://admission.brown.edu/apply/how-apply/integrity-application-process",
+      "tier": 1,
+      "authorRole": "Brown University Office of Undergraduate Admission (official policy)",
+      "publishedDate": "2024-08-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "AI Use in College Essays: What Top 30 Admissions Offices Will (and Won't) Allow | College Essay Advisors",
+      "url": "https://www.collegeessayadvisors.com/ai-use-in-college-essays-what-top-30-admissions-offices-will-and-wont-allow/",
+      "tier": 2,
+      "authorRole": "College Essay Advisors (named admissions-essay consultancy roundup)",
+      "publishedDate": "2025-01-01",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2024-08-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "volatile",
+  "connections": [
+    {
+      "toId": "essays-ai-in-essays-003",
+      "relation": "contrasts-with",
+      "note": "Brown's 'no AI under any circumstances' bans the brainstorming that Caltech and Yale explicitly permit -- the core of the policy-variance reality."
+    },
+    {
+      "toId": "essays-ai-in-essays-006",
+      "relation": "supports",
+      "note": "Brown/Georgetown anchor the strict-ban end of the CONTESTED variance spectrum."
+    }
+  ],
+  "provenanceTrail": "Brown's integrity page fetched 2026-06-18; the 'not permitted under any circumstances' wording, the proofreading-only carve-out, and the explicit affirmation of the Common App 'substantive content or output' language all quoted directly. Georgetown's strict stance corroborated by the College Essay Advisors top-30 roundup (Tier-2, 2025). Brown deliberately chosen as the strict-end exemplar because its proofreading-only carve-out is narrower than the brainstorm-permitting majority. Brown page undated; effective date estimated to 2024 cycle, flagged volatile."
+}

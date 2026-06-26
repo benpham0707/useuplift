@@ -1,0 +1,71 @@
+{
+  "id": "essays-rhythm-001",
+  "domain": "essays",
+  "subtopic": "rhythm",
+  "claim": "The expert rhythm move is meter-content congruence: the stress pattern of a sentence ENACTS its subject, so the reader feels the tone before they process the words. This is not 'vary your sentence length' (the surface baseline) — it is engineering the SCANSION so the beat does the work word-choice cannot. Sarika's opener about a ballerina is built in three-beat measures — a waltz — so an AO who subvocalizes feels classical-ballet grace arriving a half-second before the meaning does ('DAIN-ty / PINK / MOUSE'; 'ROSE-co-lored / BOW / FOL-low-ing'). Rhythm is pre-cognitive: it reaches the ear before meaning reaches the conscious mind, and if the rhythm is congruent with the content, the tone arrives free. The move is reserved for subjects that have an intrinsic rhythmic signature (dance, music, running, breath, machinery, ritual) — match the prose's beat to that signature and the sentence performs its own meaning.",
+  "application": [
+    {
+      "kind": "before-after",
+      "content": "RHYTHM MOVE — meter-content congruence. When your subject has an audible rhythmic signature (a waltz is in 3; a sprint is short bursts; a heartbeat is two-then-pause; a loom or a metronome is steady duple time), build the sentence that introduces it so its STRESS PATTERN reproduces that signature. Procedure (Le Guin's 'mind's ear'): draft the sentence for meaning; read it aloud; mark the stressed syllables; then rearrange words, swap synonyms, and add or cut small unstressed words until the recurring beat-count matches the subject's signature. Do NOT announce it ('the rhythm of her dance, like a waltz, filled the room') — that names the effect and kills it; the meter must be felt, not described. Reserve the move for ONE or two load-bearing sentences (usually the opener or a turn); a whole essay metered to one signature becomes sing-song. Empirical anchor: Sarika's opener scans as repeated three-beat measures over a ballet subject ('DAIN-ty / PINK / MOUSE … ROSE-co-lored / BOW / FOL-low-ing'); the review names this 'meter-content congruence' and notes AOs feel the ballet before they notice why the sentence feels right. Authority: Le Guin (Steering the Craft) — 'the test of a sentence is, Does it sound right?'; rhythm 'arrives at the reader's ear before meaning arrives at their conscious mind'; the writer controls it 'by hearing it.' This goes beyond Provost's length-variation passage, which only varies how LONG sentences are, not whether the internal beat MATCHES the content.",
+      "dimensionTags": [
+        "voice",
+        "specificity"
+      ],
+      "surfaceVsExpert": "expert",
+      "workedExample": {
+        "before": "I started rowing crew the summer before tenth grade, and I quickly fell in love with how powerful and rhythmic and synchronized it felt to move a boat with seven other people, all of us pulling together as one unit through the cold morning water.",
+        "after": "Catch. Drive. Release. Catch. Eight oars bite the river at once, eight backs unfold, eight blades lift clean, and the shell surges a body-length forward on the silence between strokes.",
+        "exemplarProvenance": "illustrative-synthetic",
+        "sourceRef": "Composed to instantiate the VERIFIED meter-content-congruence move (Sarika opener, review #05 'Move 6'; Le Guin, Steering the Craft). The rowing subject's signature is the stroke cycle, so the AFTER opens in clipped one-word beats ('Catch. Drive. Release.') that reproduce the catch-drive-release of a rowing stroke, then runs a long surging clause to enact the glide between strokes. NOT a quoted admit essay.",
+        "usage": "private-teaching-aid — DO NOT SURFACE to the student and DO NOT MIMIC its words OR its rowing-cycle skeleton. It teaches the SYSTEM the move; generated output must scan to the STUDENT'S own subject, not row a boat."
+      },
+      "mechanics": "Two levers, both auditory. (1) Beat-MATCHING: identify the subject's rhythmic signature (rowing = a hard catch, a long drive, a quick release, then glide) and reproduce that PROFILE in syllable stress and clause length, not just in word meaning. The BEFORE describes the rhythm ('powerful and rhythmic and synchronized') in a flat 43-word sentence whose own beat is a shapeless drone; the AFTER stops describing and PERFORMS — three monosyllabic stressed beats ('Catch. Drive. Release.') for the stroke, then a long clause for the glide. (2) The CONGRUENCE must be felt only: nowhere does the AFTER say 'like a rowing stroke.' To transfer: name the subject's sound-shape in one phrase, then build the sentence so a read-aloud reproduces that shape; if you can hear the subject in the sentence with your eyes closed, it works; if you had to TELL the reader it was rhythmic, it failed.",
+      "transfer": [
+        "BEFORE (a subject with a sprint signature, flat): 'The hundred-meter dash was over so fast that by the time I processed what was happening I had already crossed the line, breathing hard.' AFTER (beat matched to the sprint — short, accelerating, then a hard stop): 'Gun. Eight strides and the stands smear sideways, ten and my lungs are a fist, eleven, twelve — tape.' (The clipped 'Gun.' is the start; the run-on accelerates with the body; the dash and the single word 'tape' are the line. The reader sprints the sentence.)",
+        "BEFORE (a subject with a heartbeat/monitor signature): 'In the ICU I sat next to my grandfather and listened to the steady beeping of the heart monitor for hours, terrified of the moment it might change.' AFTER: 'Beep. Beep. The monitor kept its two-count through the night, and I counted with it, and I did not let myself imagine the count breaking.' (Duple beat for the monitor; the long anxious clause for the vigil.)"
+      ],
+      "failureModes": [
+        "Naming the rhythm instead of performing it ('the words flowed like a melody') — that is description, the surface move; the meter must live in the syllables, invisible.",
+        "Metering the WHOLE essay to one signature — every sentence in waltz-3 or sprint-bursts becomes sing-song and exhausting; the move is for one or two load-bearing sentences against a varied background.",
+        "Forcing meter onto a subject with no rhythmic signature (a quiet conversation, a chemistry problem) — the contortion to hit a beat reads as artificial; if you can't name the subject's sound-shape in a phrase, don't use this move.",
+        "Sacrificing sense for beat — rearranging until the stress pattern is perfect but the sentence now says something slightly false or strained; meaning is the master, rhythm the servant."
+      ],
+      "antiTemplate": "The MOVE (make the beat enact the subject) is transferable; the SIGNATURE and its execution must not become a template. Do NOT default to 'open with three one-word sentences' (Catch. Drive. Release.) — that clipped-triad opener is ONE realization for ONE kind of subject (a discrete repeating cycle). A waltz wants flowing three-beat measures inside a single long sentence (Sarika), not staccato fragments; a tide or a loom wants a long even-stressed line; breath wants a clause that expands and contracts. Vary whether the congruent sentence is the opener or a mid-essay turn, whether it is long or short, whether the beat is duple/triple/accelerating/decelerating. Never let the device be detectable as 'the rhythm trick'; the only through-line is that the sentence sounds, when read aloud, like the thing it describes."
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Ursula K. Le Guin, 'Steering the Craft: A Twenty-First-Century Guide to Sailing the Sea of Story' (Mariner/Houghton Mifflin Harcourt), ch. 'The Sound of Your Writing' — 'The sound of the language is where it all begins. The test of a sentence is, Does it sound right?'; 'Both the meaning and the beauty of the writing depend on these sounds and rhythms'; 'Pace and movement depend above all on rhythm, and the primary way you feel and control the rhythm of your prose is by hearing it.' Le Guin's 'mind's ear' / read-aloud method is the operational basis for the scansion procedure.",
+      "url": "https://lithub.com/a-writing-lesson-from-ursula-k-leguin/",
+      "tier": 2,
+      "authorRole": "Named master author / craft-handbook (Steering the Craft); excerpt reproduced by Literary Hub",
+      "publishedDate": "2015-08-25",
+      "accessedDate": "2026-06-19"
+    },
+    {
+      "citation": "Harvard 'Essays That Worked' corpus (Sarika, 'I, Too, Can Dance') + Uplift editorial review #05, 'Move 6 — meter-content congruence': the opening sentence scans as repeated three-beat (waltz) measures over a ballet subject ('DAIN-ty / PINK / MOUSE'; 'ROSE-co-lored / BOW / FOL-low-ing'); 'Rhythm is pre-cognitive… the reader feels the tone of the content before processing it'; AOs 'subvocalize' and 'feel the ballet rhythm before they notice why the sentence feels right.'",
+      "url": "https://www.thecrimson.com/topic/sponsored-successful-harvard-essays-2024/",
+      "tier": 2,
+      "authorRole": "Sponsored consultant feature (Crimson, admission unverified) + Uplift internal review — self-citation, Tier-2",
+      "publishedDate": "2024-01-01",
+      "accessedDate": "2026-06-19"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2015-08-25",
+  "lastVerified": "2026-06-19",
+  "freshnessClass": "stable",
+  "connections": [
+    {
+      "toId": "essays-rhythm-005",
+      "relation": "related-to",
+      "note": "Meter-content congruence and sound-count/list-length matching are sibling 'the form enacts the content' moves; 001 works at the level of STRESS, 005 at the level of repeated SOUND predicting structure."
+    },
+    {
+      "toId": "essays-rhythm-002",
+      "relation": "contrasts-with",
+      "note": "001 builds a congruent flowing beat across a sentence; 002 breaks rhythm deliberately with a short declarative. Both control pacing, but one sustains a beat and the other interrupts it."
+    }
+  ],
+  "provenanceTrail": "Built from the cycle-2 craft-taxonomy 'rhythm' row (the second-densest craft axis in the admit reviews, near-zero in KB). Empirical anchor = Sarika #05 'Move 6,' whose scansion ('DAIN-ty / PINK / MOUSE') was read directly against the RAW essay text (tests/calibration/top-tier-reference/essays/05-harvard-2028-i-too-can-dance.txt, opening sentence) — confirmed the three-beat measures are present in the actual line, not only in the review. Named authority = Le Guin, Steering the Craft, 'The Sound of Your Writing' (captured via Literary Hub excerpt: 'Does it sound right?'; rhythm controlled 'by hearing it'). Provost's 'This sentence has five words…' length-variation passage was reviewed and explicitly REJECTED as the bar — it teaches duration-variation (surface), not beat-content congruence (expert); referenced only to mark the floor we exceed. surfaceVsExpert=expert because a base model volunteers 'vary sentence length / read aloud' but not 'engineer the stress pattern to reproduce the subject's rhythmic signature.'"
+}

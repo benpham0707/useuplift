@@ -1,0 +1,55 @@
+{
+  "id": "essays-post-sffa-identity-007",
+  "domain": "essays",
+  "subtopic": "post-sffa-identity",
+  "claim": "The Common App's core personal-statement prompts were NOT changed after SFFA; the long-standing 'background, identity, interest, or talent so meaningful... your application would be incomplete without it' prompt remains the primary vehicle for identity content. Because the platform did not pivot, the burden of correctly framing identity falls on the writer, not the prompt — and post-SFFA emphasis on essays means AOs are reading these with 'greater emphasis than ever' (AACRAO).",
+  "application": [
+    {
+      "kind": "how-to",
+      "content": "When a student uses the unchanged Common App 'background/identity' prompt for racial or cultural identity, scaffold it exactly to the SFFA hinge even though the prompt itself is silent on the ruling: open in a specific scene, surface the quality/value it built, and close on transfer to how they'll act in college. The neutral prompt does not protect a category-only essay — the framing must do that work.",
+      "dimensionTags": [
+        "reflection_meaning_making",
+        "originality_specificity_voice",
+        "context_constraints_disclosure"
+      ]
+    },
+    {
+      "kind": "decision-rule",
+      "content": "Don't let students assume the unchanged prompt means 'nothing changed.' Decision rule: any identity draft submitted through the Common App should still pass the 001/004 tests (tied to a quality of character; not interchangeable with anyone of that background), because AOs now weight the essay more heavily and read identity content through the post-SFFA lens regardless of prompt wording.",
+      "dimensionTags": [
+        "originality_specificity_voice",
+        "reflection_meaning_making"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Common App personal-statement prompts (unchanged post-2023), incl. 'Some students have a background, identity, interest, or talent that is so meaningful they believe their application would be incomplete without it.' — confirmed unchanged in post-SFFA coverage (Inside Higher Ed / Washington Post)",
+      "url": "https://www.insidehighered.com/news/admissions/traditional-age/2023/07/10/will-essay-prompts-get-students-after-affirmative-action",
+      "tier": 2,
+      "authorRole": "Established higher-ed journalism reporting Common App prompt status (Common App = Tier-1 originator of the prompt text)",
+      "publishedDate": "2023-07-10",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Inside Higher Ed, 'Colleges change essay prompts after affirmative action' — Jill Orcutt (AACRAO) stating essay responses would receive 'greater emphasis than ever this admissions cycle'",
+      "url": "https://www.insidehighered.com/news/admissions/traditional-age/2023/08/02/colleges-change-essay-prompts-after-affirmative-action",
+      "tier": 2,
+      "authorRole": "Named AACRAO official via established higher-ed journalism",
+      "publishedDate": "2023-08-02",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2023-08-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "semi-stable",
+  "connections": [
+    {
+      "toId": "essays-post-sffa-identity-003",
+      "relation": "contrasts",
+      "note": "Schools added supplements (003) while Common App's core prompts held steady (007)."
+    }
+  ],
+  "provenanceTrail": "Common App prompt text is the platform's own published wording (Tier-1 originator); its non-change post-SFFA is reported by Inside Higher Ed (2023-07-10) and corroborated by Washington Post coverage. The 'greater emphasis than ever' weighting is attributed to a named AACRAO official (Jill Orcutt) via Inside Higher Ed (2023-08-02). The actionable lift — neutral prompt still requires SFFA-aligned framing — is an inference cleanly entailed by 001/004 plus the unchanged-prompt fact, not an independent unsourced claim. Re-verify prompt wording each cycle (Common App occasionally revises)."
+}

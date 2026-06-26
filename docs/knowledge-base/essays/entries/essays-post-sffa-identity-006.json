@@ -1,0 +1,55 @@
+{
+  "id": "essays-post-sffa-identity-006",
+  "domain": "essays",
+  "subtopic": "post-sffa-identity",
+  "claim": "Identity/diversity supplements are an invitation, not an obligation to perform hardship. Sarah Lawrence's dean of admissions, explaining the college's new SFFA-citing prompt, stated: 'We're not expecting any students who don't want to put any sort of trauma and anxieties around race in their essays to do so, or feel like that's an expectation.' Empirically, the predicted surge in race-disclosure did not occur — Starr's survey of 881 applicants found post-SFFA applicants wrote about race slightly LESS, with the only increase among non-Hispanic white students.",
+  "application": [
+    {
+      "kind": "decision-rule",
+      "content": "Do not coach a student to manufacture or amplify adversity/trauma to 'answer' a diversity prompt. Decision rule: write about race/hardship only when it is genuinely formative AND the student wants to; otherwise answer the prompt through an authentic community, value, or intellectual identity. A forced trauma narrative reads as performance and underperforms an honest, specific one — and the data show no admissions penalty for not centering race.",
+      "dimensionTags": [
+        "character_interiority_vulnerability",
+        "context_constraints_disclosure",
+        "reflection_meaning_making"
+      ]
+    },
+    {
+      "kind": "calibrated-heuristic",
+      "content": "Vulnerability calibration: include a hard experience only to the depth needed to show what it built in the student, then pivot to agency and meaning. The reader should leave understanding the student's resilience and what they'll contribute — not feeling they were handed pain as a credential. If the draft lingers in the wound without the turn to growth/transfer, it is over-disclosed and under-reflected.",
+      "dimensionTags": [
+        "character_interiority_vulnerability",
+        "reflection_meaning_making"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Inside Higher Ed, 'New application essay prompt cites affirmative action ruling' — Sarah Lawrence Dean Kevin McKenna on not expecting trauma disclosure; full Sarah Lawrence prompt text quoting Roberts",
+      "url": "https://www.insidehighered.com/news/admissions/traditional-age/2023/07/20/new-application-essay-prompt-cites-affirmative-action",
+      "tier": 2,
+      "authorRole": "Named dean of admissions (Kevin McKenna, Sarah Lawrence) via established higher-ed journalism",
+      "publishedDate": "2023-07-20",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Sonja Starr, 'Admissions Essays After SFFA' — survey of 881 students finding post-SFFA applicants wrote about race slightly less; only non-Hispanic white students wrote more; reported by Inside Higher Ed",
+      "url": "https://www.insidehighered.com/news/admissions/traditional-age/2024/05/20/examining-admissions-essays-post-affirmative-action",
+      "tier": 2,
+      "authorRole": "Named law professor empirical study / established higher-ed journalism",
+      "publishedDate": "2024-05-20",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2023-07-20",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "semi-stable",
+  "connections": [
+    {
+      "toId": "essays-post-sffa-identity-004",
+      "relation": "complements",
+      "note": "004 says only write race if it shaped you; 006 adds the do-no-harm corollary against forced trauma."
+    }
+  ],
+  "provenanceTrail": "Two independent Tier-2 sources: a named admissions dean (McKenna, Sarah Lawrence) explicitly disclaiming a trauma-disclosure expectation, and a named law professor's empirical survey (Starr, n=881) showing race-disclosure did not rise post-SFFA. Both reported by Inside Higher Ed across two separate articles (2023-07-20 and 2024-05-20). The Sarah Lawrence prompt text was fetched verbatim. Together they ground both the ethical stance (don't pressure) and the empirical claim (no surge, no penalty)."
+}

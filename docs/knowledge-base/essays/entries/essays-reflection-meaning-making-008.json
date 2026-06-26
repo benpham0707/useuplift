@@ -1,0 +1,53 @@
+{
+  "id": "essays-reflection-meaning-making-008",
+  "domain": "essays",
+  "subtopic": "reflection-meaning-making",
+  "claim": "Admissions officers treat reflection — defined as 'looking back at the situation being described to explain its greater impact' — as one of the best ways to show what kind of community member an applicant would be. The reflective beats, not the events, are what let a reader forecast the applicant's contribution on campus; a displayed 'growth mindset' is read as direct evidence of fit.",
+  "application": [
+    {
+      "kind": "how-to",
+      "content": "REVISION MOVE — add the 'greater impact' lookback. After the climactic moment of your essay, write the explicit lookback Conn College's readers reward: not 'what happened next' but 'what this experience now means beyond itself' — how it changed the way you engage with others, what you'll carry into a community. Conn College admissions, commenting on a sculpting-class essay, credited the student's 'growth mindset' as displayed in the essay and noted it 'provides context for what she would bring to campus,' adding that reflection ('looking back at the situation being described to explain its greater impact') is 'a tremendous strength of essays and one of the best ways to show... the kind of community member an applicant would be.' Test your lookback against this: does it let a reader picture you contributing somewhere, or does it only summarize the past event?",
+      "dimensionTags": ["reflection_meaning_making"],
+      "surfaceVsExpert": "surface",
+      "workedExample": {
+        "before": "After months of practice, our robotics team finally placed second at state. It was an amazing feeling, and all our hard work had paid off. I will never forget that day.",
+        "after": "We placed second at state, but the part I keep coming back to isn't the trophy — it's that the freshman I'd almost cut in October was the one who debugged the drive code at 1 a.m. when none of the seniors could. I'd been running the team like talent was fixed and my job was to find it. Now I think the opposite: the job is to keep people in the room long enough to surprise you. That's the kind of teammate I want to be in a dorm, a lab, a study group — the one who doesn't write anyone off in October. I'd rather build a team that gets better than one that was already good.",
+        "exemplarProvenance": "illustrative-synthetic",
+        "sourceRef": "Composed to instantiate Conn College's 'looking back... to explain its greater impact' / 'what she would bring to campus' standard and JHU's reflection-forecasts-contribution lens; not a quoted essay.",
+        "usage": "private-teaching-aid — DO NOT SURFACE to the student and DO NOT MIMIC its phrasing OR its rhetorical structure. It exists to teach the SYSTEM the move; generated output must be lexically and structurally distinct from it."
+      },
+      "mechanics": "The lookback must pivot from EVENT-summary ('hard work paid off,' 'never forget that day' — closed, backward-facing) to GREATER IMPACT ('what this now means beyond itself'). Two levers: (1) reframe what the experience taught about how the writer treats OTHERS ('the job is to keep people in the room' — a relational, transferable stance, not a private feeling); (2) name the community contribution explicitly in NEW settings ('a dorm, a lab, a study group') so a reader can forecast the applicant on campus — this is the AO's actual decision question. Anchor the reframe to one concrete detail from the scene (the almost-cut freshman) so it's earned. The lookback is forward-leaning; it need not be tidily resolved (links to entry 005).",
+      "transfer": ["BEFORE: 'Winning the art show was the proudest moment of my life.' Greater-impact AFTER: 'The ribbon mattered less than what I noticed hanging my piece next to the others: I'd spent three years quietly judging the \"lesser\" artists in our club, and theirs were the works I couldn't stop looking at. I want to be the person in a critique who assumes the thing I don't yet like is the thing I don't yet understand — in a studio, a seminar, anywhere people make things and risk being judged.' Same move: past event → relational stance → named contribution across new communities."],
+      "failureModes": ["Writing a lookback that only summarizes the event with feeling-words ('it was amazing, I'll never forget it') — backward-facing closure, no greater impact, gives the AO nothing to forecast.", "Naming a contribution in the abstract ('I'll bring leadership and teamwork to campus') instead of a specific transferable stance grounded in the scene — generic résumé language the reader can't picture.", "Making the lookback about the writer's achievement ('this proved I can succeed under pressure') rather than about how they'll engage OTHERS — the Conn College bar is 'what kind of community member,' which is relational, not self-promotional."],
+      "antiTemplate": "The MOVE is mandatory; the FRAMING must vary. Do NOT default to the 'I used to think X → I realized the opposite → [aphorism] → it shows up elsewhere → I'm still learning' arc, and do NOT require a standalone aphorism sentence. Rotate rhetorical forms across users: a present-tense scene with no stated prior belief; an unresolved question the writer can't answer; a flat declarative observation with the transfer left implicit; embedded dialogue; a list that breaks pattern; etc. The transfer-to-a-surprising-domain insight is the technique and stays; the packaging around it must differ each time."
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Connecticut College Admissions, 'Essays That Worked' — admissions-officer commentary on a sculpting-class essay crediting the student's 'growth mindset' and naming reflection ('looking back at the situation being described to explain its greater impact') as 'a tremendous strength' and 'one of the best ways to show... the kind of community member an applicant would be.'",
+      "url": "https://www.conncoll.edu/admission/apply/essays-that-worked/",
+      "tier": 1,
+      "authorRole": "Connecticut College Admissions (on-record AO commentary)",
+      "publishedDate": "2022-01-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Johns Hopkins University Admissions, 'Essays That Worked' — committee commentary attributing an essay's value to the applicant's 'reflection and analysis' as what lets the committee understand his campus contribution.",
+      "url": "https://apply.jhu.edu/hopkins-insider/lessons-learned/",
+      "tier": 1,
+      "authorRole": "Johns Hopkins University Admissions committee (on-record)",
+      "publishedDate": "2023-01-01",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2020-01-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "stable",
+  "connections": [
+    { "toId": "essays-reflection-meaning-making-003", "relation": "supports", "note": "Same AO logic: reflection > narration as the signal of who you'd be in a community." },
+    { "toId": "essays-reflection-meaning-making-005", "relation": "related-to", "note": "The 'greater impact' lookback is forward-leaning and need not be tidily resolved." },
+    { "toId": "essays-reflection-meaning-making-006", "relation": "supported-by", "note": "The lookback is the Evaluate/Plan phase of the writing-center DIEP model in AO language." }
+  ],
+  "provenanceTrail": "Two Tier-1 admissions sources. JHU committee commentary confirmed verbatim via WebFetch. Connecticut College's AO commentary (definition of reflection as 'looking back... to explain its greater impact' and 'one of the best ways to show the kind of community member an applicant would be') surfaced via WebSearch of the official conncoll.edu 'Essays That Worked' domain; the verbatim quote lives on the per-essay subpages of that section (the landing page only links to them) — flagged for a direct-subpage re-verify at next freshness sweep. Pairing with the independently-confirmed JHU Tier-1 commentary sustains VERIFIED."
+}

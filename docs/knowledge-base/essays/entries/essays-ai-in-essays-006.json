@@ -1,0 +1,68 @@
+{
+  "id": "essays-ai-in-essays-006",
+  "domain": "essays",
+  "subtopic": "ai-in-essays",
+  "claim": "School-level AI essay policy is genuinely CONTESTED across the sector, and the dominant reality (2024-2026) is the ABSENCE of policy. Kaplan's July-August 2025 survey of 220 admissions officers found that on using GenAI to WRITE the essay, only 2% of colleges have an official policy ALLOWING it, 30% have a policy BANNING it, and 68% have NO policy at all; on brainstorming, 27% allow / 4% ban / 69% no policy; on feedback, 21% allow / 5% ban / 73% no policy. The minority of schools that DO have policies span the full range: blanket ban (Brown, Georgetown), detailed permit-with-limits (Caltech, Yale, Cornell, Vanderbilt, CMU, WashU, Emory, UVA), and brief Common-App-echo. Officer sentiment skews negative: 50% unfavorable toward GenAI in essays, 26% neutral, only 14% favorable.",
+  "application": [
+    {
+      "kind": "decision-rule",
+      "content": "Never assume a target school's silence means permission. For each school on a student's list, check that school's own admissions/application-policy page that cycle; if it has no AI statement (the 68% case), default to the Common App fraud baseline (no AI-authored substance) AND the strictest policy among the student's OTHER schools. Build the student's process to satisfy the strictest list-member, since one essay (e.g. the Common App personal statement) is sent to all of them. The variance itself is the actionable insight: there is no single 'is AI allowed' answer to give a student -- the answer is per-school and changes yearly.",
+      "dimensionTags": ["originality_specificity_voice"]
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Kaplan Survey: Colleges Clarify Rules on AI Use in Admissions Essays (220 admissions officers, July-Aug 2025)",
+      "url": "https://kaplan.com/about/press-media/college-admissions-officers-survey-2025-essays-ai",
+      "tier": 2,
+      "authorRole": "Kaplan (named survey of 220 admissions officers, established education company)",
+      "publishedDate": "2025-09-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "AI Use in College Essays: What Top 30 Admissions Offices Will (and Won't) Allow | College Essay Advisors",
+      "url": "https://www.collegeessayadvisors.com/ai-use-in-college-essays-what-top-30-admissions-offices-will-and-wont-allow/",
+      "tier": 2,
+      "authorRole": "College Essay Advisors (named admissions-essay consultancy, top-30 policy roundup)",
+      "publishedDate": "2025-01-01",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "CONTESTED",
+  "contested": {
+    "positions": [
+      "No policy / silence (majority, ~68% of colleges per Kaplan) -- applicant left to infer rules; Common App baseline applies by default.",
+      "Permit-with-limits (e.g. Caltech, Yale, Cornell, Vanderbilt, CMU, WashU, Emory, UVA) -- AI OK for grammar + brainstorming, banned for drafting/substance.",
+      "Strict ban (Brown 'under any circumstances except proofreading'; Georgetown) -- no AI in application content at all.",
+      "Sentiment: most admissions officers are personally unfavorable (50%) toward GenAI in essays even where no policy exists."
+    ],
+    "whoHoldsWhat": [
+      "Kaplan 2025 survey holds: 2% allow-writing policy / 30% ban-writing / 68% none.",
+      "Caltech & Yale hold: brainstorming + grammar permitted, substance prohibited (detailed guidance).",
+      "Brown & Georgetown hold: AI not permitted under any circumstances (proofreading-only carve-out at Brown).",
+      "Common App holds: AI 'substantive content or output' submitted as own work = fraud (binding default for 1,000+ members).",
+      "College Essay Advisors (2025 roundup) holds: ~7% ban / 27% limited-use / 70% no policy among top-30 -- broadly consistent with Kaplan."
+    ]
+  },
+  "effectiveDate": "2025-09-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "volatile",
+  "connections": [
+    {
+      "toId": "essays-ai-in-essays-001",
+      "relation": "contextualizes",
+      "note": "The Common App baseline is what governs the 68% of schools with no policy of their own."
+    },
+    {
+      "toId": "essays-ai-in-essays-005",
+      "relation": "summarizes",
+      "note": "Brown/Georgetown are the strict-ban anchor of this spectrum."
+    },
+    {
+      "toId": "essays-ai-in-essays-003",
+      "relation": "summarizes",
+      "note": "Caltech/Yale are the detailed-permit anchor of this spectrum."
+    }
+  ],
+  "provenanceTrail": "Kaplan press release (220 AOs, July-Aug 2025) fetched 2026-06-18 with exact splits (write 2/30/68; brainstorm 27/4/69; feedback 21/5/73; sentiment 50/26/14). College Essay Advisors top-30 roundup (2025) gives a broadly agreeing independent breakdown (~7% ban, 27% limited, 70% none) -- two independent Tier-2 sources agreeing on the SHAPE of the distribution, which is why this clears the bar as CONTESTED-with-sources rather than provisional. Named-school positions cross-checked against Tier-1 policy pages in entries 002/003/005. Note one freshness discrepancy: College Essay Advisors classified Yale as 'no policy' while Yale's own page (entry 002) has one -- resolved toward the Tier-1 school page. Flagged volatile: the percentages will move every cycle as more schools publish policies."
+}

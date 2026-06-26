@@ -1,0 +1,46 @@
+{
+  "id": "essays-supplement-expectations-007",
+  "domain": "essays",
+  "subtopic": "supplement-expectations",
+  "claim": "'Why Major' and intellectual-curiosity supplements at top schools reward demonstrated intellectual engagement with a specific idea, not a resume of accomplishments in the field. Stanford explicitly frames its curiosity prompt as distinct from grades/extracurriculars; Yale asks 'why are you drawn to it'; a former Pomona associate dean names 'recapping accomplishments (already in transcripts)' as a top mistake.",
+  "application": [
+    {
+      "kind": "decision-rule",
+      "content": "For any 'why this major / what excites you intellectually' prompt: the content must be the IDEA and the writer's relationship to it, never the credential. Rule of thumb - if a sentence could be moved verbatim into the activities/awards section, it does not belong in the curiosity essay. Replace 'I founded X and won Y' with 'the question that hooked me was Z, and here is what I did with it once no one assigned it.'",
+      "dimensionTags": ["intellectual_vitality_curiosity"]
+    },
+    {
+      "kind": "diagnostic-signal",
+      "content": "Strong signal: the essay contains at least one moment of self-directed inquiry (reading, building, debating, exploring) that school did not require. Weak signal: every example of 'curiosity' is something the writer was rewarded or graded for - that reads as achievement-signaling, which is the named anti-pattern across both Stanford's framing and named-counselor guidance.",
+      "dimensionTags": ["intellectual_vitality_curiosity", "originality_specificity_voice"]
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Application and Essays / Holistic Admission - Stanford Undergraduate Admission (intellectual vitality framed as not 'good grades or a lot of extracurriculars')",
+      "url": "https://admission.stanford.edu/apply/first-year/apply.html",
+      "tier": 1,
+      "authorRole": "Stanford Undergraduate Admission (institution)",
+      "publishedDate": "2025-08-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "What Do Admissions Officers Really Want in a College Essay? - Top Tier Admissions (Dr. Tina Brooks, former Associate Dean of Admissions, Pomona College: 'recapping accomplishments' is a top mistake)",
+      "url": "https://toptieradmissions.com/what-do-admissions-officers-really-want-in-a-college-essay/",
+      "tier": 2,
+      "authorRole": "Former Associate Dean of Admissions, Pomona College (named on-record)",
+      "publishedDate": "2024-08-05",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2024-01-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "semi-stable",
+  "connections": [
+    { "toId": "essays-supplement-expectations-002", "relation": "generalizes", "note": "Yale's academic-topic essay is an instance of this rule." },
+    { "toId": "essays-supplement-expectations-003", "relation": "generalizes", "note": "Stanford's intellectual-vitality essay is an instance of this rule." },
+    { "toId": "essays-supplement-expectations-006", "relation": "sibling", "note": "Why-Major (engagement) pairs with Why-Us (institution fit) but tests a different thing." }
+  ],
+  "provenanceTrail": "Verified at Tier-1 (Stanford's own framing that intellectual vitality is not grades/ECs) plus Tier-2 named former Pomona associate dean on 'recapping accomplishments' as a top mistake (on-record, dated Aug 2024). The principle is durable craft, hence semi-stable; underlying prompt wordings (cited in entries 002-003) are volatile and tracked separately."
+}

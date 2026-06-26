@@ -1,0 +1,40 @@
+{
+  "id": "essays-ai-in-essays-003",
+  "domain": "essays",
+  "subtopic": "ai-in-essays",
+  "claim": "Caltech's 'Ethical Use of AI' guidelines (Fall 2026 applicants) operationalize acceptable AI use with a 'trusted adult test': 'ask yourself whether it would be ethical to have a trusted adult perform the same task.' Permitted: grammar/spelling tools (Grammarly, Microsoft Editor), generating brainstorming questions/exercises, and researching the application process. Prohibited: copying directly from an AI generator, using AI to outline or draft essays, replacing one's voice with AI content, and machine-translating an essay written in another language. 'Failure to comply ... may result in the rescission of your admission.' For Fall 2026, Caltech requires applicants to REVIEW these guidelines before submitting; the separate confidential Fall-2025 disclosure question ('Did you receive any AI generated assistance') is no longer present.",
+  "application": [
+    {
+      "kind": "how-to",
+      "content": "Give students the trusted-adult test as a portable self-check for ANY school, not just Caltech: 'Would it be honest to have a teacher or mentor do exactly this AI task for me?' A teacher proofreading grammar = fine. A teacher writing or outlining the essay = not. This single heuristic converts vague school policies into a yes/no decision the student can apply line-by-line. Flag for students that machine TRANSLATION of an essay drafted in another language is explicitly prohibited by Caltech even though it feels like 'just translating' -- the translated voice is no longer theirs.",
+      "dimensionTags": ["originality_specificity_voice"]
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Ethical Use of AI: Guidelines for Fall Applicants | Caltech Undergraduate Admissions",
+      "url": "https://www.admissions.caltech.edu/apply/first-year-applicants/supplemental-application-essays/ethical-use-of-ai-guidelines-for-fall-applicants",
+      "tier": 1,
+      "authorRole": "Caltech Undergraduate Admissions (official policy)",
+      "publishedDate": "2025-08-01",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2025-08-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "volatile",
+  "connections": [
+    {
+      "toId": "essays-ai-in-essays-006",
+      "relation": "contrasts-with",
+      "note": "Caltech is a named example on the 'detailed-guidance' end of the policy-variance spectrum, distinct from no-policy schools and from blanket-ban schools."
+    },
+    {
+      "toId": "essays-ai-in-essays-004",
+      "relation": "evolved-from",
+      "note": "Caltech itself moved from a Fall-2025 confidential AI-disclosure question to a Fall-2026 mandatory-guidelines-review model -- a concrete instance of how fast these policies mutate."
+    }
+  ],
+  "provenanceTrail": "Caltech official admissions page fetched 2026-06-18; trusted-adult-test wording, permitted/prohibited lists, machine-translation prohibition, and rescission consequence all quoted directly from the page. Year-over-year change (Fall-2025 disclosure question dropped for Fall-2026 review model) corroborated across the live page plus a 2026 secondary roundup. Tier-1 official; flagged volatile because Caltech demonstrably revises this annually."
+}

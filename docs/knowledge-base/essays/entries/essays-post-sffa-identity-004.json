@@ -1,0 +1,55 @@
+{
+  "id": "essays-post-sffa-identity-004",
+  "domain": "essays",
+  "subtopic": "post-sffa-identity",
+  "claim": "Named college-essay experts (Ethan Sawyer / College Essay Guy) advise that post-SFFA the threshold question is not 'should I mention race?' but 'has my race or cultural background actually influenced who I am — and can I show HOW?' Merely stating a racial identity is insufficient; the writing must demonstrate the way that background shaped a specific character quality, value, or capacity, structured as narrative (challenge → action → lesson) rather than declaration.",
+  "application": [
+    {
+      "kind": "decision-rule",
+      "content": "Gate any identity content with two questions in order: (1) 'Did this background genuinely shape who I am?' — if no, choose a truer topic; don't write about race because you think you're supposed to. (2) 'Am I sharing a generic story OF my race/culture, or MY specific experience WITHIN it?' — only the second clears the bar. If a paragraph could have been written by anyone of that background, it is still a category, not a self.",
+      "dimensionTags": [
+        "originality_specificity_voice",
+        "character_interiority_vulnerability",
+        "reflection_meaning_making"
+      ]
+    },
+    {
+      "kind": "before-after",
+      "content": "BEFORE: 'I'm proud of my heritage and it makes me who I am.' (declaration; interchangeable). AFTER: a concrete scene — the smell of the kitchen, the specific argument with a grandparent, the moment a tradition stopped being inherited and became chosen — followed by the reflection on what it taught the student to value and how they now act on it. The 'how' and the transfer are what an AO is permitted to credit.",
+      "dimensionTags": [
+        "originality_specificity_voice",
+        "reflection_meaning_making"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Ethan Sawyer (College Essay Guy), 'Is It \"Okay\" to Talk About Race in Your College Application and Essays—And If So, How Should You Do It?'",
+      "url": "https://www.collegeessayguy.com/blog/race-in-college-essays",
+      "tier": 2,
+      "authorRole": "Named, widely-cited independent college-essay counselor/author",
+      "publishedDate": "2023-07-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "NAACP Legal Defense Fund, 'Writing a College Admission Essay in the Post-SFFA Landscape' — concurring guidance that students' specific stories are central and that race may be discussed when tied to individual experience",
+      "url": "https://legaldefensefund.substack.com/p/writing-a-college-admission-essay",
+      "tier": 2,
+      "authorRole": "Named civil-rights legal organization issuing applicant guidance",
+      "publishedDate": "2023-09-01",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2023-06-29",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "semi-stable",
+  "connections": [
+    {
+      "toId": "essays-post-sffa-identity-001",
+      "relation": "operationalizes",
+      "note": "Translates the ruling's 'tie to a quality of character' into a drafting gate."
+    }
+  ],
+  "provenanceTrail": "Two independent named sources agreeing: College Essay Guy (Ethan Sawyer), the most-cited independent essay-craft authority, gives the 'did it shape you / shared-story-vs-my-experience' gate and the five-section application structure; the NAACP Legal Defense Fund's applicant guidance independently affirms that the path forward is specific individual stories tied to experience. Both align with the ruling text in 001. Sawyer's piece is craft guidance (semi-stable); marked VERIFIED on the two-Tier-2-agreeing standard."
+}

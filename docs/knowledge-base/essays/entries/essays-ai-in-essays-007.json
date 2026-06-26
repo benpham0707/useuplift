@@ -1,0 +1,56 @@
+{
+  "id": "essays-ai-in-essays-007",
+  "domain": "essays",
+  "subtopic": "ai-in-essays",
+  "claim": "Named admissions practitioners converge on AI-as-tool, not AI-as-author, and on a shared craft reason: the personal essay is graded on exactly the qualities current generative AI is worst at. Georgia Tech's director of undergraduate admission Rick Clark advises students to use AI like 'a conversation with a friend or a classmate to help brainstorm and get their ideas on paper' but to NOT 'have ChatGPT open while they're writing an essay, or copy and paste from it,' because readers reward 'specificity, unique details, and a personalized voice. And that's not what ChatGPT does well.' College Essay Guy (Ethan Sawyer) gives the same line -- AI for research and technical review only, never for generating content -- citing Caltech's trusted-adult test as the operational rule.",
+  "application": [
+    {
+      "kind": "diagnostic-signal",
+      "content": "Use the 'AO mismatch' tell that AOs themselves report: generic, voice-flat prose that doesn't match the specificity of the rest of the application is the signal readers act on -- one surveyed officer said flat essay prose prompts them to ask 'how strong of a writer is this student?' So the craft fix doubles as the AI-safety fix: drive concrete, irreplaceable, first-person detail (named people, specific moments, idiosyncratic word choices) that a model cannot fabricate about this student. If a draft could have been written about anyone, it is both weak AND AI-suspect; push for detail only this student could write.",
+      "dimensionTags": ["originality_specificity_voice", "reflection_meaning_making"]
+    }
+  ],
+  "sources": [
+    {
+      "citation": "AI is Coming for the College Essay -- Rick Clark, Georgia Tech",
+      "url": "https://www.gtalumni.org/news/2024/ai-is-coming-for-the-college-essay.html",
+      "tier": 2,
+      "authorRole": "Rick Clark, Director of Undergraduate Admission, Georgia Tech (named AO on record)",
+      "publishedDate": "2024-01-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Navigating College Applications with AI: What Colleges Say + CEG's Advice | College Essay Guy",
+      "url": "https://www.collegeessayguy.com/blog/navigating-college-apps-with-ai",
+      "tier": 2,
+      "authorRole": "Ethan Sawyer / College Essay Guy (named admissions-essay educator)",
+      "publishedDate": "2025-01-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Kaplan Survey: Colleges Clarify Rules on AI Use in Admissions Essays (officer quote on voice mismatch)",
+      "url": "https://kaplan.com/about/press-media/college-admissions-officers-survey-2025-essays-ai",
+      "tier": 2,
+      "authorRole": "Kaplan survey of 220 admissions officers (on-record officer quote)",
+      "publishedDate": "2025-09-01",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2024-01-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "semi-stable",
+  "connections": [
+    {
+      "toId": "essays-ai-in-essays-002",
+      "relation": "supports",
+      "note": "Clark's 'brainstorm not author' line is the practitioner form of Yale's start-vs-substance rule."
+    },
+    {
+      "toId": "essays-ai-in-essays-008",
+      "relation": "complements",
+      "note": "Voice as the AO signal pairs with the detection-reliability entry: AOs trust their reading of voice over unreliable detector scores."
+    }
+  ],
+  "provenanceTrail": "Three independent named sources agreeing: Rick Clark (Georgia Tech, on-record, brainstorm-not-author + voice/specificity rationale), College Essay Guy/Ethan Sawyer (named educator, same rule + trusted-adult framing), and an on-record admissions officer in the Kaplan survey (voice-mismatch tell). Clark's exact quotes fetched from the GT Alumni article 2026-06-18. Clark separately updated GT's applicant-facing guidance in Sept 2025 ('lean on ChatGPT for brainstorming ... but your voice, your thoughts ... will be most important'), consistent with the 2024 statement. Marked semi-stable: the craft principle (AI is weak at irreplaceable voice) is more durable than the policy entries, though model capability could shift it."
+}

@@ -1,0 +1,45 @@
+{
+  "id": "essays-post-sffa-identity-003",
+  "domain": "essays",
+  "subtopic": "post-sffa-identity",
+  "claim": "For the 2023-24 cycle, selective colleges responded to SFFA by adding identity/diversity/adversity supplemental prompts: among the top ~65 colleges studied by Sonja Starr, 43 had such prompts (up from 35), mandatory questions on those topics rose from 21 to 31, and identity-specific mandatory questions rose from 11 to 17. Most new prompts use indirect, open-ended framing ('lived experience,' 'adversity,' 'community,' 'perspective') rather than asking about race directly. The Common App's own personal-statement prompts were NOT changed.",
+  "application": [
+    {
+      "kind": "decision-rule",
+      "content": "Read a 'lived experience / community / perspective' supplement as an invitation, not a demand for a race-or-trauma confession. Decision rule: answer it with whatever community or formative experience genuinely shaped the student's character and what they'd add to campus — that can be racial/cultural identity, but it can equally be a neighborhood, a disability, a family role, a faith, or an intellectual community. The prompt rewards specificity and contribution-orientation, not category-disclosure.",
+      "dimensionTags": ["originality_specificity_voice", "reflection_meaning_making", "context_constraints_disclosure"]
+    },
+    {
+      "kind": "how-to",
+      "content": "Map the supplement back to the SFFA hinge before drafting: identify (a) the specific community/experience, (b) the quality or value it built, (c) how that quality will show up in this college's community. Answering all three is what converts an 'amorphous' diversity prompt into a passage an AO can legitimately credit — and it works whether or not race is the subject.",
+      "dimensionTags": ["reflection_meaning_making", "originality_specificity_voice"]
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Sonja Starr, 'Admissions Essays After SFFA' (Indiana Law Journal vol. 100, iss. 3) — counts of 43 vs 35 colleges, 31 vs 21 mandatory, 17 vs 11 identity-specific; reported in Inside Higher Ed",
+      "url": "https://www.insidehighered.com/news/admissions/traditional-age/2024/05/20/examining-admissions-essays-post-affirmative-action",
+      "tier": 2,
+      "authorRole": "Named law professor (Sonja Starr, Univ. of Chicago) / established higher-ed journalism",
+      "publishedDate": "2024-05-20",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Inside Higher Ed, 'Colleges change essay prompts after affirmative action' — named-school prompt text (Columbia, Babson, UMass Amherst, Brandeis, Emory) and AACRAO's Jill Orcutt noting essays carry 'greater emphasis than ever'",
+      "url": "https://www.insidehighered.com/news/admissions/traditional-age/2023/08/02/colleges-change-essay-prompts-after-affirmative-action",
+      "tier": 2,
+      "authorRole": "Established higher-ed journalism quoting named AOs/associations",
+      "publishedDate": "2023-08-02",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2023-08-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "volatile",
+  "connections": [
+    { "toId": "essays-post-sffa-identity-001", "relation": "applies", "note": "The new prompts are the institutional surface where the carve-out is exercised." },
+    { "toId": "essays-supplement-expectations-006", "relation": "cross-subtopic-overlaps", "note": "Overlaps the 'why-us / community / perspective' supplement craft: the post-SFFA carve-out is exercised through the Why-Us supplement, whose dominant failure mode this entry documents." }
+  ],
+  "provenanceTrail": "Prompt counts are from Sonja Starr's named empirical study (Indiana Law Journal), reported by Inside Higher Ed (2024-05-20). Specific named-school prompt texts independently verified by fetching the Inside Higher Ed 2023-08-02 article, which quotes Columbia, Babson, UMass Amherst, Brandeis, and Emory prompts verbatim. Common App non-change verified via search corroboration of the unchanged personal-statement prompt list. Marked volatile because prompt rosters change annually — re-verify each cycle. Specific 2026-27 prompt wording should be re-checked against each school's live application."
+}

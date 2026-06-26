@@ -1,0 +1,53 @@
+{
+  "id": "essays-reflection-meaning-making-006",
+  "domain": "essays",
+  "subtopic": "reflection-meaning-making",
+  "claim": "University writing centers operationalize reflection as a four-phase progression — Describe, Interpret, Evaluate, Plan — where most weak drafts stall at Describe. Reflection is the work of moving a passage from 'the facts of what happened' through 'how it met or defied my expectations / what surprised me' to 'what I learned' and 'how I'll apply it.'",
+  "application": [
+    {
+      "kind": "how-to",
+      "content": "REVISION MOVE — the DIEP pass (Describe / Interpret / Evaluate / Plan). Take any descriptive paragraph and write one sentence for each next phase: INTERPRET — 'How did this meet or defy what I expected? What surprised me?' EVALUATE — 'What did I actually learn from it (about myself, others, the world)?' PLAN — 'How does this change what I now do or pursue?' (per George Mason University Writing Center's reflective-essay model). A paragraph that is all Describe is narration; reflection begins at Interpret. Use surprise as the entry point: the gap between what you expected and what happened is where genuine insight lives, which is also why it reads as non-generic.",
+      "dimensionTags": ["reflection_meaning_making"],
+      "surfaceVsExpert": "expert",
+      "workedExample": {
+        "before": "I spent three months building a robot for the regional competition. We tested it the night before, and on the first run at the event it tipped over and we scored last. I was really disappointed after all that work.",
+        "after": "[DESCRIBE — kept, compressed] We spent three months on the robot, tested it the night before, and on its first competition run it tipped over and scored last. [INTERPRET — what surprised me] What surprised me wasn't that it failed; it was that I'd never once tested it on a surface that wasn't our perfectly flat garage floor — the gym mats were the variable I'd been too proud of my code to imagine. [EVALUATE — what I learned] I'd been treating 'works in my conditions' as 'works,' which I now realize is how I do most things: I optimize for the version of the world I can control. [PLAN — what I now do] So this season I test on the worst floor I can find first. I've started doing the same with arguments in debate — I look for the messiest room before I trust the idea.",
+        "exemplarProvenance": "illustrative-synthetic",
+        "sourceRef": "Composed to instantiate GMU Writing Center's Describe→Interpret→Evaluate→Plan phases (and UTM RGASC's What/So What/Now What); not a quoted essay.",
+        "usage": "private-teaching-aid — DO NOT SURFACE to the student and DO NOT MIMIC its phrasing OR its rhetorical structure. It exists to teach the SYSTEM the move; generated output must be lexically and structurally distinct from it."
+      },
+      "mechanics": "Label the existing prose: it's all DESCRIBE, which is narration. Then add one sentence per remaining phase. The hinge is INTERPRET via surprise — name the expectation/reality GAP ('I'd never tested on a non-flat surface'), because that gap is where non-generic insight lives. EVALUATE generalizes the gap into a self-truth ('I optimize for the version of the world I can control' — specific, slightly unflattering, true only of this writer). PLAN converts it to a current changed behavior AND transfers it to a second domain (debate), proving it's internalized. Each phase must add NEW information, not re-describe the prior one.",
+      "transfer": ["DESCRIBE: 'I cooked dinner for my family every night the month my mom was in the hospital.' INTERPRET (surprise): 'I expected to resent it; what surprised me was looking forward to 6 p.m.' EVALUATE: 'I learned I steady myself by feeding people — the chopping is where my anxiety goes to die.' PLAN: 'Now when a friend is falling apart I don't say \"let me know if you need anything,\" I just show up with food.' Same four-phase climb on a caretaking topic."],
+      "failureModes": ["Adding phases in name only: writing 'I learned a lot about myself' for EVALUATE — that's a Describe-level label wearing an Evaluate hat, with no actual self-truth.", "Skipping INTERPRET (the surprise/gap) and jumping Describe→Evaluate, which produces a generic lesson with no engine behind it ('the robot failed and I learned perseverance').", "A PLAN that just restates the lesson as intention ('I'll always test more carefully') instead of a concrete current behavior plus transfer ('I test on the worst floor first; I do the same in debate') — the transfer is what proves the reflection took."],
+      "antiTemplate": "The MOVE is mandatory; the FRAMING must vary. Do NOT default to the 'I used to think X → I realized the opposite → [aphorism] → it shows up elsewhere → I'm still learning' arc, and do NOT require a standalone aphorism sentence. Rotate rhetorical forms across users: a present-tense scene with no stated prior belief; an unresolved question the writer can't answer; a flat declarative observation with the transfer left implicit; embedded dialogue; a list that breaks pattern; etc. The transfer-to-a-surprising-domain insight is the technique and stays; the packaging around it must differ each time."
+    }
+  ],
+  "sources": [
+    {
+      "citation": "George Mason University Writing Center, 'Reflective Essays' — four-phase model: Describe, Interpret ('how it met/defied your expectations and what surprised you'), Evaluate ('What did you learn...'), Plan ('future application'); 'your own thoughts, feelings, and insights matter here.'",
+      "url": "https://writingcenter.gmu.edu/writing-resources/different-genres/reflective-essays",
+      "tier": 1,
+      "authorRole": "George Mason University Writing Center (university's own writing guidance)",
+      "publishedDate": "2023-01-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Robert Gillespie Academic Skills Centre, University of Toronto Mississauga, 'Fundamentals of Reflective Practice (Reflective Writing)' — the 'What? / So What? / Now What?' reflective model (situate experience in context; explore consequences).",
+      "url": "https://www.utm.utoronto.ca/rgasc/student-resource-hub/writing-resources/fundamentals-reflective-practice-reflective-writing",
+      "tier": 1,
+      "authorRole": "University of Toronto Mississauga Academic Skills Centre (university writing guidance)",
+      "publishedDate": "2023-01-01",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2015-01-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "stable",
+  "connections": [
+    { "toId": "essays-reflection-meaning-making-001", "relation": "supports", "note": "Interpret/Evaluate are the writing-center form of the 'so what' ladder; What/So What/Now What is the same recursion." },
+    { "toId": "essays-reflection-meaning-making-002", "relation": "related-to", "note": "DIEP's Describe phase should stay the minority (≈one-third) per the proportion rule." },
+    { "toId": "essays-reflection-meaning-making-003", "relation": "supports", "note": "Plan ('how I'll apply it') is the changed-action that AOs credit as demonstrated growth." }
+  ],
+  "provenanceTrail": "Two Tier-1 university writing-center models. GMU's four-phase Describe/Interpret/Evaluate/Plan structure captured verbatim via WebFetch. The U. Toronto Mississauga RGASC 'What/So What/Now What' model surfaced via WebSearch as an independent university source teaching the same describe→meaning→action recursion. Both are general reflective-writing pedagogy (not college-essay-specific), so the application adapts the model to the personal statement; flagged as adaptation in-content."
+}

@@ -1,0 +1,81 @@
+{
+  "id": "essays-rhythm-007",
+  "domain": "essays",
+  "subtopic": "rhythm",
+  "claim": "Rhythm operates at the PARAGRAPH level, not only the sentence level: deliberately alternating a dense, accumulating sentence with a plain, minimal one gives the reader's attention a wave to ride (high attention, then breath), and a cadenced CLOSE — a short, metrically balanced final line — gives the essay an audible sense of completion. After Sarika's 39-word waltz-rhythmed opener, her next sentence is a flat 15-word statement; the relaxation is itself the craft. And she ends not on explanation but on a falling three-beat cadence — 'but I can dance across the page. / I, too, can dance.' — an antithetical balance resolving into a short isocolon that the ear hears as a final chord. The expert layer: pace is engineered across sentences (never three long or three short in a row by accident), and the last line is TUNED for cadence — short, balanced, often falling — so the essay STOPS rather than merely ending.",
+  "application": [
+    {
+      "kind": "before-after",
+      "content": "RHYTHM MOVE — dense/plain alternation + cadenced close (paragraph-level rhythm). Two linked controls. (1) ALTERNATION: after a demanding sentence (long, clause-heavy, image-dense, technical), give the reader a short plain one — and never let three long OR three short sentences stack by accident; the wave of high-then-low attention is what makes a paragraph feel paced rather than droning or choppy. The plain sentence is not filler; it is the breath that lets the dense sentence land. (2) CADENCED CLOSE: tune the final line for completion — short, metrically balanced, often a falling rhythm or an antithetical pair resolving into a brief coda, so the ear hears a chord, not a trail-off. Read the last line aloud; if it doesn't 'land,' rebalance its stresses or split it. Empirical anchor: Sarika #05 — the review names 'alternation of dense and plain sentences to create breathing room' (after the 39-word opener, a flat 15-word sentence) and her close 'I may not dance across the stage like Angelina Ballerina, but I can dance across the page. / I, too, can dance.' lands as antithesis (stage↔page) resolving into a short three-beat coda. Authority: Le Guin (Steering the Craft) — 'Do not write three long sentences in a row. Do not write three short sentences in a row'; the lithub excerpt's 'well-paced, flowing' vs 'choppy, droning'; Hale (Sin and Syntax) on cadence as the music that carries emotion. NOT 'vary your sentence length' as a flat rule — this is the wave (alternation as breath) and the tuned final chord (cadenced close).",
+      "dimensionTags": ["voice"],
+      "surfaceVsExpert": "expert",
+      "workedExample": {
+        "before": "Cooking with my grandmother every Sunday taught me patience and tradition and the importance of family, and I learned so much from her about where I come from and who I am, and these are lessons that I will carry with me for the rest of my life as I go forward into my future and pursue my dreams.",
+        "after": "Every Sunday my grandmother taught me to fold dumplings — pleat, press, the seam sealed with a thumbnail of water, thirty of them lined up like small white moons before the first one ever hit the pot. I was clumsy. She was patient. I can fold them now in the dark, and I do, on the Sundays she can't.",
+        "exemplarProvenance": "illustrative-synthetic",
+        "sourceRef": "Composed to instantiate the VERIFIED paragraph-level-rhythm + cadenced-close move (Sarika #05 dense/plain alternation and the 'I, too, can dance' cadenced close; Le Guin's 'not three long / not three short' rule; Hale on cadence). The BEFORE is three long abstract clauses droning at one length, ending on an explained 'lessons'; the AFTER alternates a long dense sentence, two short plain ones ('I was clumsy. She was patient.'), and a balanced cadenced close ('I can fold them now in the dark, and I do, on the Sundays she can't.'). NOT a quoted admit essay.",
+        "usage": "private-teaching-aid — DO NOT SURFACE and DO NOT MIMIC the dumpling scaffold or this close's phrasing/shape. It teaches the SYSTEM the alternation-and-cadence mechanic; the generated rhythm must be tuned to the STUDENT'S own content."
+      },
+      "mechanics": "Two levers operating across (not within) sentences. (1) ALTERNATION = managed attention: a dense sentence taxes the reader; the following plain sentence relieves them; the oscillation is the wave that keeps a paragraph moving. The BEFORE drones because all three clauses are the same length and altitude (long, abstract); the AFTER alternates long-dense → short-plain ('I was clumsy. She was patient.') → cadenced-close. Le Guin's hard rule supplies the diagnostic: scan a paragraph for three-in-a-row same-length sentences and break the monotony. (2) CADENCED CLOSE = tuned final chord: the last line is shaped for completion — short, balanced, often falling. The AFTER's close 'I can fold them now in the dark, and I do, on the Sundays she can't' has a balanced two-part build resolving into a quiet four-word coda ('on the Sundays she can't') whose falling stress lands like a final note; it also withholds the explanation (restraint), letting the grandmother's decline live in the cadence. To transfer: scan the draft for length-monotony and insert plain sentences as breath after dense ones; then read the final line aloud and tune its stresses/balance until it lands as a chord rather than fading.",
+      "transfer": [
+        "Alternation in a technical paragraph: '[long dense] I spent the spring rewriting the simulation's collision logic, swapping the brute-force pairwise check for a spatial hash that bucketed ten thousand particles into a grid and cut the frame time from two seconds to forty milliseconds. [short plain] It finally ran. [short plain] I watched it loop for an hour.' (The two short sentences let the dense optimization land.)",
+        "Cadenced close (falling, balanced) for a different essay: 'I came to the river to scatter his ashes. I stayed to learn its name in his language, the one I'd let go cold. Mníšoše. I say it now when no one's listening.' (Balanced build resolving into a short coda; the single word and the four-word close give an audible final chord without explaining.)"
+      ],
+      "failureModes": [
+        "Three (or more) same-length sentences in a row — Le Guin's named fault: all-long drones, all-short is choppy/staccato; either flattens the wave and the paragraph stops breathing.",
+        "Treating the plain sentence as filler — a flat sentence inserted where nothing needs relief just dilutes; the plain sentence must follow a genuinely DENSE one to function as breath.",
+        "A close that trails off instead of landing — an unbalanced, hedge-laden, or over-long final line ('and so, in many ways, that experience really shaped who I am today') fades rather than resolves; the cadenced close must be tuned short and balanced.",
+        "Over-tuning the close into sing-song — forcing a perfectly metrical, rhyme-adjacent final line can read as a greeting-card couplet; the cadence should feel inevitable, not performed."
+      ],
+      "antiTemplate": "The MOVE (alternate dense/plain for breath; tune the final line for cadence) transfers; the SHAPE must vary and must respect the close-register variance gate (#7). Do NOT make every cadenced close an antithesis-plus-short-coda (Sarika's 'across the stage… across the page / I, too, can dance' is ONE realization). A cadenced close can be a single falling sentence, a short balanced pair, a one-word landing, an image whose rhythm happens to resolve — vary the syntactic form (declarative / fragment / lyric) AND the landing target (object / relational / bare-fact / unresolved) so that across many generated essays no single (form × target) close-cell dominates. Critically, 'cadenced' must not become a license to add an explanatory final sentence for the sake of rhythm — the close lands on a concrete or balanced beat, never on a stated moral (see restraint-004). And the alternation rule is a diagnostic to BREAK monotony, not a mandate to alternate mechanically every other sentence."
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Ursula K. Le Guin, 'Steering the Craft,' ch. 'The Sound of Your Writing' — paragraph-level pacing rule: 'Do not write three long sentences in a row. Do not write three short sentences in a row (unless producing a staccato effect deliberately)'; faults of poor pacing named as 'choppy, droning, jerky,' virtues as 'well-paced, flowing'; 'Pace and movement depend above all on rhythm… by hearing it' (read the close aloud).",
+      "url": "https://lithub.com/a-writing-lesson-from-ursula-k-leguin/",
+      "tier": 2,
+      "authorRole": "Named master author / craft-handbook",
+      "publishedDate": "2015-08-25",
+      "accessedDate": "2026-06-19"
+    },
+    {
+      "citation": "Harvard 'Essays That Worked' corpus (Sarika, 'I, Too, Can Dance') + Uplift editorial review #05 — 'alternation of dense and plain sentences to create breathing room' (after the 39-word opener, a flat 15-word sentence: 'After a maximal sentence, a minimal one. Rhythm-at-the-paragraph-level'); the close 'I may not dance across the stage like Angelina Ballerina, but I can dance across the page. I, too, can dance.' lands as antithesis (stage↔page) resolving into a short cadenced coda.",
+      "url": "https://www.thecrimson.com/topic/sponsored-successful-harvard-essays-2024/",
+      "tier": 2,
+      "authorRole": "Sponsored consultant feature (Crimson, admission unverified) + Uplift internal review — self-citation, Tier-2",
+      "publishedDate": "2024-01-01",
+      "accessedDate": "2026-06-19"
+    },
+    {
+      "citation": "Constance Hale, 'Sin and Syntax: How to Craft Wickedly Effective Prose' (Three Rivers Press) — the 'Music' section on cadence and melody: 'it is in the beauty, rhythm, and lyricism of the English language that we find the emotion and the ability to make connections to other humans'; cadence as the close-level music that carries feeling. Grounds the tuned-final-chord requirement.",
+      "url": "https://en.wikipedia.org/wiki/Sin_and_Syntax",
+      "tier": 2,
+      "authorRole": "Named writing-craft author; named-practitioner book",
+      "publishedDate": "1999-01-01",
+      "accessedDate": "2026-06-19"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "1999-01-01",
+  "lastVerified": "2026-06-19",
+  "freshnessClass": "stable",
+  "connections": [
+    {
+      "toId": "essays-rhythm-002",
+      "relation": "related-to",
+      "note": "The plain sentence in dense/plain alternation is the same family as the beat-drop (002) — a short sentence relieving a long build; 007 generalizes it to the paragraph-level wave, 002 sharpens it to a single pivot."
+    },
+    {
+      "toId": "essays-rhythm-001",
+      "relation": "supported-by",
+      "note": "Meter-content congruence (001) is sentence-level; the cadenced close (007) is its paragraph-level cousin — both tune stress/beat so the prose lands as music; together they cover micro and macro rhythm."
+    },
+    {
+      "toId": "essays-restraint-004",
+      "relation": "contrasts-with",
+      "note": "A cadenced close must NOT become a pretext to keep an explanatory final sentence for its rhythm; resolve with restraint-004 — land the cadence on a concrete or balanced beat, never on a stated moral."
+    }
+  ],
+  "provenanceTrail": "rhythm row, cycle-2 taxonomy; the macro (paragraph/essay-level) rhythm entry complementing the micro entries 001-006. Empirical anchor = Sarika #05. VERIFIED against raw text: tests/calibration/.../essays/05-harvard-2028-i-too-can-dance.txt — the 39-word opener is followed by 'I had always dreamed I would dance, and Angelina Ballerina made it seem so easy.' (the flat plain sentence the review cites), and the essay closes on the two-line cadence 'I may not dance across the stage like Angelina Ballerina, but I can dance across the page. / I, too, can dance.' (verbatim; the antithesis-plus-coda shape re-checked against raw text per standard #8). Tier-2 = Le Guin's explicit 'not three long / not three short' pacing rule + read-aloud, and Hale on cadence carrying emotion. surfaceVsExpert=expert: a base model says 'vary sentence length'; the non-obvious layer is alternation-as-managed-attention (the wave is breath) + tuning the FINAL line for cadence as a resolving chord, with the antiTemplate enforcing close-register variance gate #7 so cadence does not collapse into one repeated shape."
+}

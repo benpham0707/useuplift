@@ -1,0 +1,54 @@
+{
+  "id": "essays-post-sffa-identity-001",
+  "domain": "essays",
+  "subtopic": "post-sffa-identity",
+  "claim": "SFFA v. Harvard/UNC (decided 2023-06-29) struck down race-conscious admissions but expressly preserved an applicant's ability to discuss race in an essay: 'nothing in this opinion should be construed as prohibiting universities from considering an applicant's discussion of how race affected his or her life, be it through discrimination, inspiration, or otherwise.' The decisive condition is that any benefit 'must be tied to that student's courage and determination' or 'unique ability to contribute to the university' — 'the student must be treated based on his or her experiences as an individual—not on the basis of race.'",
+  "application": [
+    {
+      "kind": "decision-rule",
+      "content": "When a draft mentions race or ethnicity, test it against the ruling's hinge: does the passage tie the identity to a demonstrated quality of character (courage, determination), a value, or a capacity the student will bring to campus? If the line could be cut and replaced with a bare demographic checkbox without losing anything, it is operating as a category, not an experience — rewrite it to show the specific lived moment and what it forged in the student.",
+      "dimensionTags": ["reflection_meaning_making", "character_interiority_vulnerability", "originality_specificity_voice"]
+    },
+    {
+      "kind": "before-after",
+      "content": "BEFORE: 'As a Mexican American, diversity is important to me.' (category as standalone factor — the post-SFFA carve-out does not cover this). AFTER: a scene of teaching folklorico steps to younger cousins until the choreography finally clicked, then naming the patience and leadership it built and how that shows up in how the student runs a study group — the identity is the soil, the character quality is the fruit the reader is allowed to credit.",
+      "dimensionTags": ["originality_specificity_voice", "reflection_meaning_making"],
+      "reuse": {
+        "verbatimReuseOK": [
+          "nothing in this opinion should be construed as prohibiting universities from considering an applicant's discussion of how race affected his or her life, be it through discrimination, inspiration, or otherwise",
+          "must be tied to that student's courage and determination",
+          "unique ability to contribute to the university",
+          "the student must be treated based on his or her experiences as an individual—not on the basis of race"
+        ],
+        "reExpressPerUser": "The illustrative FRAMINGS in this item must be RE-EXPRESSED freshly per student and NEVER copied: (1) the 'identity is the soil, character is the fruit' metaphor — this exact metaphor was passed through near-verbatim in generated output (cycle-1c finding); re-express the soil/fruit relationship in language native to THIS student's material, do not reuse the soil/fruit image; (2) the folklorico / Mexican-American teaching example — this is one illustrative instantiation, not a template; generate from the user's own identity, scene, and character quality. Only the SFFA ruling quotes in verbatimReuseOK are reproduced exactly (paraphrasing verified legal text would be a defect); everything else here is re-expressed."
+      }
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Students for Fair Admissions, Inc. v. President and Fellows of Harvard College, 600 U.S. 181 (2023), majority opinion (Roberts, C.J.) — quoted in Stanford Center for Racial Justice FAQ",
+      "url": "https://law.stanford.edu/2023/12/12/students-for-fair-admissions-v-harvard-faq-navigating-the-evolving-implications-of-the-courts-ruling/",
+      "tier": 1,
+      "authorRole": "U.S. Supreme Court (quoted by Stanford Law School)",
+      "publishedDate": "2023-06-29",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "City Journal / McGuireWoods legal alert — quoting Roberts' 'courage and determination' / 'unique ability to contribute' / 'treated based on his or her experiences as an individual' language",
+      "url": "https://www.mcguirewoods.com/client-resources/alerts/2023/6/us-supreme-court-landmark-college-affirmative-action-decision-sffa/",
+      "tier": 2,
+      "authorRole": "Established legal-practitioner analysis (corroborating the ruling text)",
+      "publishedDate": "2023-06-30",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2023-06-29",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "semi-stable",
+  "connections": [
+    { "toId": "essays-post-sffa-identity-002", "relation": "refines", "note": "002 captures the ruling's anti-circumvention warning that bounds this carve-out." },
+    { "toId": "essays-reflection-meaning-making-001", "relation": "cross-subtopic-implies", "note": "The 'tie identity to a quality of character' rule is executed through reflection/meaning-making craft." }
+  ],
+  "provenanceTrail": "Primary text is the SFFA majority opinion (2023-06-29). The supremecourt.gov PDF returned HTTP 403 to the fetcher, so the exact wording was verified through two independent reproductions of the quotation: Stanford Law School's Center for Racial Justice FAQ (Tier-1-adjacent, legal academic) and McGuireWoods' practitioner alert (Tier 2). Both reproduce identical phrasing for the 'how race affected his or her life' carve-out and the 'courage and determination / unique ability / treated as an individual' condition. Cross-checked against Inside Higher Ed and College Essay Guy quotations of the same passage."
+}

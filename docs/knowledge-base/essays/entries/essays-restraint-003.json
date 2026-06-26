@@ -1,0 +1,73 @@
+{
+  "id": "essays-restraint-003",
+  "domain": "essays",
+  "subtopic": "restraint",
+  "claim": "Emotion lands when it is RENDERED in the body and deleted as a label — not when it is named. 'I slumped against the wall' shows disappointment as a posture; 'I felt disappointed' merely reports it. The expert restraint move is to cut the emotion-naming sentence ('I felt honored / afraid / overwhelmed') and replace it with the specific bodily or behavioral evidence of the feeling, letting the reader run the feeling themselves. Naming the emotion is the single most common over-explanation in student essays, and it is restraint — deletion of the label — that fixes it, not adding more description.",
+  "application": [
+    {
+      "kind": "before-after",
+      "content": "RESTRAINT MOVE — embodied-not-named emotion (cut 'I felt X'; render the body instead). Find every 'I felt [emotion-word]' / 'I was [emotion-word]' / thought-verb sentence (felt, realized, knew, was overwhelmed, was so happy). For each, ask: what did my body or behavior actually DO in that moment? Write that physical action and DELETE the emotion label. The reader infers the feeling from the posture, the breath, the hands — and inference is more intimate than report. Diagnostic ratio (from the admit corpus): count 'I felt X' sentences vs. bodily/behavioral-rendering sentences; if the ratio exceeds ~0.5, the essay is telling its feelings and should be revised toward showing. Empirical contrast in one corpus: Marcus renders disappointment as 'I slumped against the wall' (embodied — a hallmark of controlled prose) while Francisco repeatedly names feelings ('I felt honored,' 'it was awkward,' 'I felt out of place') — the review flags this naming as the essay's 'craft ceiling.' Authority: Palahniuk's 'Thought Verbs' — forbid 'Thinks, Knows, Realizes, Loves, Hates'; 'show the physical actions and details... and allow your reader to do the thinking and knowing.'",
+      "dimensionTags": [
+        "emotional_resonance"
+      ],
+      "surfaceVsExpert": "expert",
+      "workedExample": {
+        "before": "When I saw my name on the list, I was overjoyed. I felt so proud and validated. It was the happiest moment of my life, and I was overwhelmed with emotion.",
+        "after": "I read the list top to bottom, then again from the bottom, in case I'd skipped a line. My name was still there the third time. I stood in the hallway holding the door I'd meant to walk through, and a freshman had to say 'excuse me' twice before I moved.",
+        "exemplarProvenance": "illustrative-synthetic",
+        "sourceRef": "Composed to instantiate the VERIFIED move: Marcus's 'I slumped against the wall, disappointed' embodied emotion (review #10) + Francisco's named-emotion failure (review #06, 'emotional-summary over emotional-rendering') + Palahniuk 'Thought Verbs.' The joy is never named; it is rendered as re-reading the list, freezing in the doorway, missing the freshman. Not a quoted admit essay.",
+        "usage": "private-teaching-aid — DO NOT SURFACE to the student and DO NOT MIMIC its phrasing OR its rhetorical structure. It teaches the SYSTEM the move; generated output must be lexically and structurally distinct from it."
+      },
+      "mechanics": "The lever is DELETION of the abstract label plus substitution of one concrete physical behavior that has the feeling as its cause. 'I was overjoyed / proud / overwhelmed' (three labels) is cut entirely; the joy is reconstructed from re-reading the list three times (disbelief), freezing in the doorway holding a door he meant to walk through (the body outrunning the mind), and not hearing the freshman (absorption). The reader assembles 'overjoyed' from the behavior — and owns it. Sub-lever: pick behaviors that are slightly specific and odd (reading bottom-to-top 'in case I'd skipped a line') rather than stock ('my heart raced'), because stock bodily clichés are just a fancier label. Transfer the move by locating each emotion-name and asking 'what did the body do?' — then keep the body and cut the name.",
+      "transfer": [
+        "BEFORE (grief, named): 'When I heard the news, I was devastated. I felt a wave of grief wash over me and I was completely heartbroken.' — AFTER, embodied: 'I kept the phone to my ear for a while after she'd hung up. Then I went and washed the same three dishes that were already clean, slowly, until my brother came in and turned the tap off for me.' (No 'devastated,' no 'grief,' no 'heartbroken'; the feeling is in the held phone, the clean dishes washed again, the brother turning off the tap.)"
+      ],
+      "failureModes": [
+        "Showing the body AND naming the feeling ('I slumped against the wall, devastated and heartbroken') — the label re-tells what the posture already showed; cut the label. (Marcus's actual line keeps one quiet word, 'disappointed' — but the test is whether the naming adds anything the body didn't; usually it doesn't.)",
+        "Substituting a CLICHE body-signal for the label ('my heart raced,' 'tears welled up,' 'a chill ran down my spine') — these are emotion-labels in disguise; the rendering must be specific to this moment (re-reading the list bottom-to-top), not a stock physiological stamp.",
+        "Rendering so obliquely the reader can't recover the feeling — the behavior must reliably imply the emotion (Hemingway's 'hollow places' warning). Restraint is controlled showing, not withholding."
+      ],
+      "antiTemplate": "The MOVE is mandatory; the FRAMING must vary. Do NOT default to a fixed body-vocabulary (slumping, freezing, hands shaking) and do NOT always render emotion through posture. Rotate the channel: sometimes posture, sometimes a small displaced action (washing clean dishes), sometimes what the person fails to notice, sometimes a thing they say or don't say, sometimes a change in how they treat an object. Vary intensity — not every feeling needs a dramatic body; quiet feelings get quiet renderings. The transferable technique is 'cut the emotion-label, render the specific behavior'; the specific behavior must be freshly observed each time, never a stock kit."
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Chuck Palahniuk, 'Nuts and Bolts: \"Thought\" Verbs' (LitReactor) — forbids thought/feeling verbs (Thinks, Knows, Understands, Realizes, Believes, Wants, Remembers, Loves, Hates) and instructs: 'show the physical actions and details of your characters and allow your reader to do the thinking and knowing'; demonstrated via the coffee example (Monica only makes her own coffee → reader infers his anxiety without the thought verb).",
+      "url": "https://litreactor.com/essays/chuck-palahniuk/nuts-and-bolts-%E2%80%9Cthought%E2%80%9D-verbs",
+      "tier": 2,
+      "authorRole": "Named-practitioner craft authority (best-selling novelist; widely-taught craft essay)",
+      "publishedDate": "2013-07-12",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Harvard Crimson Brand Studio 'Essays That Worked' + Uplift sentence-level reviews #10 (Marcus, 'The Zoo': 'I slumped against the wall, disappointed' — 'the emotion is the posture... a hallmark of controlled prose') and #06 (Francisco: 'I felt honored' etc. flagged as 'emotional-summary over emotional-rendering,' the essay's 'craft ceiling').",
+      "url": "https://www.thecrimson.com/topic/sponsored-successful-harvard-essays-2024/",
+      "tier": 2,
+      "authorRole": "Sponsored consultant feature (Crimson, admission unverified) + Uplift internal review — self-citation, Tier-2",
+      "publishedDate": "2024-01-01",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2013-07-12",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "stable",
+  "connections": [
+    {
+      "toId": "essays-restraint-002",
+      "relation": "related-to",
+      "note": "Both apply Palahniuk's 'present the details, let the reader do the knowing' — reveal-through-consequence to a FACT, embodied-emotion to a FEELING."
+    },
+    {
+      "toId": "essays-restraint-004",
+      "relation": "supports",
+      "note": "Cutting 'I felt X' is the sentence-level version of cutting the explanatory close: in both, the deletion of the naming sentence is the craft."
+    },
+    {
+      "toId": "essays-restraint-005",
+      "relation": "related-to",
+      "note": "Embodied emotion often pairs with the 'almost'-unresolved close — render the feeling, refuse to summarize it."
+    }
+  ],
+  "provenanceTrail": "Authority anchor: Palahniuk's 'Thought Verbs' essay captured verbatim via WebFetch of the LitReactor primary text (the forbidden-verb list, the 'present the details that allow the reader to know them' instruction, and the coffee example) — a named, widely-taught craft authority on rendering interior states through physical action. Empirical anchor: two contrasting Uplift sentence-level reviews from the Harvard-2028 corpus — Marcus #10 (embodied 'I slumped against the wall, disappointed' praised as controlled prose) and Francisco #06 (named emotions flagged as the essay's craft ceiling, with the explicit 'emotional-summary over emotional-rendering' move and the >0.5 'I felt X' ratio diagnostic). The positive exemplar and the negative exemplar come from independent admit essays, and both align with Palahniuk's named-authority rule."
+}

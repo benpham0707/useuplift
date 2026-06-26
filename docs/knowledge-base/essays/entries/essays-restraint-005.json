@@ -1,0 +1,82 @@
+{
+  "id": "essays-restraint-005",
+  "domain": "essays",
+  "subtopic": "restraint",
+  "claim": "A calibrated refusal of tidy closure — the essay that ends on 'almost,' on an unresolved question, or on a state still in progress — reads as more honest and more mature than the essay that ties a neat bow. The single qualifier 'almost' ('I have almost gotten used to being alone') admits the thing is not finished, which is truer to how growth and grief actually work; and admissions readers credit the writer who is not pretending to have it all figured out. The restraint is refusing the resolution the genre pressures you toward: not 'and now I am whole,' but the honest, still-open state.",
+  "application": [
+    {
+      "kind": "calibrated-heuristic",
+      "content": "RESTRAINT MOVE — the calibrated 'almost' that refuses tidy closure. When your ending wants to declare completion ('I am now confident,' 'I have finally healed,' 'I learned to love myself'), test whether the honest state is actually still in progress — and if so, write the in-progress version. The lightest form is a single qualifier: 'almost,' 'most days,' 'still,' 'I've stopped trying to explain it neatly.' The qualifier does enormous work: it converts a performed resolution into a credible one. Calibration (this is a precision move, not 'be vague'): the unresolved ending must still show a DIRECTION of growth and self-awareness about the open question — 'I'm not there yet, but here is where I am and that I know it' — not confusion about the essay's point. Empirical anchors: Michael's essay ('I have almost gotten used to being alone. But I won't let my story end here.') lets the 'almost' carry the unhealed reality while the next line names the direction; Uplift's cycle-1d benchmark found the ONE at-bar generation (Ramadan) was the one that 'refuses the transfer-resolution and ends unresolved (\"I've stopped trying to explain it neatly\"), which is exactly why it reads most human' — the four near-bar ones all resolved tidily. Authority: Sawyer/CEG and CollegeVine on endings that needn't be neatly wrapped; an unresolved ending 'shows honesty and maturity... you're not pretending to have it all figured out.'",
+      "dimensionTags": [
+        "authentic_voice",
+        "reflection_meaning_making"
+      ],
+      "surfaceVsExpert": "expert",
+      "workedExample": {
+        "before": "After everything that happened with my dad, I have completely forgiven him. I no longer feel any anger, only peace and gratitude for the lessons he taught me. Our relationship is stronger than ever, and I am finally at peace with my past.",
+        "after": "I call him on Sundays now. Some Sundays we talk for an hour; some Sundays I hang up after ten minutes and don't know why. I've stopped keeping score of which kind it was. That, for now, is the most I can do, and I've decided it counts.",
+        "exemplarProvenance": "illustrative-synthetic",
+        "sourceRef": "Composed to instantiate the VERIFIED move: Michael's 'I have almost gotten used to being alone' (review #12) + cycle-1d at-bar Ramadan unresolved close ('I've stopped trying to explain it neatly') + Sawyer/CEG & CollegeVine on un-wrapped endings. The forgiveness is NOT declared complete; the honest in-progress state (some Sundays good, some not; not keeping score) carries direction without a bow. Not a quoted admit essay.",
+        "usage": "private-teaching-aid — DO NOT SURFACE to the student and DO NOT MIMIC its phrasing OR its rhetorical structure. It teaches the SYSTEM the move; generated output must be lexically and structurally distinct from it."
+      },
+      "mechanics": "The lever is replacing a COMPLETION claim with a calibrated in-progress state plus a small marker of self-awareness. The BEFORE makes three completion claims ('completely forgiven,' 'no longer feel any anger,' 'finally at peace') that read as performed because total resolution is not believable from one essay. The AFTER swaps in the honest oscillation (some Sundays an hour, some Sundays ten minutes) and adds the maturity-marker ('I've stopped keeping score'; 'I've decided it counts') so the openness reads as chosen and understood, not as the writer failing to land the point. The word doing the most work is a single qualifier/limiter ('for now,' 'the most I can do') — that is the 'almost.' Transfer the move by finding any closing completion-claim and asking 'is this actually finished? if not, what is the true current state, and do I know I'm in the middle of it?'",
+      "transfer": [
+        "BEFORE (immigration/identity, tidily resolved): 'I used to be ashamed of my culture, but now I fully embrace both halves of my identity and feel completely at home in who I am.' — AFTER, calibrated-open: 'I order in Tagalog at the restaurant on Ninth and in English everywhere else, and I still can't always predict which one will come out when my cousin calls. I used to think I had to fix that. I'm not sure anymore that it's broken.' (No 'fully embrace,' no 'completely at home'; the unresolved code-switching is held, with the self-aware turn that it may not need resolving.)"
+      ],
+      "failureModes": [
+        "Unresolved as a cop-out — ending on confusion with no direction or self-awareness ('I still don't really know what any of it meant') reads as an unfinished essay, not a mature one. The openness must be CHOSEN and understood; show you know you're mid-process.",
+        "Adding the honest open state but then re-closing it with a bow ('...some Sundays are hard. But in the end, I've learned that family is forever.') — the bolted-on resolution cancels the restraint; trust the open state to stand.",
+        "Faking 'almost' as a tic while still claiming completion ('I have almost completely and totally healed') — the qualifier is decorative if the surrounding claim is still total. The qualifier must genuinely limit the claim."
+      ],
+      "antiTemplate": "The MOVE is mandatory; the FRAMING must vary. Do NOT default to the literal word 'almost,' and do NOT always end on a wistful unresolved note (perpetual wistfulness is its own template). The calibrated openness can be a limiter ('for now,' 'most days'), an unanswered question, a flatly-stated ongoing oscillation, or a small decision to stop seeking resolution. Vary the register — dry, tender, wry, matter-of-fact. Crucially, restraint does NOT mean every essay must end unresolved: some material genuinely resolves, and a calibrated-confident close is correct there. The transferable technique is 'when the honest state is in-progress, refuse the false bow and show the open state with self-awareness'; when to deploy it, and in what register, must be decided per essay, not applied as a default ending."
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Ethan Sawyer & Andrew Simpson (College Essay Guy), 'How to End a College Essay' — endings need not restate a thesis or wrap up neatly; show then tell, and let the reader hold the open meaning.",
+      "url": "https://www.collegeessayguy.com/blog/end-personal-statement",
+      "tier": 2,
+      "authorRole": "Named college-essay author/coach (College Essay Guy)",
+      "publishedDate": "2023-01-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Quad Education Group, 'How to End a College Essay' (and corroborating practitioner guidance) — 'An ending that leaves things unresolved shows honesty and maturity, telling the admissions officer that you're not pretending to have it all figured out and that you're aware that growth takes time'; not every story needs a clean resolution, especially grief.",
+      "url": "https://www.quadeducationgroup.com/blog/how-to-end-a-college-essay",
+      "tier": 2,
+      "authorRole": "Established admissions-counseling firm (named-practitioner guidance)",
+      "publishedDate": "2023-01-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Harvard Crimson 'Essays That Worked' + Uplift review #12 (Michael, 'Three Years Alone': 'I have almost gotten used to being alone. But I won't let my story end here.') + Uplift cycle-1d Harvard-craft benchmark: the sole at-bar generation (Ramadan) 'refuses the transfer-resolution and ends unresolved (\"I've stopped trying to explain it neatly\"), which is exactly why it reads most human.'",
+      "url": "https://www.thecrimson.com/topic/sponsored-successful-harvard-essays-2024/",
+      "tier": 2,
+      "authorRole": "Sponsored consultant feature (Crimson, admission unverified) + Uplift internal review — self-citation, Tier-2",
+      "publishedDate": "2024-01-01",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2020-01-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "stable",
+  "connections": [
+    {
+      "toId": "essays-restraint-004",
+      "relation": "related-to",
+      "note": "Sibling ending-restraint moves: 004 deletes the stated takeaway and ends on an image; 005 refuses the tidy resolution and ends on the open state. Both decline to hand the reader a bow."
+    },
+    {
+      "toId": "essays-reflection-meaning-making-005",
+      "relation": "supported-by",
+      "note": "Reflection entry 005 already establishes that the lookback/insight 'need not be tidily resolved' — this entry is the dedicated restraint form of that principle."
+    },
+    {
+      "toId": "essays-restraint-003",
+      "relation": "related-to",
+      "note": "Embodied (not named) emotion pairs naturally with an unresolved close — render the feeling, refuse to summarize it into a moral."
+    }
+  ],
+  "provenanceTrail": "Empirical anchors: Uplift review #12 (Michael's 'almost gotten used to being alone') from the Harvard-2028 corpus, and the cycle-1d Harvard-craft benchmark finding that the ONLY at-bar entry-grounded generation was the one that ended unresolved ('I've stopped trying to explain it neatly') while the four tidily-resolved ones fell to near-bar — a direct internal experimental result that unresolved/calibrated-open endings clear the bar. Authority anchors captured via WebSearch/WebFetch: Sawyer/CEG (endings needn't restate/wrap) and a corroborating named-practitioner firm (Quad) with the explicit 'unresolved ending shows honesty and maturity / not pretending to have it all figured out' guidance. NOTE: a College MatchPoint article voicing the same point was DROPPED as a verifier — it states no named author or credentials (Tier-3 by the source bar) and is retained only as context, not citation. The 'almost'-as-precision-limiter calibration (must show direction + self-awareness, not confusion) is derived from the corpus + benchmark."
+}

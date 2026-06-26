@@ -1,0 +1,48 @@
+{
+  "id": "essays-ai-in-essays-004",
+  "domain": "essays",
+  "subtopic": "ai-in-essays",
+  "claim": "Disclosure norms for AI in applications are themselves unsettled and moving: Caltech briefly used a confidential self-disclosure question ('Did you receive any AI generated assistance') for Fall 2025, then replaced it for Fall 2026 with a mandatory guidelines-review-plus-rescission model and no standalone disclosure prompt. No major school requires applicants to disclose PERMITTED uses (grammar, brainstorming). The practical norm in 2024-2026 is therefore: schools that address AI ask for attestation of authorship, not an itemized AI-use log -- and the small number that experimented with explicit disclosure have not converged.",
+  "application": [
+    {
+      "kind": "decision-rule",
+      "content": "Advise students NOT to volunteer a list of AI uses unless a school's application explicitly asks (it almost never does in 2026). Over-disclosing permitted use (e.g. 'I used Grammarly') adds nothing and can read as defensiveness; the operative obligation is the authorship attestation. The ONE exception: if a specific school's application contains an AI-use question that cycle, answer it honestly and completely -- a false 'no' there is its own integrity violation, separate from the essay content.",
+      "dimensionTags": ["originality_specificity_voice"]
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Ethical Use of AI: Guidelines for Fall 2025 Applicants | Caltech Undergraduate Admissions",
+      "url": "https://www.admissions.caltech.edu/apply/32-program/supplemental-32-application-essays/ethical-use-of-ai-guidelines-for-fall-2025-applicants",
+      "tier": 1,
+      "authorRole": "Caltech Undergraduate Admissions (official policy, prior cycle)",
+      "publishedDate": "2024-08-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Ethical Use of AI: Guidelines for Fall Applicants | Caltech Undergraduate Admissions",
+      "url": "https://www.admissions.caltech.edu/apply/first-year-applicants/supplemental-application-essays/ethical-use-of-ai-guidelines-for-fall-applicants",
+      "tier": 1,
+      "authorRole": "Caltech Undergraduate Admissions (official policy, current cycle)",
+      "publishedDate": "2025-08-01",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2024-08-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "volatile",
+  "connections": [
+    {
+      "toId": "essays-ai-in-essays-003",
+      "relation": "elaborates",
+      "note": "Same Caltech policy family; this entry isolates the disclosure dimension and its year-over-year drift."
+    },
+    {
+      "toId": "essays-ai-in-essays-006",
+      "relation": "supports",
+      "note": "The non-convergence of disclosure norms is part of the broader policy-variance picture."
+    }
+  ],
+  "provenanceTrail": "Two Caltech cycle-specific URLs (Fall 2025 and Fall-2026 'first-year-applicants') both surfaced in search 2026-06-18; the existence of a distinct Fall-2025 page plus a current page with different mechanics establishes the year-over-year change. The dropping of the explicit confidential disclosure question was corroborated by a 2026 secondary roundup. Caltech is the clearest documented case of disclosure-norm flux; entry deliberately scoped to disclosure to avoid overclaiming a stable industry norm where none exists."
+}

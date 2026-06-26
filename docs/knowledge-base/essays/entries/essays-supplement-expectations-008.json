@@ -1,0 +1,46 @@
+{
+  "id": "essays-supplement-expectations-008",
+  "domain": "essays",
+  "subtopic": "supplement-expectations",
+  "claim": "After the June 2023 SFFA ruling, selective colleges measurably expanded community/identity/contribution supplements. In an analysis of the top 65 U.S. colleges, prompts addressing diversity, identity, or adversity rose from 35 to 43 schools; mandatory such questions rose from 21 to 31; and mandatory identity-specific questions rose from 11 to 17. Several new prompts explicitly track the ruling's carve-out (e.g., Sarah Lawrence quotes the ruling; Babson asks students to share background/lived experience that shows how they'll contribute).",
+  "application": [
+    {
+      "kind": "how-to",
+      "content": "Treat the now-common community/contribution supplement as the sanctioned channel for identity and lived experience: the SFFA majority opinion permits an applicant's discussion of 'how race affected his or her life... through discrimination, inspiration, or otherwise.' The actionable form is to write the EXPERIENCE and its effect on the person (what it taught, how it shaped values/contribution), not a demographic label. A bare identity statement is both weaker craft and outside the carve-out's logic; the through-line to contribution is what makes it usable.",
+      "dimensionTags": ["school_program_fit", "originality_specificity_voice"]
+    },
+    {
+      "kind": "diagnostic-signal",
+      "content": "Strong signal: the community/identity supplement names a specific community or experience and traces a concrete effect on how the student thinks or what they'd bring. Weak signal: the essay states group membership as a credential ('as a first-gen student...') and stops - post-SFFA, the readable, defensible version is the experience-and-effect, not the label.",
+      "dimensionTags": ["school_program_fit"]
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Examining admissions essays post-affirmative action - Inside Higher Ed (analysis by Sonja Starr, law professor, Univ. of Chicago; top-65 prompt counts 35->43, 21->31, 11->17)",
+      "url": "https://www.insidehighered.com/news/admissions/traditional-age/2024/05/20/examining-admissions-essays-post-affirmative-action",
+      "tier": 2,
+      "authorRole": "Established journalism (Inside Higher Ed) reporting peer/academic analysis by named law professor Sonja Starr",
+      "publishedDate": "2024-05-20",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Colleges change essay prompts after affirmative action ruling - Inside Higher Ed (Babson and Sarah Lawrence new prompts confirmed tied to the ruling)",
+      "url": "https://www.insidehighered.com/news/admissions/traditional-age/2023/08/02/colleges-change-essay-prompts-after-affirmative-action",
+      "tier": 2,
+      "authorRole": "Established journalism (Inside Higher Ed)",
+      "publishedDate": "2023-08-02",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2023-06-29",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "semi-stable",
+  "connections": [
+    { "toId": "essays-supplement-expectations-004", "relation": "generalizes", "note": "Stanford's 'distinctive contribution' prompt is one instance of this post-SFFA surge." },
+    { "toId": "essays-supplement-expectations-005", "relation": "generalizes", "note": "MIT's collaboration/community prompt fits the same trend." },
+    { "toId": "essays-post-sffa-identity-001", "relation": "cross-subtopic-implies", "note": "Directly continues the post-SFFA-identity subtopic: the legal carve-out is the why; this entry is the supplement-side how." }
+  ],
+  "provenanceTrail": "Statistics (35->43, 21->31, 11->17 across top-65) and named analyst (Prof. Sonja Starr, Univ. of Chicago) verified by WebFetch of the Inside Higher Ed May 20 2024 article; the Babson/Sarah Lawrence prompt-change confirmation comes from a second independent Inside Higher Ed report (Aug 2 2023). Tier-2 established journalism x2 independent + agreeing. The SFFA carve-out quote ('how race affected his or her life...') is from the ruling itself (Tier-1) and is tracked in the post-SFFA-identity subtopic. Counts are semi-stable (cycle-to-cycle), so re-verify quarterly and watch for an updated Starr/IHE count."
+}

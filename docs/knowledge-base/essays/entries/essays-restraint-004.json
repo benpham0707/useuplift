@@ -1,0 +1,90 @@
+{
+  "id": "essays-restraint-004",
+  "domain": "essays",
+  "subtopic": "restraint",
+  "claim": "The single most consistent gap between strong student essays and real admit essays is the explanatory final sentence: students END on an image or scene and then add one more sentence that EXPLAINS what it meant ('...and that's when I realized that hard work pays off'). Admit essays delete that sentence — they drop an image (Francisco's 'ambulance on my chest'), a memory-anchor (Clara's Agnes), or an earned counterintuitive claim and walk away. The craft is the deletion: trusting that the essay has already earned the meaning, so the reader, not the writer, supplies the takeaway. Test every close: 'If I cut the last explanatory sentence, does the meaning survive — or improve?' If yes, cut it. Knowing when to stop is craft.",
+  "application": [
+    {
+      "kind": "before-after",
+      "content": "RESTRAINT MOVE — end-on-the-image-and-delete-the-explanatory-sentence. After drafting your ending, identify the last sentence that NAMES the lesson/significance/thesis ('I learned that...,' 'This taught me...,' 'In the end, I gained confidence, resilience, and...'). Delete it. End instead on the most concrete prior beat — an image, a scene, a memory-anchor, a single counterintuitive claim — and let it stand uninterpreted. Then verify the meaning still reaches the reader (the essay must have EARNED the takeaway in its body, per Sawyer: don't end on 'lessons these experiences taught me' if 'the author didn't tell us in the essay' what they were). Empirical anchors: Francisco's essay is weakened precisely by its closing abstract gain-list ('I gained priceless confidence, social skills, self-worth, empathetic ability, and mental fortitude...') — the review calls it 'the essay's weakest sentence,' five universal abstractions any applicant could claim; the strong essays instead end on a concrete image and stop. Authority convergence: Sawyer/CEG ('probably don't restate your thesis'; show THEN tell, and only if you showed it); CollegeVine ('the purpose of a compelling essay will always be self-evident'; phrases like 'I learned...' / 'that was when I realized that...' 'underestimate reader intelligence'); Bauld (former Brown/Columbia AO) on the clichéd moral-of-the-story / epiphany ending; Hemingway omission.",
+      "dimensionTags": [
+        "reflection_meaning_making",
+        "specificity"
+      ],
+      "surfaceVsExpert": "expert",
+      "workedExample": {
+        "before": "On the last night of the program, my roommate taught me to fold a paper crane, and we left it on the windowsill for whoever came next. As I boarded the plane home, I reflected on how much I had grown. That summer taught me the true meaning of friendship, and I learned that stepping outside my comfort zone is the key to becoming my best self. I will carry these lessons with me for the rest of my life.",
+        "after": "On the last night of the program, my roommate taught me to fold a paper crane, and we left it on the windowsill for whoever came next. It was crooked. We left it anyway.",
+        "exemplarProvenance": "illustrative-synthetic",
+        "sourceRef": "Composed to instantiate the VERIFIED move: the deletion of Francisco-style abstract gain-list / explanatory closes (review #06; cycle-1d Harvard-craft benchmark: '4 of 5 explain their own insight in the final sentence; the admits drop an image and walk away') + Sawyer/CEG, CollegeVine, Bauld, Hemingway. The three explanatory sentences are cut; the essay ends on the crooked crane left anyway. Not a quoted admit essay.",
+        "usage": "private-teaching-aid — DO NOT SURFACE to the student and DO NOT MIMIC its phrasing OR its rhetorical structure. It teaches the SYSTEM the move; generated output must be lexically and structurally distinct from it."
+      },
+      "mechanics": "The lever is pure DELETION plus, optionally, one tiny concrete tail. The BEFORE earns its image (the crane on the windowsill) and then buries it under three sentences of stated meaning ('reflected on how much I had grown,' 'taught me the true meaning of friendship,' 'carry these lessons for the rest of my life') — each a universal abstraction the reader can't verify and didn't need. The AFTER cuts all three and adds only 'It was crooked. We left it anyway.' — a concrete, slightly counterintuitive beat that lets the reader infer the meaning (imperfection accepted, generosity to a stranger) without it being stated. Sub-lever: if anything follows the image, it must be MORE concrete than the image (a smaller detail), never an abstraction climbing up out of it. Transfer the move by finding the last image in the draft, deleting everything after it, and testing whether a single concrete tail sharpens the landing.",
+      "transfer": [
+        "BEFORE (research essay, over-explained): 'I finally got the assay to work at 2 a.m. Looking back, I realize that science is about perseverance, and this experience showed me that I am capable of overcoming any obstacle I set my mind to.' — AFTER, deleted to the image: 'I finally got the assay to work at 2 a.m. I texted my lab partner a photo of the gel. She texted back a single exclamation point, then, a minute later, go to sleep.' (The perseverance/capability claims are cut; the meaning lives in the 2 a.m. photo and the two-text exchange.)"
+      ],
+      "failureModes": [
+        "Deleting the explanation but leaving NO earned image to land on — if the body never showed the meaning, cutting the closing statement leaves a hollow place (Hemingway). The fix is to earn the image earlier, not to re-add the explanation.",
+        "Replacing the abstract close with a SHORTER abstract close ('In the end, I had changed.') — still a stated takeaway, just briefer; the test is concreteness, not length.",
+        "Adding a closing image that is itself generic ('and I smiled, knowing the future was bright') — a cliché image is an explanation in costume. The landing beat must be specific and ideally faintly surprising (the crane was crooked; the partner said go to sleep)."
+      ],
+      "antiTemplate": "The MOVE is mandatory; the FRAMING must vary. Do NOT default to ending on a quiet object-image every time (that becomes its own template — the 'meaningful object on a windowsill' close). The landing can be an image, a line of overheard dialogue, an action, a single counterintuitive claim, or a deliberately flat observation. Do NOT require a two-word punch tail. Vary the register: tender, dry, comic, abrupt. The transferable technique is 'delete the sentence that states the meaning; end on the most concrete earned beat'; whether that beat is sensory, relational, or a bare claim must differ each time, and sometimes the strongest close is a single sentence with nothing added after it."
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Ethan Sawyer & Andrew Simpson (College Essay Guy), 'How to End a College Essay: 10 Tactics & Strategies' — show THEN tell ('we get to watch the movie... before she tells us what they mean'); 'Be careful not to refer to things that you haven't really shown earlier in the essay... we don't really know what those lessons are because the author didn't tell us in the essay'; 'probably don't restate your thesis.'",
+      "url": "https://www.collegeessayguy.com/blog/end-personal-statement",
+      "tier": 2,
+      "authorRole": "Named college-essay author/coach (College Essay Guy)",
+      "publishedDate": "2023-01-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "CollegeVine, 'How to End Your College Essay: 5 Strategies' — 'The purpose of a compelling essay will always be self-evident'; warns against summarizing phrases like 'I learned...' and 'That was when I realized that...' because they 'interrupt the narrative and underestimate reader intelligence'; recommends image-based closes (Full Circle, Image of the Future, Same-but-Different) that let readers recognize the change themselves.",
+      "url": "https://blog.collegevine.com/how-to-end-your-college-essay",
+      "tier": 2,
+      "authorRole": "Established counselor-backed college-admissions guidance platform",
+      "publishedDate": "2021-01-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Harry Bauld (former admissions officer, Brown & Columbia), 'On Writing the College Application Essay' — 'show more than you tell'; names the clichéd 'lesson/moral-of-the-story' and epiphany endings ('The Trip,' the what-I-learned close) as the marks of applicant-number prose to avoid.",
+      "url": "https://harrybauld.com/on-writing-the-college-application-essay",
+      "tier": 2,
+      "authorRole": "Named former AO (Brown, Columbia); named-practitioner book",
+      "publishedDate": "2012-01-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Harvard Crimson 'Essays That Worked' (Ivy Institute) + Uplift review #06 (Francisco) — the closing abstract gain-list ('confidence, social skills, self-worth, empathetic ability, and mental fortitude') named 'the essay's weakest sentence'; Uplift cycle-1d Harvard-craft benchmark — '4 of 5 explain their own insight in the final sentence; the admits drop an image and walk away.'",
+      "url": "https://www.thecrimson.com/topic/sponsored-successful-harvard-essays-2024/",
+      "tier": 2,
+      "authorRole": "Sponsored consultant feature (Crimson, admission unverified) + Uplift internal review — self-citation, Tier-2",
+      "publishedDate": "2024-01-01",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "2012-01-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "stable",
+  "connections": [
+    {
+      "toId": "essays-restraint-005",
+      "relation": "related-to",
+      "note": "The deleted-explanation close and the 'almost'-unresolved close are sibling endings; both refuse to hand the reader a tidy stated takeaway."
+    },
+    {
+      "toId": "essays-restraint-003",
+      "relation": "supported-by",
+      "note": "Cutting 'I felt X' (003) is the sentence-level case; cutting the explanatory final sentence (004) is the whole-essay case of the same deletion discipline."
+    },
+    {
+      "toId": "essays-reflection-meaning-making-001",
+      "relation": "contrasts-with",
+      "note": "Reflection demands an earned 'so-what'; restraint demands you not STATE it flatly at the close. Resolve the tension: earn the insight in the body, then end on the image — don't bolt the insight on as a final sentence."
+    }
+  ],
+  "provenanceTrail": "This entry encodes the #1 empirically-identified gap from Uplift's cycle-1d Harvard-craft benchmark (4 of 5 entry-grounded generations explained their own insight in the final sentence; the real admits drop an image and stop). Triangulated against FOUR sources: Sawyer/CEG ending guide (captured verbatim via WebFetch — 'show then tell,' 'the author didn't tell us in the essay,' 'probably don't restate your thesis'); CollegeVine ending guide (captured via WebFetch — 'self-evident,' 'underestimate reader intelligence,' image-based closes); Bauld (named former Brown/Columbia AO; cliché-of-the-lesson teaching confirmed via book summary + author site); and Francisco #06 as the negative admit exemplar (abstract gain-list = weakest sentence). Note: a single weak admit close (Francisco still admitted) shows the bar is the STRONG admit closes (image-drop) — corroborated by the benchmark's 'at-bar R2/Ramadan' which ends unresolved on an image. The deletion discipline is independently attested by three named practitioners + Hemingway omission (entry 001)."
+}

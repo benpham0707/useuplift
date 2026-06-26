@@ -1,0 +1,82 @@
+{
+  "id": "essays-restraint-006",
+  "domain": "essays",
+  "subtopic": "restraint",
+  "claim": "When an essay's image or detail already implies its meaning, the writer should build at most ONE explicit bridge and trust the reader to make the last connection — not spell out every link. The strongest details are double-loaded: a single concrete choice that carries both the literal sensation AND the thematic point, so no explanatory sentence is needed (Francisco's 'ambulance on my chest' renders weight AND imports the connotation of medical emergency — the metaphor does the interpretive work the writer would otherwise state). Subtext — meaning the reader infers rather than is told — is the mechanism; over-bridging (explaining the connection you already implied) is the failure. This is Hemingway's iceberg discipline applied at the level of the single image.",
+  "application": [
+    {
+      "kind": "how-to",
+      "content": "RESTRAINT MOVE — single-explicit-bridge discipline (trust the reader to make the last connection; choose double-loaded details). Two complementary techniques. (1) DOUBLE-LOAD the detail: when picking a metaphor or concrete image, choose one whose vehicle carries thematic connotation beyond its literal property, so the image states the meaning implicitly. Francisco chose 'ambulance' (not 'truck' or 'stone') for a chest-weight because an ambulance also signals medical emergency — the vehicle does double work, and no follow-up sentence is needed to explain the panic. (2) BUILD ONLY ONE BRIDGE: when a detail implies a point, make the connection explicit at most once, then stop — do not re-state the link in the next sentence, and do not pre-explain it before showing it. Per Sawyer/CEG, 'show THEN tell' (let the reader 'watch the movie' and interpret BEFORE you name it, which gives suspense) — and only tell once. Per Hemingway, the omitted connection, if the writing is true enough, is 'felt as strongly as though stated.' His 'Hills Like White Elephants' carries an entire taboo decision through subtext, never naming it. Diagnostic: for each explanatory clause, ask 'did the image already imply this?' If yes, and you've already bridged once, cut.",
+      "dimensionTags": [
+        "imagery_figurative_language",
+        "specificity"
+      ],
+      "surfaceVsExpert": "expert",
+      "workedExample": {
+        "before": "My grandmother's hands were rough and worn from decades of hard work. They showed how much she had sacrificed for our family. Every callus was a symbol of her love and dedication. Looking at her hands reminded me of everything she had given up so that I could have a better life, and I felt grateful for her sacrifice.",
+        "after": "My grandmother counted my college deposit out in twenties from a coffee can, smoothing each bill flat against the table with a thumb that no longer fully straightened.",
+        "exemplarProvenance": "illustrative-synthetic",
+        "sourceRef": "Composed to instantiate the VERIFIED move: Francisco's double-connotation 'ambulance on my chest' (review #06, 'metaphor-with-double-connotation') + Sawyer/CEG 'show then tell' + Hemingway omission / 'Hills Like White Elephants' subtext. The single double-loaded image (twenties from a coffee can; the thumb that won't straighten) carries sacrifice, labor, and love WITHOUT any of the four explanatory sentences. Not a quoted admit essay.",
+        "usage": "private-teaching-aid — DO NOT SURFACE to the student and DO NOT MIMIC its phrasing OR its rhetorical structure. It teaches the SYSTEM the move; generated output must be lexically and structurally distinct from it."
+      },
+      "mechanics": "Two levers. (1) Double-loading: the BEFORE separates image from meaning across five sentences (rough hands → 'showed sacrifice' → 'symbol of love' → 'reminded me' → 'I felt grateful') — four explanatory bridges. The AFTER fuses them into one detail where the literal facts ARE the meaning: cash in a coffee can (no bank, saved-by-hand), twenties (small denominations, hard-earned), smoothing each bill (care, ritual, reluctance to part with it), the thumb that no longer straightens (the body's cost of the labor). The reader extracts sacrifice/love/cost from the detail; the writer states none of it. (2) One-bridge: if any naming is needed, it happens once and after the image, never before and never twice. Transfer the move by, first, replacing abstract symbol-claims with one concrete detail whose particulars encode the theme; second, deleting every explanatory clause past the first.",
+      "transfer": [
+        "BEFORE (mentor essay, over-bridged): 'Coach never gave up on me, which taught me the value of having someone believe in you. His faith in me showed me that I was capable of more than I thought, and it inspired me to work harder than ever.' — AFTER, double-loaded, one bridge at most: 'Coach kept my old time written on the whiteboard in the corner of the gym for two years after I'd beaten it. He never said why. I never erased it.' (Belief, persistence, and the unspoken bond are carried by the un-erased time on the board; the three explanatory sentences are gone, and the writer trusts the reader to make the last connection.)"
+      ],
+      "failureModes": [
+        "Stating the meaning the image already carried ('...the thumb that no longer fully straightened — a testament to her years of sacrifice') — the appositive re-explains what the detail showed; cut it. One bridge maximum, and here the image needs zero.",
+        "Choosing a FLAT detail that carries no thematic connotation, then having to explain it — if the vehicle doesn't double-load ('a regular metal can'), the writer is forced back to telling. Pick the detail whose particulars ARE the point (coffee can, won't-straighten thumb).",
+        "Building the bridge BEFORE the image ('To show how much she sacrificed, consider her hands:') — pre-explaining removes the reader's interpretive work and the suspense. Show first; tell once, if at all, after."
+      ],
+      "antiTemplate": "The MOVE is mandatory; the FRAMING must vary. Do NOT default to the heirloom-object / weathered-hands register (the 'meaningful family object' is its own cliché). Double-loaded details can be metaphors (the ambulance), objects (the coffee can), actions (never erasing the time), sounds, or word-choices whose connotation does the thematic work. Vary how much explicit bridging is used — sometimes one short bridge clarifies; often zero is stronger; never more than one. Vary the register — tender, stark, comic, clinical. The transferable technique is 'load the meaning into the concrete choice and trust the reader to make the last connection'; the kind of detail and the amount of bridging must be decided per essay, never applied as a fixed shape."
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Ernest Hemingway, 'Death in the Afternoon' (1932) — theory of omission (omitted material is 'felt as strongly as though stated'); demonstrated in 'Hills Like White Elephants,' which carries an entire taboo decision through subtext, never naming it.",
+      "url": "https://en.wikipedia.org/wiki/Iceberg_theory",
+      "tier": 2,
+      "authorRole": "Named-practitioner craft authority (Nobel laureate author; primary craft statement + canonical subtext exemplar)",
+      "publishedDate": "1932-01-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Ethan Sawyer & Andrew Simpson (College Essay Guy), 'How to End a College Essay' — 'show THEN tell': 'we get to watch the movie... before she tells us what they mean'; 'Showing before telling gives your reader a chance to interpret the meaning of your images before you do, which provides a little suspense and engages the reader's imagination'; subtext lets readers 'infer things... without being explicitly told.'",
+      "url": "https://www.collegeessayguy.com/blog/end-personal-statement",
+      "tier": 2,
+      "authorRole": "Named college-essay author/coach (College Essay Guy)",
+      "publishedDate": "2023-01-01",
+      "accessedDate": "2026-06-18"
+    },
+    {
+      "citation": "Harvard Crimson 'Essays That Worked' (Ivy Institute) + Uplift review #06 (Francisco): 'It felt as though an ambulance was sitting on my chest' — 'metaphor-with-double-connotation': the vehicle conveys weight AND imports medical-emergency connotation, doing 'double work' so the meaning need not be stated; named the essay's single most-crafted sentence.",
+      "url": "https://www.thecrimson.com/topic/sponsored-successful-harvard-essays-2024/",
+      "tier": 2,
+      "authorRole": "Sponsored consultant feature (Crimson, admission unverified) + Uplift internal review — self-citation, Tier-2",
+      "publishedDate": "2024-01-01",
+      "accessedDate": "2026-06-18"
+    }
+  ],
+  "status": "VERIFIED",
+  "effectiveDate": "1932-01-01",
+  "lastVerified": "2026-06-18",
+  "freshnessClass": "stable",
+  "connections": [
+    {
+      "toId": "essays-restraint-001",
+      "relation": "supported-by",
+      "note": "Both are Hemingway iceberg discipline: 001 omits the central LABEL; 006 omits the explanatory BRIDGE and loads meaning into the image."
+    },
+    {
+      "toId": "essays-restraint-004",
+      "relation": "supports",
+      "note": "Double-loading the image is what MAKES the deleted-explanation close (004) survive: if the image carries the meaning, the explanatory sentence is safe to cut."
+    },
+    {
+      "toId": "essays-reflection-meaning-making-002",
+      "relation": "related-to",
+      "note": "Sawyer's show-then-tell structure: subtext/single-bridge governs the 'show' so the 'tell' (reflection) can be minimal and earned."
+    }
+  ],
+  "provenanceTrail": "Authority anchors: Hemingway's omission principle + the 'Hills Like White Elephants' subtext exemplar (WebFetch of the iceberg-theory primary-quote source) and Sawyer/CEG's 'show then tell' / 'interpret before you do' / subtext guidance (WebFetch of the CEG ending guide, verbatim) — two independent named craft authorities on implying-not-stating and on building meaning into the image. Empirical anchor: Uplift review #06 of Francisco's Harvard-2028 admit essay names 'metaphor-with-double-connotation' on the 'ambulance on my chest' line as the essay's most-crafted sentence — a real admit instance of a single double-loaded image carrying meaning without an explanatory sentence. The 'one bridge maximum' calibration synthesizes Sawyer's show-then-tell (tell once, after) with Hemingway's omission and the corpus pattern; flagged for an additional named-practitioner cross-source on the over-bridging failure specifically at next cycle."
+}
