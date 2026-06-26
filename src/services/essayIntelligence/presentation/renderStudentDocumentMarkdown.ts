@@ -90,6 +90,8 @@ function renderParagraphMarkdown(para: AnnotatedParagraph): string {
     const tag = a.nature === 'strength' ? '✓' : '△';
     const ref = a.priorityRef !== null ? ` _(→ priority ${a.priorityRef})_` : '';
     lines.push(`- ${tag} **${truncate(a.spanText, 80)}** — ${a.observation}${ref}`);
+    if (a.whyItMatters) lines.push(`    *Why:* ${a.whyItMatters}`);
+    if (a.rewrite) lines.push(`    *Try:* "${a.rewrite}"`);
     if (a.detail) lines.push(`    ${a.detail}`);
   }
   lines.push('');

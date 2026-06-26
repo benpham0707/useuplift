@@ -14,6 +14,7 @@
  */
 
 import type { EssayProfile, Finding } from '../profileTypes';
+import type { L5AnnotationResult, L5Annotation } from '../analysis/deepAnnotationService';
 import type {
   StudentAnalysisDocument,
   AnnotatedEssaySection,
@@ -121,6 +122,7 @@ function translateStructuralWeight(weight: string): 'load-bearing' | 'supporting
 export function renderAnalysisForStudent(
   profile: Readonly<EssayProfile>,
   options: RenderOptions = { mode: 'initial' },
+  annotations?: L5AnnotationResult | null,
 ): StudentAnalysisDocument {
   const maxPriorities = options.maxPriorities ?? 5;
 
@@ -130,7 +132,7 @@ export function renderAnalysisForStudent(
   const revisionPriorities = buildRevisionPriorities(profile, maxPriorities);
 
   return {
-    annotatedEssay: buildAnnotatedEssay(profile, revisionPriorities),
+    annotatedEssay: buildAnnotatedEssay(profile, revisionPriorities, annotations),
     revisionPriorities,
     structuralMap: buildStructuralMap(profile),
     overallAssessment: buildOverallAssessment(profile),
@@ -151,17 +153,32 @@ export function renderAnalysisForStudent(
 function buildAnnotatedEssay(
   profile: Readonly<EssayProfile>,
   priorities: readonly RevisionPriority[],
+  l5?: L5AnnotationResult | null,
 ): AnnotatedEssaySection {
   const paragraphs: AnnotatedParagraph[] = [];
 
   // paragraph index → rank of the FIRST revision priority that covers it, so a
-  // paragraph's growth note can point the student to the full coaching block.
+  // paragraph's note can point the student to the full coaching block.
   const priorityByPara = new Map<number, number>();
   for (const p of priorities) {
     for (const pi of p.paragraphs) {
       if (!priorityByPara.has(pi)) priorityByPara.set(pi, p.rank);
     }
   }
+
+  // The REAL inline annotations: per-span L5 notes (a note on a SPECIFIC sentence,
+  // each with a model rewrite in the student's voice). Grouped by paragraph,
+  // surfaced subset only. When present, these ARE the annotated essay. The
+  // paragraph-level strength/growth summary below is only a fallback for when L5
+  // didn't run — it is NOT the inline-annotation experience.
+  const l5ByPara = new Map<number, L5Annotation[]>();
+  for (const grp of l5?.paragraphAnnotations ?? []) {
+    const surfaced = (grp.annotations ?? []).filter(
+      (a) => a.surfaced !== false && (a.content ?? '').trim().length > 0,
+    );
+    if (surfaced.length > 0) l5ByPara.set(grp.paragraphIndex, surfaced);
+  }
+  const haveL5 = l5ByPara.size > 0;
 
   for (const para of profile.paragraphs) {
     const annotations: InlineAnnotation[] = [];
@@ -173,49 +190,46 @@ function buildAnnotatedEssay(
       annotations.push(a);
     };
 
-    const pa = para.analysis;
-    // A multi-paragraph entry is annotated ONCE, at the first paragraph it spans
-    // (it's stored redundantly on every referenced paragraph's analysis).
-    const onFirstPara = (paras: number[] | undefined): boolean =>
-      !paras || paras.length === 0 ? true : Math.min(...paras) === para.index;
+    if (haveL5) {
+      // ── Per-span L5 annotations: anchor → observation → why → MODEL REWRITE ──
+      const anns = [...(l5ByPara.get(para.index) ?? [])].sort(
+        (a, b) => (a.priority ?? 9) - (b.priority ?? 9),
+      );
+      for (const a of anns) {
+        add({
+          spanText: clampToWord(a.location?.spanText || para.text, 90),
+          observation: a.content,
+          whyItMatters: a.teachingRationale || a.stakes || undefined,
+          rewrite: a.rewriteExample || undefined,
+          nature: a.type === 'strength' ? 'strength' : 'growth',
+          priorityRef: priorityByPara.get(para.index) ?? null,
+        });
+      }
+    } else {
+      // ── FALLBACK (L5 not run): paragraph-level strengths + growth-edge summary.
+      //    Coarser than the per-span annotations above; kept so the section is
+      //    never empty when annotations are disabled.
+      const pa = para.analysis;
+      const onFirstPara = (paras: number[] | undefined): boolean =>
+        !paras || paras.length === 0 ? true : Math.min(...paras) === para.index;
 
-    // (1) What's WORKING here, anchored to the text (✓). Per-paragraph strength
-    //     signatures — the writer's own moves worth naming and protecting.
-    for (const s of (pa?.strengthSignatures ?? []).filter(s => onFirstPara(s.paragraphs))) {
-      add({
-        spanText: clampToWord(s.evidence || para.text, 80),
-        observation: s.quality,
-        nature: 'strength',
-        priorityRef: null,
-      });
-    }
-
-    // (2) What to IMPROVE here, anchored, WITH the how (△). Per-paragraph growth
-    //     edges carry the actual coaching (quality + a specific description). This
-    //     is the highest-value content we generate per paragraph and it was never
-    //     surfaced in the annotated essay before — so a $2-3 analysis showed five
-    //     bare strength labels while ~15 grounded growth observations sat unused.
-    for (const ge of (pa?.growthEdges ?? []).filter(ge => onFirstPara(ge.paragraphs))) {
-      add({
-        spanText: firstQuotedSpan(ge.description) ?? clampToWord(para.text, 60),
-        observation: ge.quality,                       // the issue, in a few words
-        detail: ge.description || undefined,           // why it matters + the concrete fix
-        nature: 'growth',
-        priorityRef: priorityByPara.get(para.index) ?? null,
-      });
-    }
-
-    // Cross-paragraph craft strengths whose FIRST paragraph is this one (so an
-    // essay-spanning strength is annotated once, here, not repeated downstream).
-    const craftStrengths = (profile.craftAssessment?.strengthSignatures ?? [])
-      .filter(s => s.paragraphs.length > 1 && Math.min(...s.paragraphs) === para.index);
-    for (const s of craftStrengths) {
-      add({
-        spanText: clampToWord(s.evidence || para.text, 80),
-        observation: s.quality,
-        nature: 'strength',
-        priorityRef: null,
-      });
+      for (const s of (pa?.strengthSignatures ?? []).filter(s => onFirstPara(s.paragraphs))) {
+        add({ spanText: clampToWord(s.evidence || para.text, 80), observation: s.quality, nature: 'strength', priorityRef: null });
+      }
+      for (const ge of (pa?.growthEdges ?? []).filter(ge => onFirstPara(ge.paragraphs))) {
+        add({
+          spanText: firstQuotedSpan(ge.description) ?? clampToWord(para.text, 60),
+          observation: ge.quality,
+          detail: ge.description || undefined,
+          nature: 'growth',
+          priorityRef: priorityByPara.get(para.index) ?? null,
+        });
+      }
+      const craftStrengths = (profile.craftAssessment?.strengthSignatures ?? [])
+        .filter(s => s.paragraphs.length > 1 && Math.min(...s.paragraphs) === para.index);
+      for (const s of craftStrengths) {
+        add({ spanText: clampToWord(s.evidence || para.text, 80), observation: s.quality, nature: 'strength', priorityRef: null });
+      }
     }
 
     paragraphs.push({

@@ -89,7 +89,7 @@ export const ANTI_ARCHETYPES: AntiArchetype[] = [
     ],
     failureMode: 'Treats disability as the essay\'s subject rather than as one fact about the writer\'s body. AOs read these as performative resilience narratives.',
     corpusAlternativeArchetypeId: 'interior-transformation-metaphor-possession',
-    transplantPath: 'Use Sarika\'s architecture: name the disability EXACTLY ONCE. Surface it through CONSEQUENCE (Sarika\'s "ran over my friends\' toes" before naming wheelchair) rather than declaration. Identify a domain the disability foreclosed and a domain the writer reached instead; use verb-possession to migrate the foreclosed domain\'s vocabulary onto the new one. The essay is about possession of an alternative tool, not about overcoming the disability.',
+    transplantPath: 'Use Sarika\'s architecture: name the disability SPARINGLY (at most once or twice, never as the sentence\'s subject). Surface it through CONSEQUENCE (Sarika\'s "ran over my friends\' toes" before naming wheelchair) rather than declaration. Identify a domain the disability foreclosed and a domain the writer reached instead; use verb-possession to migrate the foreclosed domain\'s vocabulary onto the new one. The essay is about possession of an alternative tool, not about overcoming the disability.',
   },
   {
     id: 'immigrant-parents-sacrifice-generic',
