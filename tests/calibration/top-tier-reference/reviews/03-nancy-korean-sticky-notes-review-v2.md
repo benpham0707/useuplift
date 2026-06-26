@@ -74,7 +74,7 @@ Four mechanisms in the first sentence.
 
 **S1 (entire paragraph)**: *"My mom once joked, 'Nancy, sometimes I feel like you're the adult and I'm the child.'"*
 
-**One-sentence paragraph.** The brevity marks the sentence as a thesis-anchor.
+**One-sentence paragraph** (verified 2026-06-20: paragraph 3 is a genuine standalone single-sentence paragraph in the raw essay). The brevity marks the sentence as a thesis-anchor.
 
 **"My mom once joked."** The verb *joked* is important — the mother is named as the kind of person who delivers truths as jokes. The sentence has a Mary Karr or Jeannette Walls quality: a parent's wry comment quoted in a child's essay as the revealing-frame. The word *joked* is gentle; it preserves the mother's dignity and the love underneath. The same line with *said* would be clinical; with *complained* would be dire; with *observed* would be detached. *Joked* is the right register.
 

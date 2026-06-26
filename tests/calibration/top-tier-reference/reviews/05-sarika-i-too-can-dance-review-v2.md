@@ -1,5 +1,12 @@
 # Editorial Review v2: Sarika — "I, Too, Can Dance"
 
+> **✅ CORRECTED (2026-06-20, FOUNDATION_AUDIT truth-pass):** An earlier draft of this review claimed
+> the word "wheelchair" is named *exactly once*. That was FALSE — it is used twice (the rhetorical
+> question near "injure them with my wheelchair", and the closing "a girl in a wheelchair who learned
+> how to dance"), and never as a grammatical subject. The prose below has been rewritten to the verified
+> craft move: *name the central fact SPARINGLY and never as the subject* (live catalog:
+> `name-central-fact-once`). Enforced by `tests/calibration/verifyGoldClaims.ts`.
+
 **Source**: Harvard Crimson sponsored feature (consultant: Ivy Institute), Class of 2028 admit cycle
 **Corpus ID**: `05-harvard-2028-i-too-can-dance`
 **Essay file**: `tests/calibration/top-tier-reference/essays/05-harvard-2028-i-too-can-dance.txt`
@@ -206,7 +213,7 @@ This is also **the wheelchair's entry via action rather than identity**. The nar
 
 > *"How could I share my stories with others if I managed to injure them with my wheelchair before the story even began?"*
 
-Twenty-one words. This is where "wheelchair" appears by name. The essay's single explicit naming of its central fact. The word appears once in the whole essay, and it appears here, inside a rhetorical question.
+Twenty-one words. This is the first of only two times "wheelchair" appears by name in the whole essay — and the first time it is named at all. The word is used sparingly (twice total), never as a grammatical subject or declared theme; here it appears inside a rhetorical question, and the only other time it appears is in the closing line ("a girl in a wheelchair who learned how to dance"). This first naming is the load-bearing one.
 
 **The question form is crucial**. Sarika does not declare "I couldn't share my stories." She asks "How could I share my stories." The rhetorical question:
 
@@ -218,11 +225,11 @@ Twenty-one words. This is where "wheelchair" appears by name. The essay's single
 
 **Craft move**: **frame-planting via metaphor-preposition in a late-paragraph sentence**. Rule: at the end of the paragraph that sets up your essay's core problem, introduce the metaphor that will be the essay's solution, but present it as *incidental phrasing* about the problem. The reader won't notice the frame until it returns.
 
-**The wheelchair-is-named-once choice**. "My wheelchair" is the only instance of the word in the whole essay. The restraint is tonal. A "disability essay" that names "wheelchair" 5-10 times becomes *about the wheelchair*. An essay that names it once lets the wheelchair be felt through consequences, absences, and adjustments without becoming the essay's theme.
+**The wheelchair-is-named-sparingly choice**. "My wheelchair" here, and "a girl in a wheelchair" in the closing line, are the only two uses of the word in the whole essay — and neither uses it as a grammatical subject or as a declared theme. The restraint is tonal. A "disability essay" that names "wheelchair" 5-10 times becomes *about the wheelchair*. An essay that names it twice, and never as its subject, lets the wheelchair be felt through consequences, absences, and adjustments without becoming the essay's theme.
 
-This connects to a larger pattern: the essay is *about* something (disability, writing as dance-displacement, self-authorship) while systematically *refusing* to be those things thematically. The disability is named once. "Disability" the word doesn't appear. "Difference" the word doesn't appear. The essay's thematic material is present only as its *effect* on specific moments of action.
+This connects to a larger pattern: the essay is *about* something (disability, writing as dance-displacement, self-authorship) while systematically *refusing* to be those things thematically. The disability is named sparingly — the word "wheelchair" appears just twice, and never as the sentence's subject. "Disability" the word doesn't appear. "Difference" the word doesn't appear. The essay's thematic material is present only as its *effect* on specific moments of action.
 
-**Craft move**: **name-the-central-fact-exactly-once**. Rule: if your essay is fundamentally about a thing (loss, identity, illness, family), name that thing exactly once. Let the rest of the essay orbit the fact through consequences and adjustments. Readers trust writers who don't over-label their own material. Trust creates intimacy. Over-labeling creates distance.
+**Craft move**: **name-the-central-fact-sparingly-and-never-as-the-subject**. Rule: if your essay is fundamentally about a thing (loss, identity, illness, family), name that thing only a handful of times (Sarika names "wheelchair" twice), and never as the grammatical subject or the declared theme — let it surface as the object of an action or a passing descriptor. Let the rest of the essay orbit the fact through consequences and adjustments. Readers trust writers who don't over-label their own material. Trust creates intimacy. Over-labeling creates distance.
 
 ---
 
@@ -440,7 +447,7 @@ This is an extraordinary craft move. The reader is being shown that Sarika's wri
 
 **Craft move — named**: **cross-sentence conversation between fictional and non-fictional writing in the same essay**. Rule: if your essay lists writing projects, don't make them feel like a resume. Link them thematically — fiction about X, research about the science that would resolve X, autobiography that metabolizes X. The list becomes a portrait of an intellectual ecosystem.
 
-**The Spanish poem** — foreign language writing. Brief but essential. Tells the reader Sarika is literate in at least one additional language, and specifically uses Spanish for poetry (which implies Spanish is a language she's intimate with, not just conversational). The phrase "about the beauty of unspoken moments" is thematic restraint — it tells us her poetic interests are about *what is not said*, which is exactly what Sarika's own essay is doing with the wheelchair (named once, felt throughout). The Spanish poem thematically mirrors the essay's own restraint.
+**The Spanish poem** — foreign language writing. Brief but essential. Tells the reader Sarika is literate in at least one additional language, and specifically uses Spanish for poetry (which implies Spanish is a language she's intimate with, not just conversational). The phrase "about the beauty of unspoken moments" is thematic restraint — it tells us her poetic interests are about *what is not said*, which is exactly what Sarika's own essay is doing with the wheelchair (named sparingly — twice, never as the subject — felt throughout). The Spanish poem thematically mirrors the essay's own restraint.
 
 **Craft move — named**: **thematic self-mirror in peripheral detail**. Rule: when listing your own work, choose descriptions that subtly mirror the essay's own restraints, methods, or concerns. The reader feels thematic coherence without being told "my style is X."
 
@@ -762,15 +769,15 @@ These can eventually become L3.75 observational categories, L3.5 anchor examples
 
 ---
 
-## Move 14: Name-the-central-fact exactly once
+## Move 14: Name-the-central-fact sparingly, and never as the subject
 
-**Detection**: The essay's central fact (disability, loss, identity marker, family situation) is named explicitly one time. The rest of the essay orbits the fact through consequences, adjustments, and absences.
+**Detection**: The essay's central fact (disability, loss, identity marker, family situation) is named explicitly only a few times — Sarika names "wheelchair" twice — and never as the grammatical subject or declared theme of a sentence. The rest of the essay orbits the fact through consequences, adjustments, and absences.
 
 **Function**: Refuses to let the central fact become the essay's theme. The fact is present but not thematic. Readers trust narrators who don't over-label their own material.
 
-**How-to**: Identify the fact your essay is about. Write the essay assuming the reader knows the fact. Name the fact exactly once, in a sentence whose primary work is something else. Let every other paragraph orbit the fact through its effects.
+**How-to**: Identify the fact your essay is about. Write the essay assuming the reader knows the fact. Name the fact only sparingly, and each time as the object of an action or a passing descriptor rather than as the sentence's subject — in a sentence whose primary work is something else. Let every other paragraph orbit the fact through its effects.
 
-**Failure mode**: If you name the fact five times, the essay becomes a meditation on the fact. If you name it zero times, readers miss the central material. One mention, placed well, is the threshold.
+**Failure mode**: If you name the fact five or ten times, the essay becomes a meditation on the fact. If you name it zero times, readers miss the central material. A small number of mentions (here, two), each placed well and never foregrounded as the subject, is the threshold.
 
 ---
 
@@ -1091,7 +1098,7 @@ Any essay with a personal-discovery or transformation arc benefits from this clu
 ## Cluster 3: The restraint-and-precision voice signature
 
 - Move 5 (material-specification)
-- Move 14 (name-the-central-fact-once)
+- Move 14 (name-the-central-fact-sparingly, never as the subject)
 - Move 16 (self-aware hedge on ornate metaphor)
 - Move 27 (expert-vocabulary inside casual clause)
 
@@ -1103,7 +1110,7 @@ Sarika's voice is consistent across the essay because these four moves share a p
 
 Distilled guidance a writing coach could give a student, derived from Sarika's essay:
 
-1. **If your essay has a central fact (disability, loss, family situation, identity marker), name it exactly once. Let the rest of the essay orbit it through its consequences and adjustments.** The restraint does more than explicit disclosure. Consider: what would your essay look like if you forbade yourself from saying the word "[disability / death / divorce / coming-out]" more than once?
+1. **If your essay has a central fact (disability, loss, family situation, identity marker), name it sparingly — and never as the subject of a sentence. Let the rest of the essay orbit it through its consequences and adjustments.** Sarika names "wheelchair" only twice, both times as the object of an action, never as the declared theme. The restraint does more than explicit disclosure. Consider: what would your essay look like if you forbade yourself from saying the word "[disability / death / divorce / coming-out]" more than two or three times, and never let it be the grammatical subject?
 
 2. **If your essay has a metaphor-conversion (X becomes Y), use verb-possession rather than simile.** Don't say "writing is my dance." Use dance verbs on writing objects: my pencil pirouettes, my ink leaps, my sentences waltz. Possession is stronger than comparison.
 

@@ -1,5 +1,13 @@
 # Editorial Review v2: Billy — "Peabody Skatepark Half-Pipe"
 
+> **✅ CORRECTED (2026-06-20, FOUNDATION_AUDIT truth-pass):** An earlier draft claimed a literal
+> single-word through-line in which "routine" appears in the childhood scene and reappears in adult
+> characterization. That was FALSE — "routine" is used only once in the essay and does NOT recur. What
+> recurs is the TRAIT (comfort with a fixed routine), signaled later by different words ("having a
+> plan," "planner," "schedule," "itinerary"). The prose below has been rewritten to the verified move:
+> *trait/motif retrospective through-line via related-but-different vocabulary* (live catalog).
+> Enforced by `tests/calibration/verifyGoldClaims.ts`.
+
 **Source**: Harvard Crimson sponsored feature (consultant: Dan Lichterman), Class of 2028 admit cycle
 **Corpus ID**: `07-harvard-2028-peabody-skatepark`
 **Essay file**: `tests/calibration/top-tier-reference/essays/07-harvard-2028-peabody-skatepark.txt`
@@ -88,18 +96,18 @@ The sentence's function is to state the narrator's choice without decoration. "D
 
 Seventeen words. The paragraph's close.
 
-**"I stuck with the routine I was comfortable with"** — establishes the pre-transformation state: routine-preference, comfort-zone behavior. The word "routine" is doing double work: literally referring to his skateboarding routine (the gentle slopes he always rode), and foreshadowing the adult "routine" he still prefers (hyper-organized itinerary).
+**"I stuck with the routine I was comfortable with"** — establishes the pre-transformation state: routine-preference, comfort-zone behavior. The word "routine" (used here, and only here, in the essay) does double work: literally referring to his skateboarding routine (the gentle slopes he always rode), and naming the *trait* — comfort with a fixed routine — that the adult Billy will display later, where it resurfaces not as the word "routine" but through related vocabulary (planner, schedule, itinerary).
 
-This is a **word-planting move**. The word "routine" appears here in a specific childhood context; later in the essay, the same trait (routine-preference) will be shown in an adult context. The single word forms a through-line across seven years of Billy's life.
+This is a **trait-planting move**. The word "routine" appears here in a specific childhood context and never recurs; what recurs later is the *trait* it names (routine-preference, comfort with a fixed plan), shown in the adult context through different words — "having a plan," "planner," "schedule," "detailed itinerary." The trait, not the word, forms a through-line across seven years of Billy's life.
 
 **"Avoiding the steep inclines at all costs"** — the idiom "at all costs" amplifies. Childhood voice again. But it's not hollow — the phrase concretely describes a behavior (avoidance), not a feeling (fear). The emphasis stays on what the narrator did, not on how he felt.
 
-**Craft move — named**: **word-planting for retrospective through-line**. Identify a single word that describes a character trait the essay will develop across time. Use the word in its most specific and context-bound form early (here: skatepark "routine"), then let the same word take on expanded meaning later (here: adult planning "routine"). The word's double-existence creates felt continuity.
+**Craft move — named**: **trait-planting for retrospective through-line**. Name a character trait early, in a concrete childhood scene (here: comfort with a fixed "routine" at the skatepark). Then, rather than repeating the same word, let the *trait* resurface later in an adult context through different but related vocabulary (here: "having a plan," "planner," "schedule," "itinerary"). The recurrence of the trait — not a literal word — creates felt continuity across time. The childhood word labels the trait once; the adult vocabulary embodies it.
 
 **Cross-topic transplantation**:
-- *Science essay*: plant the word "variable" in the childhood science-fair scene; let the word come back in a college-application sentence about controlling "variables" in one's life.
-- *Immigration essay*: plant the word "translate" in a childhood moment of parsing parents' English; let the word return to describe adult cultural-interpretation work.
-- *Music essay*: plant "listening" as a childhood passive act; let it return as an adult active practice.
+- *Science essay*: establish a love of control in the childhood science-fair scene ("I kept everything the same except one variable"); let the *trait* return later in different language about controlling the conditions of one's life.
+- *Immigration essay*: establish a childhood habit of interpreting between two worlds (parsing parents' English); let the *trait* return in adult vocabulary about cultural mediation, without reusing the original word.
+- *Music essay*: establish childhood attentiveness as passive "listening"; let the *trait* return as an adult active practice described in its own terms.
 
 ---
 
@@ -450,18 +458,18 @@ Eight moves from Billy's essay. Each with transplantation. Each deep enough that
 - *Music*: "The audition score was laughing at me."
 - *Public speaking*: "The microphone leaned toward me."
 
-## Move 3 — Word-planting for retrospective through-line
+## Move 3 — Trait-planting for retrospective through-line
 
-**What it does**: Plants a single word in a childhood context, then reuses the word in an adult context so the two contexts share a semantic thread.
+**What it does**: Names a character trait in a childhood context, then shows the *same trait* in an adult context through different but related vocabulary, so the two contexts share a thematic thread without repeating a word.
 
-**How it's recognized**: A specific word ("routine") appears first in a concrete past-tense childhood scene, then reappears in present-tense adult characterization with expanded meaning.
+**How it's recognized**: A trait is labeled once in a concrete past-tense childhood scene (here, comfort with a fixed "routine"), then resurfaces in present-tense adult characterization expressed in new terms ("having a plan," "planner," "schedule," "detailed itinerary") — the word does not recur, the trait does.
 
-**Why it works**: The word's double-existence creates felt continuity across time without requiring explicit statements of "this is who I was, this is who I am." The reader's ear tracks the word.
+**Why it works**: The trait's recurrence creates felt continuity across time without requiring explicit statements of "this is who I was, this is who I am," and without the heavy-handedness of literally repeating a keyword. The reader's mind tracks the behavior pattern across its different surface expressions.
 
 **Transplantation**:
-- *Science*: plant "variable" in childhood science-fair, return in adult "controlling variables."
-- *Immigration*: plant "translate" in childhood-parsing-English, return in adult cultural-interpretation.
-- *Music*: plant "listening" as childhood passive, return as adult active practice.
+- *Science*: establish a love of control via "variable" in the childhood science-fair scene; let the *trait* return in adult language about controlling life's conditions, in its own words.
+- *Immigration*: establish childhood interpreting (parsing parents' English); let the *trait* return as adult cultural mediation, described differently.
+- *Music*: establish childhood attentiveness as passive "listening"; let the *trait* return as an adult active practice, in new terms.
 
 ## Move 4 — Sentence-fragment measurement sequence for incremental progress
 
@@ -604,7 +612,7 @@ This cluster is valuable for any student whose application materials establish o
 ## Cluster 2 — The childhood-scene-as-proof-of-present-trait architecture
 
 - Move 1 (childhood-voice bleed)
-- Move 3 (word-planting through-line)
+- Move 3 (trait-planting through-line)
 - Move 10 (adult-scene validation)
 - Move 8 (single-explicit-bridge)
 
@@ -637,7 +645,7 @@ Distilled guidance for students and for the pipeline's coaching layer:
 
 6. **Use reflexive verbs ("I let myself," "I sent myself") to preserve agency-vocabulary at moments of loss-of-control.** This is especially useful for students whose broader identity is controlled or organized — it lets them describe spontaneity without abandoning control.
 
-7. **Plant a single word in an early context and let it reappear in a later context with expanded meaning.** One word can form a through-line across time that doesn't need to be announced.
+7. **Name a trait in an early scene, then let the *trait* reappear in a later context through different, related vocabulary.** Billy labels "routine" once in childhood; the trait returns as "planner," "schedule," and "itinerary" in his adult self-portrait. The pattern — not a repeated keyword — forms a through-line across time that doesn't need to be announced.
 
 8. **Generic insights land meaningfully when spoken by characters whose established nature contradicts them.** The hyper-planner endorsing spontaneity carries weight; the natural-risk-taker endorsing it doesn't.
 

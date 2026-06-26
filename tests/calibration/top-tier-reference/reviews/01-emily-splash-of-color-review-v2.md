@@ -423,7 +423,7 @@ The weakness also teaches something: the cliché *survived* the admission. Hopki
 
 *She* — the freshman girl. *Finally* — the arc has completed. *Learned how to be herself* — the essay's theme stated outright.
 
-The sentence is five words and one more small sentence if we count *Finally* separately. It is the essay's only past-tense sentence in the final paragraph. The tense-shift is deliberate: the freshman girl's story is now closed; the present-tense Emily wears the coral blush *for* a completed past.
+The sentence is five words and one more small sentence if we count *Finally* separately. It is the essay's final past-tense sentence; the paragraph has already slipped into retrospective past a few times ("I'd always been one," "I've also learned"), and this closing sentence completes that move. The tense-shift is deliberate: the freshman girl's story is now closed; the present-tense Emily wears the coral blush *for* a completed past.
 
 **Why the closing works despite the cliché risk.** "Learned how to be herself" is itself a growth-essay cliché. Why does the essay's close survive it where paragraph 8's moral-wrap sentence was a weakness?
 
@@ -818,6 +818,6 @@ The three moves to internalize from this essay:
 2. **The deferred-ironic-button** (Move 3) — a short mature-voice aside inside an immersive past-voice paragraph is the cheapest way to earn dramatic irony.
 3. **The third-person-self-reference close** (Move 13) — the grammatical shift from first-person to third-person past-self converts growth-essay clichés into earned witness.
 
-The reader-bias most at risk in reviewing this essay was **topic-bias toward seriousness**. The correction: read Emily's sentences for what they are DOING, not what they are ABOUT. The verbs invert (*race* → *drift*; *bury* → *shoot upright*). The colors stack (*hot pink* on *embarrassingly pink* cheeks that *redden*). The grammar distances (*my* TikTok pink → *that* TikTok pink). The tense shifts (present-tense throughout except for the final four words: *she finally learned*). Each of these is a craft decision. The topic is light; the craft is not.
+The reader-bias most at risk in reviewing this essay was **topic-bias toward seriousness**. The correction: read Emily's sentences for what they are DOING, not what they are ABOUT. The verbs invert (*race* → *drift*; *bury* → *shoot upright*). The colors stack (*hot pink* on *embarrassingly pink* cheeks that *redden*). The grammar distances (*my* TikTok pink → *that* TikTok pink). The tense shifts (the essay's dominant plane is present tense, punctuated by brief past-tense asides in the older, retrospective voice — "Or, so I thought," "I'd always been one," "I've also learned" — and closing on the past-tense final clause: *she finally learned*). Each of these is a craft decision. The topic is light; the craft is not.
 
 For student writers who want to write about their own small-stakes experiences — the blush that didn't work, the broadcast that did, the specific friends who dared them into the specific risk — Emily's essay is the template. The key is not to inflate the topic but to write the sentences at the density the topic can support. If the sentences are dense enough, the topic's size stops mattering.

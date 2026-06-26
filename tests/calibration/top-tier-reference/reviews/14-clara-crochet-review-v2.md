@@ -12,7 +12,7 @@
 
 ## Framing Note Before the Close Reading
 
-Clara's essay is the corpus's clearest example of **compressed-heritage-essay architecture**. At five paragraphs, it is substantially shorter than most corpus entries. What it lacks in word-count it makes up in compression density: a 650-word essay that carries a grandmother's biography, a grandfather's imprisonment, a family's wartime history, a three-generation skill transmission, and the writer's own named creative practice. Most heritage essays fail by trying to do this much and becoming diffuse; Clara's essay succeeds because each paragraph has one load-bearing job and does it in three to five sentences.
+Clara's essay is the corpus's clearest example of **compressed-heritage-essay architecture**. At five paragraphs, it is substantially shorter than most corpus entries. What it lacks in word-count it makes up in compression density: a 491-word essay that carries a grandmother's biography, a grandfather's imprisonment, a family's wartime history, a three-generation skill transmission, and the writer's own named creative practice. Most heritage essays fail by trying to do this much and becoming diffuse; Clara's essay succeeds because each paragraph has one load-bearing job and does it in three to five sentences.
 
 The essay's most distinctive craft move is its relationship to family trauma. The Vietnam War, the grandfather's imprisonment in a Viet Cong labor camp for thirteen years, the family's refugee status — all of it is named in ONE long sentence in paragraph 2, then the essay moves on. The trauma is not the essay's subject; the grandmother's response to the trauma is. This is the redirection that most heritage essays fail to make. Clara's essay demonstrates how to acknowledge family trauma as load-bearing context without letting it become the essay's whole content.
 
@@ -567,7 +567,7 @@ When a student's heritage essay is spending multiple paragraphs on family histor
 
 ## Close
 
-Clara's essay is the Harvard corpus exemplar of **compressed heritage-essay execution**. The essay carries a century of family history, a war, a thirteen-year imprisonment, a three-generation craft transmission, and the writer's own creative practice — in five paragraphs and roughly 650 words. The compression is the craft.
+Clara's essay is the Harvard corpus exemplar of **compressed heritage-essay execution**. The essay carries a century of family history, a war, a thirteen-year imprisonment, a three-generation craft transmission, and the writer's own creative practice — in five paragraphs and roughly 491 words. The compression is the craft.
 
 The most important move to internalize from this essay is the relationship between **Move 4 (one-sentence historical pivot)** and **Move 9 (named-character detail)**. The one-sentence compression of the war and the grandfather's imprisonment keeps the essay from becoming family-biography; the richly-specified Agnes keeps the essay from becoming abstract. Together, these two moves define the essay's architecture: carry weight quickly, land specifics densely.
 

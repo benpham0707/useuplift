@@ -28,7 +28,7 @@ That combination — maximalist domain-insider voice + specific passion-to-polit
 
 **S1**: *"Lunch and recess were opportunities to 'play' Stephen Sondheim's Sweeney Todd, so we murdered our friends."*
 
-Six mechanisms in twenty-three words:
+Six mechanisms in sixteen words:
 
 1. **"'Play' in scare-quotes."** The word "play" is quoted because the essay knows the verb is about to do non-standard work. Kids don't usually "play Sweeney Todd" at recess. The scare-quotes signal self-awareness — the writer knows how strange this is going to sound.
 

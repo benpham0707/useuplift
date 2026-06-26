@@ -67,7 +67,7 @@
         },
         "word_economy_craft": {
           "score": 30,
-          "rationale": "Significant bloat. 'Really' appears 7 times. 'I learned' appears 3 times. Sentences are uniformly mid-length with no variety. No memorable phrasing."
+          "rationale": "Significant bloat. 'Really' appears 7 times. 'I learned' appears 5 times. Sentences are uniformly mid-length with no variety. No memorable phrasing."
         }
       },
       "arcType": "linear",
