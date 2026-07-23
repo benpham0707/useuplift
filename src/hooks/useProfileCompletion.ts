@@ -38,6 +38,7 @@ export function useProfileCompletion(): ProfileCompletion {
   const [sections, setSections] = useState<ProfileSection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [storedCompletionScore, setStoredCompletionScore] = useState<number>(0);
 
   useEffect(() => {
     const checkProfileCompletion = async () => {
@@ -52,11 +53,15 @@ export function useProfileCompletion(): ProfileCompletion {
         // Fetch profile data
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('id, onboarding_completed, first_name')
+          .select('id, onboarding_completed, completion_score, completion_details')
           .eq('user_id', user.id)
           .single();
 
         if (profileError) throw profileError;
+        // The meter is driven by the persisted rubric, not recomputed from the
+        // child-table fan-out on every dashboard render. The queries below only
+        // power the actionable checklist until each wizard is migrated fully.
+        setStoredCompletionScore(Number(profile.completion_score ?? 0));
 
         // Fetch all canonical tables
         const [
@@ -213,9 +218,7 @@ export function useProfileCompletion(): ProfileCompletion {
   }, [user, authLoading]);
 
   // Calculate weighted completion percentage
-  const percentage = sections.reduce((total, section) => {
-    return total + (section.isComplete ? section.weight : 0);
-  }, 0);
+  const percentage = Math.round(Math.max(0, Math.min(1, storedCompletionScore)) * 100);
 
   // Find next incomplete section in priority order (activities → academics → goals → identity → family → support → growth)
   // Skip quick_start since they're already on dashboard

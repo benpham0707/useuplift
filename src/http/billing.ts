@@ -10,6 +10,7 @@
 import { Request, Response } from 'express';
 import { stripe, isStripeConfigured, STRIPE_WEBHOOK_SECRET, isWebhookSecretConfigured } from '../lib/stripe';
 import { createClient } from '@supabase/supabase-js';
+import { provisionProfile } from '@/services/profileProvisioning';
 import { logSecurityEvent, sanitizeErrorForClient, ERROR_CODES } from './security';
 import dotenv from 'dotenv';
 
@@ -139,14 +140,8 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
           .update({ stripe_customer_id: customerId })
           .eq('user_id', userId);
       } else {
-        // Create profile if it doesn't exist
-        await supabase
-          .from('profiles')
-          .insert({
-            user_id: userId,
-            stripe_customer_id: customerId,
-            credits: 0
-          });
+        await provisionProfile(supabase, userId);
+        await supabase.from('profiles').update({ stripe_customer_id: customerId }).eq('user_id', userId);
       }
     }
 

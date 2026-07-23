@@ -22,6 +22,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import type { UserCollegeListItem, College, CollegeCategory, ApplicationStatus } from '@/lib/types/college';
 import { Building2, Loader2, X, ExternalLink, AlertCircle } from 'lucide-react';
+import { CollegeMatchProfilePrompt } from '@/components/profile/JustInTimeProfilePrompt';
 
 export default function MyCollegeList() {
   const { user } = useAuth();
@@ -285,6 +286,8 @@ export default function MyCollegeList() {
           </div>
         )}
       </div>
+
+      <CollegeMatchProfilePrompt />
 
       {/* Empty State */}
       {totalColleges === 0 && (
