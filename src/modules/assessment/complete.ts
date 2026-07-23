@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { CompleteAssessmentSchema } from "@/schemas/assessment";
 import { supabaseAdmin } from "@/supabase/admin";
+import { provisionProfile } from '@/services/profileProvisioning';
 import { randomUUID } from "crypto";
 
 export async function completeAssessment(req: Request, res: Response, next: NextFunction) {
@@ -14,19 +15,7 @@ export async function completeAssessment(req: Request, res: Response, next: Next
     const { data: prof, error: pErr } = await supabaseAdmin
       .from("profiles").select("id").eq("user_id", userId).maybeSingle();
     if (pErr) throw pErr;
-    let profileId = prof?.id as string | undefined;
-    if (!profileId) {
-      const { data: created, error } = await supabaseAdmin
-        .from("profiles")
-        .insert({
-          user_id: userId,
-          user_context: "high_school_11th",
-          status: "initial"
-        })
-        .select("id").single();
-      if (error) throw error;
-      profileId = created.id;
-    }
+    const profileId = (prof?.id as string | undefined) ?? (await provisionProfile(supabaseAdmin, userId)).id;
 
     // Academic records functionality removed for current schema - using academic_journey table instead
     const gpaNum = parseGPA(input.gpa);
@@ -128,6 +117,4 @@ function parseGPA(s?: string) {
   if (pct) return +(Math.min(Math.max(num, 0), 100) / 25).toFixed(2);
   return +num.toFixed(2);
 }
-
-
 

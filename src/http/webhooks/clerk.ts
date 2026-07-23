@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { Webhook } from 'svix';
 import { createClient } from '@supabase/supabase-js';
+import { provisionProfile } from '@/services/profileProvisioning';
 
 // Use service role key to bypass RLS (webhook doesn't have user JWT)
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -93,47 +94,16 @@ export async function handleClerkWebhook(req: Request, res: Response) {
 
   // Handle user.created event
   if (payload.type === 'user.created') {
-    const { id: clerkUserId, email_addresses, first_name, last_name } = payload.data as any;
-    const primaryEmail = email_addresses?.[0]?.email_address;
+    const { id: clerkUserId } = payload.data as any;
 
     try {
-      // Check if profile already exists (idempotency)
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', clerkUserId)
-        .maybeSingle();
-
-      if (existingProfile) {
-        return res.json({ received: true, action: 'profile_exists' });
-      }
-
-      // Create the profile
-      // Note: Email is stored in personal_information.primary_email, not in profiles
-      // The user's email is available from Clerk and will be captured during onboarding
-      const { data: newProfile, error: insertError } = await supabase
-        .from('profiles')
-        .insert({
-          user_id: clerkUserId,
-          user_context: 'high_school_11th', // Default context
-          credits: 10, // Free credits for new users
-          has_completed_assessment: false,
-          status: 'initial',
-        })
-        .select('id')
-        .single();
-
-      if (insertError) {
-        // Return 200 anyway to prevent Clerk from retrying
-        // Log the error for investigation
-        return res.json({ received: true, error: insertError.message });
-      }
-
-      return res.json({ received: true, action: 'profile_created', profileId: newProfile.id });
+      const profile = await provisionProfile(supabase, clerkUserId);
+      console.info('[profile-provisioning]', { userId: clerkUserId, created: profile.created });
+      return res.json({ received: true, action: profile.created ? 'profile_created' : 'profile_exists', profileId: profile.id });
 
     } catch (err: any) {
-      // Return 200 to prevent retry loops
-      return res.json({ received: true, error: err?.message });
+      console.error('[profile-provisioning] failed', { userId: clerkUserId, error: err?.message });
+      return res.status(500).json({ received: false, error: 'Profile provisioning failed' });
     }
   }
 

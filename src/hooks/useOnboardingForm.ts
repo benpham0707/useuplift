@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { OnboardingFormData } from '@/types/onboarding';
 import { toast } from 'sonner';
+import { getCurrentProfileId, upsertCanonicalProfileRow } from '@/integrations/supabase/canonicalProfile';
 
 /**
  * Hook to manage onboarding form state and auto-save to Supabase
@@ -10,7 +11,7 @@ import { toast } from 'sonner';
 export const useOnboardingForm = (initialData: OnboardingFormData = {}) => {
   const { user } = useAuth();
   const [formData, setFormData] = useState<OnboardingFormData>(initialData);
-  const [currentStep, setCurrentStep] = useState(initialData.current_onboarding_step || 1);
+  const [currentStep, setCurrentStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
 
   /**
@@ -31,17 +32,18 @@ export const useOnboardingForm = (initialData: OnboardingFormData = {}) => {
       setIsSaving(true);
 
       try {
-        // First try to update existing profile
-        const { data: updateData, error: updateError } = await supabase
+        const profileId = await getCurrentProfileId(user.id);
+        const profileUpdates: Record<string, unknown> = {
+          current_onboarding_step: newStep,
+          updated_at: new Date().toISOString(),
+        };
+        if (updates.application_stage !== undefined) profileUpdates.application_stage = updates.application_stage;
+
+        const { error: updateError } = await supabase
           .from('profiles')
-          .update({
-            ...updates,
-            current_onboarding_step: newStep,
-            updated_at: new Date().toISOString(),
-          })
+          .update(profileUpdates)
           .eq('user_id', user.id)
-          .select('id')
-          .maybeSingle();
+          .select('id');
 
         if (updateError) {
           console.error('[useOnboardingForm] Error updating profile:', updateError);
@@ -49,29 +51,8 @@ export const useOnboardingForm = (initialData: OnboardingFormData = {}) => {
           return { success: false, error: updateError.message };
         }
 
-        // If update worked, we're done
-        if (updateData?.id) {
-          return { success: true };
-        }
-
-        // Profile doesn't exist - create it
-        const { data: insertData, error: insertError } = await supabase
-          .from('profiles')
-          .insert({
-            user_id: user.id,
-            ...updates,
-            current_onboarding_step: newStep,
-            user_context: 'high_school_11th', // Default value (required column)
-            credits: 10, // Default credits
-            has_completed_assessment: false,
-          })
-          .select('id')
-          .single();
-
-        if (insertError) {
-          console.error('[useOnboardingForm] Error creating profile:', insertError);
-          toast.error('Failed to save progress. Please try again.');
-          return { success: false, error: insertError.message };
+        if (updates.first_name !== undefined) {
+          await upsertCanonicalProfileRow('personal_information', profileId, { first_name: updates.first_name });
         }
 
         return { success: true };
@@ -102,7 +83,7 @@ export const useOnboardingForm = (initialData: OnboardingFormData = {}) => {
         .update({
           onboarding_completed: true,
           onboarding_completed_at: now,
-          current_onboarding_step: 3,
+          current_onboarding_step: 1,
           updated_at: now,
         })
         .eq('user_id', user.id);

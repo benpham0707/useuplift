@@ -25,24 +25,7 @@ export const useOnboardingStatus = () => {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select(
-            `onboarding_completed,
-             current_onboarding_step,
-             first_name,
-             academic_path,
-             school_name,
-             graduation_year,
-             gpa_range,
-             major,
-             has_test_scores,
-             test_score_range,
-             highest_education,
-             years_experience,
-             current_field,
-             current_activities,
-             college_plans,
-             interest_areas`
-          )
+          .select('id, onboarding_completed, current_onboarding_step, application_stage')
           .eq('user_id', user.id)
           .maybeSingle() as { data: any; error: any }; // Type assertion for newly added columns
 
@@ -68,22 +51,12 @@ export const useOnboardingStatus = () => {
           return;
         }
 
+        const { data: personalInformation, error: personalError } = await supabase
+          .from('personal_information').select('first_name').eq('profile_id', data.id).maybeSingle();
+        if (personalError) throw personalError;
         const formData: OnboardingFormData = {
-          first_name: data.first_name,
-          academic_path: data.academic_path,
-          school_name: data.school_name,
-          graduation_year: data.graduation_year,
-          gpa_range: data.gpa_range,
-          major: data.major,
-          has_test_scores: data.has_test_scores,
-          test_score_range: data.test_score_range,
-          highest_education: data.highest_education,
-          years_experience: data.years_experience,
-          current_field: data.current_field,
-          current_activities: data.current_activities || [],
-          college_plans: data.college_plans,
-          interest_areas: data.interest_areas || [],
-          current_onboarding_step: data.current_onboarding_step,
+          first_name: personalInformation?.first_name ?? undefined,
+          application_stage: data.application_stage ?? null,
           onboarding_completed: data.onboarding_completed,
         };
 

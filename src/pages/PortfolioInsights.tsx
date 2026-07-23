@@ -94,18 +94,12 @@ export default function PortfolioInsights() {
         if (error) throw error;
 
         if (!cancelled && !data) {
-          const { data: created, error: insertError } = await supabase
-            .from('profiles')
-            .insert({ user_id: user.id, user_context: 'high_school_11th', has_completed_assessment: false, credits: 10 })
-            .select('id, has_completed_assessment')
-            .single();
-          if (insertError) throw insertError;
-          if (!cancelled) setHasCompletedOnboarding(Boolean(created?.has_completed_assessment));
+          throw new Error('Your profile is still being provisioned. Please reload in a moment.');
         } else if (!cancelled) {
           setHasCompletedOnboarding(Boolean(data?.has_completed_assessment));
         }
-      } catch {
-        // If profile creation fails, let fetch show a helpful error later
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Unable to load your profile.');
       } finally {
         if (!cancelled) setInitializing(false);
       }

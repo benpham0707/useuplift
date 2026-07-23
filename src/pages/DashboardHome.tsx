@@ -42,6 +42,7 @@ export default function DashboardHome() {
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState<string>('');
   const [profileId, setProfileId] = useState<string>('');
+  const [applicationStage, setApplicationStage] = useState<'exploring' | 'mid_application' | 'almost_done' | null>(null);
   const [openDrawer, setOpenDrawer] = useState<SectionKey | null>(null);
   const [drawerRefreshKey, setDrawerRefreshKey] = useState(0);
 
@@ -52,11 +53,11 @@ export default function DashboardHome() {
         return;
       }
 
-      // Fetch first_name and profile id from profiles table (set during onboarding)
+      // Profile facts live in canonical child tables; profiles owns process stage.
       try {
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('id, first_name')
+          .select('id, application_stage')
           .eq('user_id', user.id)
           .maybeSingle() as { data: any; error: any }; // Type assertion for newly added column
 
@@ -64,12 +65,14 @@ export default function DashboardHome() {
           console.error('Error fetching profile name:', profileError);
         }
 
-        // Use first_name from onboarding, fallback to email username, then 'there'
-        const name = profileData?.first_name || user.email?.split('@')[0] || 'there';
-        setUserName(name);
-
         if (profileData?.id) {
           setProfileId(profileData.id);
+          setApplicationStage(profileData.application_stage ?? null);
+          const { data: personal } = await supabase
+            .from('personal_information').select('first_name').eq('profile_id', profileData.id).maybeSingle();
+          setUserName(personal?.first_name || user.email?.split('@')[0] || 'there');
+        } else {
+          setUserName(user.email?.split('@')[0] || 'there');
         }
       } catch (error) {
         console.error('Error fetching user name:', error);
@@ -162,6 +165,7 @@ export default function DashboardHome() {
           />
           <ApplicationProgressCompact />
         </div>
+        <StageGuidance stage={applicationStage} />
 
         {/* Top Priority Section - 3 columns */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4">
@@ -311,6 +315,17 @@ export default function DashboardHome() {
       )}
     </div>
   );
+}
+
+function StageGuidance({ stage }: { stage: 'exploring' | 'mid_application' | 'almost_done' | null }) {
+  const copy = stage === 'exploring'
+    ? ['Start with discovery', 'Tell us what you want in a college to get better matches.']
+    : stage === 'mid_application'
+      ? ['Keep your applications moving', 'Prioritize deadlines, essays, and the information that improves your plan.']
+      : stage === 'almost_done'
+        ? ['Finish with confidence', 'Use your dashboard to check requirements and submit on time.']
+        : ['Build your plan at your pace', 'Add what matters when you need a more personalized recommendation.'];
+  return <Card className="mb-4 p-4 border-primary/20 bg-primary/5"><h2 className="font-semibold">{copy[0]}</h2><p className="mt-1 text-sm text-muted-foreground">{copy[1]}</p></Card>;
 }
 
 /**

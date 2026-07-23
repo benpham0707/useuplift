@@ -1,8 +1,6 @@
 import { ReactNode, useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { supabase } from '@/integrations/supabase/safeClient';
-import { getAuthenticatedSupabaseClient } from '@/services/auth/getAuthenticatedSupabaseClient';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -16,11 +14,12 @@ interface RequireTermsAcceptedProps {
 
 const RequireTermsAccepted = ({ children }: RequireTermsAcceptedProps) => {
   const { user, loading: authLoading } = useAuth();
-  const { getToken } = useClerkAuth();
   const [loading, setLoading] = useState(true);
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -39,8 +38,8 @@ const RequireTermsAccepted = ({ children }: RequireTermsAcceptedProps) => {
 
         if (error) {
           console.error('Error checking terms acceptance:', error);
-          // If there's an error, let them through (fail open) but log it
-          setHasAcceptedTerms(true);
+          setHasAcceptedTerms(false);
+          setLoadError('We could not verify your account setup. Please retry.');
         } else if (data?.terms_accepted_at) {
           setHasAcceptedTerms(true);
         } else {
@@ -48,7 +47,8 @@ const RequireTermsAccepted = ({ children }: RequireTermsAcceptedProps) => {
         }
       } catch (err) {
         console.error('Error checking terms:', err);
-        setHasAcceptedTerms(true); // Fail open
+        setHasAcceptedTerms(false);
+        setLoadError('We could not verify your account setup. Please retry.');
       } finally {
         setLoading(false);
       }
@@ -61,14 +61,12 @@ const RequireTermsAccepted = ({ children }: RequireTermsAcceptedProps) => {
     if (!user || !isChecked) return;
 
     setIsSubmitting(true);
+    setSubmitError(null);
     try {
-      // For development, just use the regular Supabase client
-      // The RLS policies check user_id which comes from Clerk anyway
-      const authSupabase = supabase;
       const now = new Date().toISOString();
       
       // First, try to update existing profile
-      const { data: updateData, error: updateError } = await authSupabase
+      const { data: updateData, error: updateError } = await supabase
         .from('profiles')
         .update({ terms_accepted_at: now })
         .eq('user_id', user.id)
@@ -77,7 +75,7 @@ const RequireTermsAccepted = ({ children }: RequireTermsAcceptedProps) => {
 
       if (updateError) {
         console.error('Error updating terms:', updateError);
-        alert('There was an error saving your acceptance. Please try again.');
+        setSubmitError('Your profile is not ready yet. Please retry in a moment.');
         return;
       }
 
@@ -87,32 +85,10 @@ const RequireTermsAccepted = ({ children }: RequireTermsAcceptedProps) => {
         return;
       }
 
-      // Profile doesn't exist - create it with required fields
-      // This handles the case where Clerk webhook didn't fire
-      const { data: insertData, error: insertError } = await authSupabase
-        .from('profiles')
-        .insert({
-          user_id: user.id,
-          terms_accepted_at: now,
-          user_context: 'high_school_11th',
-          credits: 10,
-          has_completed_assessment: false,
-        })
-        .select('terms_accepted_at')
-        .single();
-
-      if (insertError) {
-        console.error('Error creating profile:', insertError);
-        alert('There was an error saving your acceptance. Please try again.');
-      } else if (insertData?.terms_accepted_at) {
-        setHasAcceptedTerms(true);
-      } else {
-        console.error('Terms acceptance not saved - no data returned');
-        alert('There was an error saving your acceptance. Please try again.');
-      }
+      setSubmitError('Your profile is still being provisioned. Please retry in a moment.');
     } catch (err) {
       console.error('Error accepting terms:', err);
-      alert('There was an error. Please try again.');
+      setSubmitError('There was an error saving your acceptance. Please retry.');
     } finally {
       setIsSubmitting(false);
     }
@@ -227,6 +203,10 @@ const RequireTermsAccepted = ({ children }: RequireTermsAcceptedProps) => {
               </label>
             </div>
 
+            {(loadError || submitError) && (
+              <p role="alert" className="text-sm text-destructive">{submitError || loadError}</p>
+            )}
+
             {/* Submit Button */}
             <Button
               onClick={handleAcceptTerms}
@@ -246,6 +226,7 @@ const RequireTermsAccepted = ({ children }: RequireTermsAcceptedProps) => {
                 </>
               )}
             </Button>
+            {loadError && <Button variant="outline" className="w-full" onClick={() => window.location.reload()}>Retry setup check</Button>}
           </CardContent>
         </Card>
       </motion.div>
@@ -254,4 +235,3 @@ const RequireTermsAccepted = ({ children }: RequireTermsAcceptedProps) => {
 };
 
 export default RequireTermsAccepted;
-

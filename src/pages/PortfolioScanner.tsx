@@ -522,23 +522,9 @@ const PortfolioScanner = () => {
       }
 
       if (!data) {
-        // Create profile if missing
-        const { data: created, error: insertError } = await supabase
-          .from('profiles')
-          .insert({
-            user_id: user.id,
-            user_context: 'high_school_11th',
-            credits: 10 // Free credits for new users
-          })
-          .select('id')
-          .single();
-        if (insertError) {
-          // eslint-disable-next-line no-console
-          setInitializing(false);
-          return;
-        }
+        console.error('[PortfolioScanner] Profile is still being provisioned');
         setHasCompletedOnboarding(false);
-        if (!isPreviewMode) setCredits(10);
+        if (!isPreviewMode) setCredits(0);
       } else {
         setHasCompletedOnboarding(data.has_completed_assessment ?? false);
         if (!isPreviewMode) setCredits(data.credits ?? 0);

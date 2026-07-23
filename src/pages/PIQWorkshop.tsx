@@ -1764,6 +1764,8 @@ export default function PIQWorkshop() {
       {/* Gradient background */}
       <div className="hero-gradient hero-gradient-fade absolute top-0 left-0 right-0 h-[120vh] pointer-events-none -z-10" />
 
+      <PIQActivitiesPrompt />
+
       {/* Sticky PIQ header */}
       <div className="sticky top-16 z-40 bg-white/90 dark:bg-gray-950/90 backdrop-blur-md border-b shadow-sm">
         {/* Main header row */}
@@ -2270,3 +2272,4 @@ export default function PIQWorkshop() {
     </div>
   );
 }
+import { PIQActivitiesPrompt } from '@/components/profile/JustInTimeProfilePrompt';

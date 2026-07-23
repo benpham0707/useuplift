@@ -475,8 +475,8 @@ export function useWritingProgress() {
       // Check for existing essay assessment data
       const { data: assessments, error } = await supabase
         .from('essay_analysis_reports')
-        .select('total_score')
-        .eq('user_id', user.id)
+        .select('essay_quality_index, created_at, essays!inner(user_id)')
+        .eq('essays.user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(2);
 
@@ -489,8 +489,8 @@ export function useWritingProgress() {
         return null;
       }
 
-      const currentScore = assessments[0]?.total_score || 0;
-      const previousScore = assessments[1]?.total_score || currentScore;
+      const currentScore = Number(assessments[0]?.essay_quality_index ?? 0) / 10;
+      const previousScore = Number(assessments[1]?.essay_quality_index ?? currentScore * 10) / 10;
 
       // Default target score (can be customized based on school selection later)
       const targetScore = 8.5;
