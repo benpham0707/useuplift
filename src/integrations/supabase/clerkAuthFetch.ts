@@ -3,8 +3,8 @@
  *
  * WHY: Uplift authenticates with Clerk, not Supabase Auth. Postgres RLS resolves
  * the current user via `auth.jwt() ->> 'sub'` (the Clerk user id). For RLS to see
- * the user, every Supabase Data API request must carry the Clerk-issued
- * 'supabase' JWT in the Authorization header. The shared browser clients
+ * the user, every Supabase Data API request must carry the Clerk-issued session
+ * token in the Authorization header. The shared browser clients
  * (`safeClient.ts`, `client.ts`) previously sent only the anon key, so all their
  * requests ran as `anon` — which is why the database had to be left wide open and
  * triggered the CRITICAL rls_disabled_in_public advisory.
@@ -20,9 +20,10 @@
  * them working (returning a null Clerk-less session) while still authenticating
  * Data API calls as the Clerk user.
  *
- * Token retrieval mirrors the proven path used by getAuthenticatedSupabaseClient:
- * `Clerk.session.getToken({ template: 'supabase' })`. Clerk caches the token and
- * refreshes it transparently, so the per-request cost is negligible.
+ * Clerk's native Supabase integration validates this session token through the
+ * Clerk JWKS configured in Supabase Third-Party Auth. Do not use the deprecated
+ * `supabase` JWT template here: its signing algorithm/key can drift from the
+ * Supabase verifier and surface as PGRST301 before RLS is evaluated.
  */
 export async function clerkAuthFetch(
   input: RequestInfo | URL,
@@ -32,9 +33,9 @@ export async function clerkAuthFetch(
 
   if (typeof window !== 'undefined') {
     try {
-      const clerk = (window as { Clerk?: { session?: { getToken: (opts: { template: string }) => Promise<string | null> } } }).Clerk;
+      const clerk = (window as { Clerk?: { session?: { getToken: () => Promise<string | null> } } }).Clerk;
       const token = clerk?.session
-        ? await clerk.session.getToken({ template: 'supabase' })
+        ? await clerk.session.getToken()
         : null;
       if (token) {
         headers.set('Authorization', `Bearer ${token}`);
