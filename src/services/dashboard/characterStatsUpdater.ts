@@ -87,127 +87,28 @@ async function calculateStatsFromAssessments(userId: string) {
     network: 50
   };
 
-  // 1. Narrative Score - from essay assessments
-  try {
-    const { data: essays } = await supabase
-      .from('essay_analysis_reports')
-      .select('total_score, narrative_voice, depth_of_reflection')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(3);
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles').select('id').eq('user_id', userId).maybeSingle();
+  if (profileError || !profile) return stats;
 
-    if (essays && essays.length > 0) {
-      // Average the latest essay scores
-      const avgScore = essays.reduce((sum, e) => sum + (e.total_score || 0), 0) / essays.length;
-      stats.narrative = Math.min(100, Math.round(avgScore * 10)); // Convert 0-10 to 0-100
-    }
-  } catch (error) {
-    console.error('Error fetching narrative data:', error);
+  const [{ data: academic }, { data: goals }, { data: experiences }, { data: reports }] = await Promise.all([
+    supabase.from('academic_journey').select('gpa').eq('profile_id', profile.id).maybeSingle(),
+    supabase.from('goals_aspirations').select('career_interests').eq('profile_id', profile.id).maybeSingle(),
+    supabase.from('experiences_activities').select('extracurriculars, volunteer_service, leadership_roles, personal_projects').eq('profile_id', profile.id).maybeSingle(),
+    supabase.from('essay_analysis_reports').select('essay_quality_index, essays!inner(user_id)').eq('essays.user_id', userId).limit(3),
+  ]);
+
+  if (reports?.length) {
+    const average = reports.reduce((sum: number, report: any) => sum + Number(report.essay_quality_index ?? 0), 0) / reports.length;
+    stats.narrative = Math.round(average);
   }
-
-  // 2. Impact Score - from activities
-  try {
-    const { data: activities } = await supabase
-      .from('assessment_activities')
-      .select('*')
-      .eq('user_id', userId);
-
-    if (activities && activities.length > 0) {
-      // Calculate impact based on:
-      // - Number of activities
-      // - Leadership roles
-      // - Community service hours
-      // - Awards/recognition
-
-      let impactPoints = 0;
-      activities.forEach((activity: any) => {
-        impactPoints += 5; // Base points per activity
-
-        if (activity.category === 'Leadership') impactPoints += 10;
-        if (activity.category === 'Community Service') impactPoints += 8;
-        if (activity.awards_recognition) impactPoints += 15;
-
-        // Hours commitment (assuming stored in hours_per_week)
-        if (activity.hours_per_week) {
-          impactPoints += Math.min(activity.hours_per_week * 2, 20);
-        }
-      });
-
-      stats.impact = Math.min(100, Math.round(50 + (impactPoints / 10)));
-    }
-  } catch (error) {
-    console.error('Error fetching impact data:', error);
-  }
-
-  // 3. Academics Score - from GPA and course rigor
-  try {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('gpa')
-      .eq('user_id', userId)
-      .single();
-
-    if (profile?.gpa) {
-      // Convert GPA to 0-100 scale (assuming 4.0 scale)
-      stats.academics = Math.min(100, Math.round((profile.gpa / 4.0) * 100));
-    }
-
-    // Bonus for AP/IB courses
-    const { data: assessment } = await supabase
-      .from('assessments')
-      .select('ap_courses_count, ib_courses_count')
-      .eq('user_id', userId)
-      .single();
-
-    if (assessment) {
-      const advancedCourses = (assessment.ap_courses_count || 0) + (assessment.ib_courses_count || 0);
-      stats.academics = Math.min(100, stats.academics + (advancedCourses * 2));
-    }
-  } catch (error) {
-    console.error('Error fetching academics data:', error);
-  }
-
-  // 4. Curiosity Score - from interests and research
-  try {
-    const { data: interests } = await supabase
-      .from('assessment_interests')
-      .select('*')
-      .eq('user_id', userId);
-
-    if (interests && interests.length > 0) {
-      // More diverse interests = higher curiosity
-      stats.curiosity = Math.min(100, 50 + (interests.length * 10));
-    }
-
-    // Bonus for research/independent projects
-    const { data: activities } = await supabase
-      .from('assessment_activities')
-      .select('category')
-      .eq('user_id', userId)
-      .or('category.eq.Research,category.eq.Academic');
-
-    if (activities && activities.length > 0) {
-      stats.curiosity = Math.min(100, stats.curiosity + (activities.length * 5));
-    }
-  } catch (error) {
-    console.error('Error fetching curiosity data:', error);
-  }
-
-  // 5. Network Score - placeholder for future network intelligence
-  // For now, base it on number of recommenders and activities with collaboration
-  try {
-    const { data: activities } = await supabase
-      .from('assessment_activities')
-      .select('category')
-      .eq('user_id', userId)
-      .or('category.eq.Clubs,category.eq.Sports,category.eq.Leadership');
-
-    if (activities && activities.length > 0) {
-      stats.network = Math.min(100, 38 + (activities.length * 8));
-    }
-  } catch (error) {
-    console.error('Error fetching network data:', error);
-  }
+  if (academic?.gpa != null) stats.academics = Math.min(100, Math.round((Number(academic.gpa) / 4) * 100));
+  const activityCount = ['extracurriculars', 'volunteer_service', 'leadership_roles', 'personal_projects']
+    .reduce((sum, key) => sum + (Array.isArray((experiences as any)?.[key]) ? (experiences as any)[key].length : 0), 0);
+  if (activityCount) stats.impact = Math.min(100, 50 + activityCount * 8);
+  const interestCount = Array.isArray(goals?.career_interests) ? goals.career_interests.length : 0;
+  if (interestCount) stats.curiosity = Math.min(100, 50 + interestCount * 10);
+  if (Array.isArray(experiences?.leadership_roles) && experiences.leadership_roles.length) stats.network = Math.min(100, 38 + experiences.leadership_roles.length * 8);
 
   return stats;
 }
@@ -241,26 +142,11 @@ async function calculateXP(userId: string): Promise<number> {
       xp += essays.length * 25; // 25 XP per essay
     }
 
-    // XP for assessments completed
-    const { data: assessments } = await supabase
-      .from('assessments')
-      .select('id')
-      .eq('user_id', userId)
-      .not('completed_at', 'is', null);
-
-    if (assessments && assessments.length > 0) {
-      xp += 100; // 100 XP for completing assessment
-    }
-
-    // XP for portfolio scans
     const { data: reports } = await supabase
-      .from('assessment_reports')
-      .select('id')
-      .eq('user_id', userId);
-
-    if (reports) {
-      xp += reports.length * 20; // 20 XP per scan
-    }
+      .from('essay_analysis_reports')
+      .select('id, essays!inner(user_id)')
+      .eq('essays.user_id', userId);
+    if (reports) xp += reports.length * 20;
 
   } catch (error) {
     console.error('Error calculating XP:', error);

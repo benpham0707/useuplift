@@ -6,9 +6,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { usePortfolioSuggestions } from '@/hooks/useDashboard';
 import { Sparkles, X, ChevronRight, Target } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/safeClient';
-import { useAuth } from '@/hooks/useAuth';
 
 /**
  * Activity Portfolio Widget - AI-powered portfolio insights
@@ -18,43 +15,9 @@ import { useAuth } from '@/hooks/useAuth';
  */
 export default function ActivityPortfolioWidget() {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { suggestions, loading, dismissSuggestion } = usePortfolioSuggestions();
-  const [portfolioScore, setPortfolioScore] = useState<number | null>(null);
-  const [scoreLoading, setScoreLoading] = useState(true);
 
-  // Load portfolio score
-  useEffect(() => {
-    const loadPortfolioScore = async () => {
-      if (!user) {
-        setScoreLoading(false);
-        return;
-      }
-
-      try {
-        // Try to get the latest assessment report
-        const { data } = await supabase
-          .from('assessment_reports')
-          .select('overall_score')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
-
-        if (data) {
-          setPortfolioScore(data.overall_score);
-        }
-      } catch (error) {
-        console.error('Error loading portfolio score:', error);
-      } finally {
-        setScoreLoading(false);
-      }
-    };
-
-    loadPortfolioScore();
-  }, [user]);
-
-  if (loading || scoreLoading) {
+  if (loading) {
     return <ActivityPortfolioWidgetSkeleton />;
   }
 
@@ -89,12 +52,6 @@ export default function ActivityPortfolioWidget() {
             <Sparkles className="h-5 w-5 text-primary" />
             <CardTitle>Portfolio Insights</CardTitle>
           </div>
-          {portfolioScore !== null && (
-            <Badge variant="secondary" className="text-lg font-bold px-3 py-1">
-              <Target className="h-3 w-3 mr-1" />
-              {portfolioScore.toFixed(1)}/10
-            </Badge>
-          )}
         </div>
       </CardHeader>
 
