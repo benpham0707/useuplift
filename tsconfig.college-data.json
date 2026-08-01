@@ -12,6 +12,6 @@
   },
   "include": [
     "scripts/college-data/foundation/**/*.ts",
-    "tests/college-data/**/*.test.ts"
+    "tests/college-data/foundation-parsers.test.ts"
   ]
 }

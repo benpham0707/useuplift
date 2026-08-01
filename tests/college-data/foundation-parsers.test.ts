@@ -30,6 +30,17 @@ test('Scorecard parser distinguishes null and suppression', () => {
   assert.equal(suppressed.metrics.find((metric) => metric.metricKey === 'median_earnings_10yr')?.isSuppressed, true);
 });
 
+test('IPEDS and Scorecard institution-level codes are source-specific', () => {
+  const ipedsCertificate = parseSourceRecord({ ...fixtures.ipedsActive, ICLEVEL: '3' }, ipeds);
+  const scorecardCertificate = parseSourceRecord({ ...fixtures.scorecardNull, PREDDEG: '1' }, scorecard);
+  const scorecardBachelor = parseSourceRecord({ ...fixtures.scorecardNull, PREDDEG: '3' }, scorecard);
+  assert.equal(ipedsCertificate.institution.institutionLevel, 'less_than_two_year');
+  assert.equal(scorecardCertificate.institution.institutionLevel, 'less_than_two_year');
+  assert.equal(scorecardCertificate.institution.isEligible, false);
+  assert.equal(scorecardBachelor.institution.institutionLevel, 'four_year');
+  assert.equal(scorecardBachelor.institution.isEligible, true);
+});
+
 test('duplicate identity and conflicting values remain detectable', () => {
   const first = parseSourceRecord(fixtures.scorecardNull, scorecard);
   const conflict = parseSourceRecord(fixtures.scorecardConflict, scorecard);

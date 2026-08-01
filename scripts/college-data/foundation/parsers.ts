@@ -42,9 +42,17 @@ function ownership(code: number | null) {
   return 'other' as const;
 }
 
-function level(code: number | null) {
-  if (code === 1 || code === 3) return 'four_year' as const;
+function ipedsLevel(code: number | null) {
+  if (code === 1) return 'four_year' as const;
   if (code === 2) return 'two_year' as const;
+  if (code === 3) return 'less_than_two_year' as const;
+  return 'other' as const;
+}
+
+function scorecardLevel(code: number | null) {
+  if (code === 3) return 'four_year' as const;
+  if (code === 2) return 'two_year' as const;
+  if (code === 1) return 'less_than_two_year' as const;
   return 'other' as const;
 }
 
@@ -82,7 +90,7 @@ export function parseSourceRecord(
     const unitid = z.coerce.number().int().positive().parse(row.UNITID);
     const active = numberOrNull(row.CYACTIVE) === 1;
     const sector = numberOrNull(row.SECTOR);
-    const institutionLevel = level(numberOrNull(row.ICLEVEL));
+    const institutionLevel = ipedsLevel(numberOrNull(row.ICLEVEL));
     return {
       institution: {
         sourceRecordLocator: `${manifest.releaseName}:${unitid}`, unitid,
@@ -101,7 +109,7 @@ export function parseSourceRecord(
   const row = scorecardSchema.parse(raw);
   const unitid = z.coerce.number().int().positive().parse(row.UNITID);
   const active = numberOrNull(row.CURROPER) === 1;
-  const institutionLevel = level(numberOrNull(row.PREDDEG));
+  const institutionLevel = scorecardLevel(numberOrNull(row.PREDDEG));
   const metrics = [
     scorecardMetric(row, 'UGDS', 'undergraduate_enrollment', 'students', manifest, unitid),
     scorecardMetric(row, 'ADM_RATE', 'admission_rate', 'ratio', manifest, unitid),

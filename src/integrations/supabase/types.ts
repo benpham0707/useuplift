@@ -214,10 +214,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      activate_college_projection: {
+        Args: { p_projection_version_id: string }
+        Returns: Json
+      }
+      build_college_projection: {
+        Args: {
+          p_field_manifest_version: string
+          p_projection_build_id: string
+        }
+        Returns: Json
+      }
       promote_ingestion_job: {
         Args: { p_ingestion_job_id: string }
         Returns: Json
       }
+      restore_ipeds_canonical_identity: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never

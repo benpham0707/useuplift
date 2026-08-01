@@ -236,7 +236,22 @@ async function main() {
     console.log(psql(`select jsonb_pretty(jsonb_build_object('job', to_jsonb(j), 'attempts', coalesce((select jsonb_agg(to_jsonb(a) order by a.attempt_number) from college_ingest.ingestion_attempts a where a.ingestion_job_id=j.id), '[]'::jsonb), 'staged_institutions', (select count(*) from college_ingest.staged_institutions s where s.ingestion_job_id=j.id), 'staged_metrics', (select count(*) from college_ingest.staged_metric_facts m where m.ingestion_job_id=j.id))) from college_ingest.ingestion_jobs j where j.id=:'job_id'::uuid;`, { job_id: jobId }));
     return;
   }
-  throw new Error('usage: foundation-ingest <download|store|validate|load|promote|audit> ...');
+  if (command === 'project') {
+    const buildId = option('build-id', true)!;
+    const fieldManifestVersion = option('field-manifest-version', true)!;
+    console.log(psql(`select college_ingest.build_college_projection(:'build_id', :'field_manifest_version');`, {
+      build_id: buildId, field_manifest_version: fieldManifestVersion
+    }));
+    return;
+  }
+  if (command === 'activate-projection') {
+    const projectionVersionId = option('projection-version-id', true)!;
+    console.log(psql(`select college_ingest.activate_college_projection(:'projection_version_id'::uuid);`, {
+      projection_version_id: projectionVersionId
+    }));
+    return;
+  }
+  throw new Error('usage: foundation-ingest <download|store|validate|load|promote|audit|project|activate-projection> ...');
 }
 
 main().catch((error) => {

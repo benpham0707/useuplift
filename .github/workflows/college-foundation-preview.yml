@@ -70,6 +70,9 @@ jobs:
       - name: Test parsers, promotion, and ingestion grants
         run: npm run test:college-ingestion
 
+      - name: Test versioned college serving layer
+        run: npm run test:college-serving
+
       - name: Link and verify staging
         shell: bash
         run: |

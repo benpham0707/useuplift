@@ -20,6 +20,7 @@
     "types:college": "supabase --workdir infra/college-foundation gen types --linked --lang typescript --schema public,college_ingest > src/integrations/supabase/types.ts",
     "ingest:college": "node --experimental-strip-types scripts/college-data/foundation/cli.ts",
     "test:college-ingestion": "node --experimental-strip-types --test tests/college-data/foundation-parsers.test.ts && psql postgresql://postgres:postgres@127.0.0.1:55322/postgres -X -f tests/college-data/milestone-3-ingestion.sql",
+    "test:college-serving": "vitest run --config vitest.college.config.ts && psql postgresql://postgres:postgres@127.0.0.1:55322/postgres -X -f tests/college-data/milestone-4-serving.sql",
     "typecheck:college-ingestion": "tsc -p tsconfig.college-data.json",
     "test": "tsx tests/unit/run-all.ts",
     "test:integration": "tsx tests/integration/run-all.ts",

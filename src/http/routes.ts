@@ -11,6 +11,7 @@ import { computePortfolioStrength, reconcilePortfolioStrength } from "@/modules/
 import activityChatRouter from "./activityChatRoutes";
 import essayCoachingRouter from "./essayCoachingRoutes";
 import annotationRouter from "./annotationRoutes";
+import collegeRouter from "./collegeRoutes";
 import { versionComparisonService, VersionScores, VersionEdit } from "@/services/analytics/versionComparisonService";
 
 const r = Router();
@@ -52,6 +53,9 @@ r.post("/billing/portal", requireAuth, Billing.createPortalSession);
 // Referrals API
 r.get("/referrals/me", requireAuth, Referrals.getReferralInfo);
 r.post("/referrals/claim", requireAuth, Referrals.claimReferral);
+
+// College discovery reads only the active, versioned server-side projection.
+r.use("/colleges", collegeRouter);
 
 r.post("/assessment/complete", requireAuth, completeAssessment);
 r.post("/personal/complete", requireAuth, completePersonal);
@@ -637,4 +641,3 @@ r.get('/health', (_req, res) => {
 r.use('/api/v1/annotate', annotationRouter);
 
 export default r;
-
