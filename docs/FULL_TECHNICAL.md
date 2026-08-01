@@ -118,7 +118,7 @@ AI-powered college application platform that deeply understands student essays a
 | Auth | Clerk | JWT → Supabase RLS via `auth.jwt()->> 'sub'` |
 | AI | Anthropic Claude (Sonnet 4.5 + Haiku 4.5) | Prompt caching, JSON mode, token tracking |
 | Payments | Stripe | Checkout sessions, webhook-driven credit grants |
-| Fraud | Custom device fingerprinting | Canvas/WebGL/Audio hashing, zero-tolerance |
+| Integrity | Essay duplication safeguards | Cross-account content-hash checks |
 
 ---
 
@@ -737,7 +737,7 @@ Atomic Deduction Flow:
 
 ### 4.4 Security & Fraud Prevention
 
-**Path**: `src/http/security/index.ts` + `src/utils/deviceFingerprint.ts`
+**Path**: `src/http/security/index.ts` + `supabase/functions/_shared/fraudPrevention.ts`
 
 #### Input Sanitization
 - AI prompt injection blocking (system overrides, jailbreak patterns)
@@ -750,17 +750,10 @@ Atomic Deduction Flow:
 - Generic error codes returned to client
 - Full errors logged server-side
 
-#### Device Fingerprinting
-- Components: user agent, language, screen, timezone, canvas hash, WebGL hash, audio hash
-- ~85% stability (vs Fingerprint.js Pro 95%)
-- Zero cost (custom implementation)
-
-#### Zero-Tolerance Fraud Policy
+#### Essay-integrity policy
 ```
 Triggers:
   - Duplicate essay hash
-  - Multiple devices from single user
-  - IP abuse patterns
 
 Response:
   - Immediate flag_user_for_fraud() call
@@ -819,9 +812,8 @@ ClerkProvider
   └─ QueryClientProvider (React Query: 5min stale, 30min GC)
     └─ BrowserRouter
       └─ AuthProvider (custom auth context)
-        └─ FraudTrackingProvider (device fingerprinting)
-          └─ TooltipProvider (shadcn/ui)
-            └─ Routes + Toast/Sonner
+        └─ TooltipProvider (shadcn/ui)
+          └─ Routes + Toast/Sonner
 ```
 
 ### Key Pages

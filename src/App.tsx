@@ -6,7 +6,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ClerkProvider } from "@clerk/clerk-react";
 import { AuthProvider } from "@/hooks/useAuth";
-import { FraudTrackingProvider } from "@/hooks/useFraudTracking";
 import ClerkErrorBoundary from "@/components/ClerkErrorBoundary";
 import ClickSparkGlobal from "@/components/ui/ClickSparkGlobal";
 // ARCHIVED: BugReportWidget moved to src/components/_archived/BugReportWidget.tsx
@@ -214,15 +213,13 @@ const App = () => {
       <ClerkErrorBoundary>
         <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} afterSignOutUrl="/">
           <AuthProvider>
-            <FraudTrackingProvider>
-              <TooltipProvider>
-                <Toaster />
-                <Sonner />
-                <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-                  <AppRoutes />
-                </Suspense>
-              </TooltipProvider>
-            </FraudTrackingProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+                <AppRoutes />
+              </Suspense>
+            </TooltipProvider>
           </AuthProvider>
         </ClerkProvider>
       </ClerkErrorBoundary>
