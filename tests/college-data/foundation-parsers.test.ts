@@ -21,6 +21,13 @@ test('IPEDS parser preserves active eligibility and closed status', () => {
   assert.equal(closed.institution.latitude, null);
 });
 
+test('graduate-only institutions are not eligible for high-school discovery', () => {
+  const graduateOnlyIpeds = parseSourceRecord({ ...fixtures.ipedsActive, UGOFFER: '2' }, ipeds);
+  const noUndergraduatesScorecard = parseSourceRecord({ ...fixtures.scorecardNull, UGDS: '0' }, scorecard);
+  assert.equal(graduateOnlyIpeds.institution.isEligible, false);
+  assert.equal(noUndergraduatesScorecard.institution.isEligible, false);
+});
+
 test('Scorecard parser distinguishes null and suppression', () => {
   const nullable = parseSourceRecord(fixtures.scorecardNull, scorecard);
   const suppressed = parseSourceRecord(fixtures.scorecardSuppressed, scorecard);

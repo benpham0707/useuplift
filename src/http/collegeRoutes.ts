@@ -91,6 +91,7 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
       .from('college_profiles')
       .select('institution_id,unitid,name,slug,city,state,ownership,institution_level,undergraduate_enrollment,admission_rate,tuition_in_state,tuition_out_of_state,net_price,coverage_score')
       .eq('projection_version_id', projectionVersionId)
+      .gt('undergraduate_enrollment', 0)
       .order('slug', { ascending: true })
       .limit(input.limit + 1);
 
@@ -144,6 +145,7 @@ router.get('/:slug', requireAuth, async (req: Request, res: Response) => {
       .from('college_profiles')
       .select('institution_id,unitid,name,slug,aliases,city,state,zip,ownership,institution_level,setting,undergraduate_enrollment,admission_rate,tuition_in_state,tuition_out_of_state,net_price,coverage_score,generated_at')
       .eq('projection_version_id', projectionVersionId)
+      .gt('undergraduate_enrollment', 0)
       .eq('slug', parsedSlug.data)
       .maybeSingle();
     if (collegeError) throw collegeError;

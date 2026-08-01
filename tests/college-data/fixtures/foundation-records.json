@@ -2,13 +2,13 @@
   "ipedsActive": {
     "UNITID": "100654", "INSTNM": "Example University", "CITY": "Example",
     "STABBR": "AL", "ZIP": "35000", "SECTOR": "1", "ICLEVEL": "1",
-    "CONTROL": "1", "CYACTIVE": "1", "WEBADDR": "example.edu",
+    "CONTROL": "1", "CYACTIVE": "1", "UGOFFER": "1", "WEBADDR": "example.edu",
     "LONGITUD": "-86.5", "LATITUDE": "34.7"
   },
   "ipedsClosed": {
     "UNITID": "100655", "INSTNM": "Closed University", "CITY": "Example",
     "STABBR": "AL", "ZIP": "35001", "SECTOR": "2", "ICLEVEL": "1",
-    "CONTROL": "2", "CYACTIVE": "0", "WEBADDR": "",
+    "CONTROL": "2", "CYACTIVE": "0", "UGOFFER": "1", "WEBADDR": "",
     "LONGITUD": "-2", "LATITUDE": "-2"
   },
   "scorecardNull": {

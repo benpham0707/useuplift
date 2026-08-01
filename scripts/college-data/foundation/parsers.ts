@@ -8,7 +8,7 @@ const states = new Set([
 const ipedsSchema = z.object({
   UNITID: z.string().min(1), INSTNM: z.string().min(1), CITY: z.string(),
   STABBR: z.string(), ZIP: z.string(), SECTOR: z.string(), ICLEVEL: z.string(),
-  CONTROL: z.string(), CYACTIVE: z.string(), WEBADDR: z.string(),
+  CONTROL: z.string(), CYACTIVE: z.string(), UGOFFER: z.string(), WEBADDR: z.string(),
   LONGITUD: z.string(), LATITUDE: z.string()
 }).passthrough();
 
@@ -91,6 +91,7 @@ export function parseSourceRecord(
     const active = numberOrNull(row.CYACTIVE) === 1;
     const sector = numberOrNull(row.SECTOR);
     const institutionLevel = ipedsLevel(numberOrNull(row.ICLEVEL));
+    const offersUndergraduateStudy = numberOrNull(row.UGOFFER) === 1;
     return {
       institution: {
         sourceRecordLocator: `${manifest.releaseName}:${unitid}`, unitid,
@@ -99,7 +100,7 @@ export function parseSourceRecord(
         city: row.CITY.trim() || null, state: row.STABBR.trim() || null,
         zip: row.ZIP.trim() || null, latitude: numberOrNull(row.LATITUDE),
         longitude: numberOrNull(row.LONGITUD), websiteUrl: normalizeUrl(row.WEBADDR),
-        isEligible: active && institutionLevel === 'four_year' &&
+        isEligible: active && institutionLevel === 'four_year' && offersUndergraduateStudy &&
           sector !== null && [1, 2, 3].includes(sector) && states.has(row.STABBR.trim())
       },
       metrics: []
@@ -110,6 +111,7 @@ export function parseSourceRecord(
   const unitid = z.coerce.number().int().positive().parse(row.UNITID);
   const active = numberOrNull(row.CURROPER) === 1;
   const institutionLevel = scorecardLevel(numberOrNull(row.PREDDEG));
+  const undergraduateEnrollment = numberOrNull(row.UGDS);
   const metrics = [
     scorecardMetric(row, 'UGDS', 'undergraduate_enrollment', 'students', manifest, unitid),
     scorecardMetric(row, 'ADM_RATE', 'admission_rate', 'ratio', manifest, unitid),
@@ -130,7 +132,9 @@ export function parseSourceRecord(
       city: row.CITY.trim() || null, state: row.STABBR.trim() || null,
       zip: row.ZIP.trim() || null, latitude: numberOrNull(row.LATITUDE),
       longitude: numberOrNull(row.LONGITUDE), websiteUrl: normalizeUrl(row.INSTURL),
-      isEligible: active && institutionLevel === 'four_year' && states.has(row.STABBR.trim())
+      isEligible: active && institutionLevel === 'four_year' &&
+        undergraduateEnrollment !== null && undergraduateEnrollment > 0 &&
+        states.has(row.STABBR.trim())
     },
     metrics
   };

@@ -14,6 +14,8 @@ prediction claims.
 ## Delivered experience
 
 - Authenticated server-side search across college name, city, and state.
+- Undergraduate-only discovery: active four-year institutions must explicitly
+  offer undergraduate study and report positive undergraduate enrollment.
 - State, ownership, admission-rate, and undergraduate-enrollment filters.
 - Stable keyset pagination with a 24-college initial page.
 - Responsive college cards using only supported foundation fields.
