@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useAuth as useClerkAuth } from '@clerk/clerk-react';
+import { useNavigate } from 'react-router-dom';
 import { AlertCircle, Database, Loader2, Search, ShieldCheck, X } from 'lucide-react';
 import { CollegeCard } from '@/components/colleges/CollegeCard';
+import { CollegePreview } from '@/components/colleges/CollegePreview';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { fetchCollegePage } from '@/services/collegeDiscovery/api';
+import { fetchCollegeDetail, fetchCollegePage } from '@/services/collegeDiscovery/api';
 import type { FoundationOwnership } from '@/lib/types/college';
 
 const states = ['AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'];
@@ -20,12 +22,14 @@ const enrollmentRanges = {
 
 export default function CollegesGallery() {
   const { getToken } = useClerkAuth();
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [state, setState] = useState('all');
   const [ownership, setOwnership] = useState<'all' | FoundationOwnership>('all');
   const [admission, setAdmission] = useState<keyof typeof admissionRanges>('all');
   const [enrollment, setEnrollment] = useState<keyof typeof enrollmentRanges>('all');
+  const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -52,15 +56,30 @@ export default function CollegesGallery() {
   const colleges = query.data?.pages.flatMap((page) => page.data) ?? [];
   const catalog = query.data?.pages[0];
   const hasFilters = Boolean(search || state !== 'all' || ownership !== 'all' || admission !== 'all' || enrollment !== 'all');
+  const activeSlug = colleges.some((college) => college.slug === selectedSlug) ? selectedSlug : colleges[0]?.slug ?? null;
+  const previewQuery = useQuery({
+    queryKey: ['foundation-college', activeSlug],
+    queryFn: () => fetchCollegeDetail(activeSlug!, getToken),
+    enabled: Boolean(activeSlug),
+    staleTime: 60_000,
+  });
 
   const clearFilters = () => {
     setSearch(''); setDebouncedSearch(''); setState('all'); setOwnership('all'); setAdmission('all'); setEnrollment('all');
   };
 
+  const selectCollege = (slug: string) => {
+    if (window.matchMedia('(max-width: 1023px)').matches) {
+      navigate(`/dashboard/colleges/${slug}`);
+      return;
+    }
+    setSelectedSlug(slug);
+  };
+
   return (
     <div className="min-h-full bg-slate-50/70">
       <section className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-[1500px] px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+        <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8 lg:py-7">
           <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
             <div className="max-w-2xl">
               <div className="mb-3 flex items-center gap-2 text-sm font-medium text-primary">
@@ -77,7 +96,7 @@ export default function CollegesGallery() {
             </div>
           </div>
 
-          <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <label htmlFor="college-search" className="sr-only">Search colleges</label>
             <div className="relative">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
@@ -103,7 +122,7 @@ export default function CollegesGallery() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-[1500px] px-4 py-7 sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6 lg:px-8">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-slate-600" aria-live="polite">
             {query.isLoading ? 'Loading colleges…' : `Showing ${colleges.length.toLocaleString()} college${colleges.length === 1 ? '' : 's'}`}
@@ -111,17 +130,20 @@ export default function CollegesGallery() {
           {hasFilters && <Button type="button" variant="ghost" size="sm" onClick={clearFilters}><X className="mr-1.5 h-4 w-4" />Clear filters</Button>}
         </div>
 
-        {query.isLoading ? <CollegeGridSkeleton /> : query.isError ? (
+        {query.isLoading ? <CollegeListSkeleton /> : query.isError ? (
           <StatePanel icon={<AlertCircle className="h-5 w-5" />} title="College data is unavailable" body="The catalog could not be loaded right now. Your filters have been preserved." action={<Button onClick={() => query.refetch()}>Try again</Button>} />
         ) : colleges.length === 0 ? (
           <StatePanel icon={<Search className="h-5 w-5" />} title="No colleges match these filters" body="Try a broader admission range, another state, or fewer filters." action={<Button variant="outline" onClick={clearFilters}>Clear all filters</Button>} />
         ) : (
-          <>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-              {colleges.map((college) => <CollegeCard key={college.institution_id} college={college} />)}
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:grid lg:min-h-[620px] lg:grid-cols-[minmax(320px,390px)_minmax(0,1fr)]">
+            <div className="border-slate-200 lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto lg:border-r" aria-label="College search results">
+              {colleges.map((college) => <CollegeCard key={college.institution_id} college={college} selected={college.slug === activeSlug} onSelect={() => selectCollege(college.slug)} />)}
+              {query.hasNextPage && <div className="bg-white p-4"><Button className="w-full" variant="outline" onClick={() => query.fetchNextPage()} disabled={query.isFetchingNextPage}>{query.isFetchingNextPage && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Load more colleges</Button></div>}
             </div>
-            {query.hasNextPage && <div className="mt-8 flex justify-center"><Button variant="outline" size="lg" onClick={() => query.fetchNextPage()} disabled={query.isFetchingNextPage}>{query.isFetchingNextPage && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Load more colleges</Button></div>}
-          </>
+            <div className="hidden min-w-0 lg:block">
+              <CollegePreview response={previewQuery.data} loading={previewQuery.isLoading} error={previewQuery.isError} onRetry={() => previewQuery.refetch()} onOpenProfile={() => activeSlug && navigate(`/dashboard/colleges/${activeSlug}`)} />
+            </div>
+          </div>
         )}
 
         {catalog && <p className="mt-8 text-center text-xs leading-5 text-slate-500">Catalog sources: {catalog.sources.map((source) => source.producer).filter((value, index, all) => all.indexOf(value) === index).join(' and ')}. Projection {catalog.projectionVersionId.slice(0, 8)}.</p>}
@@ -134,8 +156,8 @@ function FilterSelect({ label, value, onChange, children }: { label: string; val
   return <div><label className="mb-1.5 block text-xs font-medium text-slate-600">{label}</label><Select value={value} onValueChange={onChange}><SelectTrigger className="h-10 bg-white"><SelectValue /></SelectTrigger><SelectContent>{children}</SelectContent></Select></div>;
 }
 
-function CollegeGridSkeleton() {
-  return <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" aria-label="Loading colleges">{Array.from({ length: 12 }).map((_, index) => <div key={index} className="h-[250px] animate-pulse rounded-2xl border border-slate-200 bg-white"><div className="m-5 h-11 w-11 rounded-xl bg-slate-100" /><div className="mx-5 mt-5 h-16 rounded-xl bg-slate-100" /><div className="mx-5 mt-8 h-10 rounded bg-slate-100" /></div>)}</div>;
+function CollegeListSkeleton() {
+  return <div className="overflow-hidden rounded-xl border border-slate-200 bg-white lg:grid lg:min-h-[620px] lg:grid-cols-[minmax(320px,390px)_minmax(0,1fr)]" aria-label="Loading colleges"><div className="divide-y divide-slate-200 lg:border-r">{Array.from({ length: 5 }).map((_, index) => <div key={index} className="h-[142px] animate-pulse p-4"><div className="h-5 w-2/3 rounded bg-slate-200" /><div className="mt-3 h-4 w-2/5 rounded bg-slate-100" /><div className="mt-7 h-4 w-4/5 rounded bg-slate-100" /></div>)}</div><div className="hidden animate-pulse p-7 lg:block"><div className="h-8 w-1/2 rounded bg-slate-200" /><div className="mt-4 h-4 w-1/3 rounded bg-slate-100" /><div className="mt-10 grid grid-cols-4 gap-1">{Array.from({ length: 4 }).map((_, index) => <div key={index} className="h-28 bg-slate-100" />)}</div></div></div>;
 }
 
 function StatePanel({ icon, title, body, action }: { icon: React.ReactNode; title: string; body: string; action: React.ReactNode }) {
