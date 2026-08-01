@@ -40,15 +40,45 @@ jobs:
           test -n "$SUPABASE_DB_PASSWORD"
           test "$SUPABASE_PROJECT_ID" = "$EXPECTED_SUPABASE_PROJECT_ID"
 
+      - name: Replay foundation on a fresh local database
+        run: supabase --workdir infra/college-foundation start
+
+      - name: Test foundation constraints and grants
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql \
+            postgresql://postgres@127.0.0.1:55322/postgres \
+            -X \
+            -f tests/college-data/milestone-2-foundation.sql
+
       - name: Link and verify staging
         shell: bash
         run: |
           set -euo pipefail
-          supabase link \
+          supabase --workdir infra/college-foundation link \
             --project-ref "$SUPABASE_PROJECT_ID" \
             --password "$SUPABASE_DB_PASSWORD"
-          test "$(sed -n '1p' supabase/.temp/project-ref)" = \
+          test "$(sed -n '1p' infra/college-foundation/supabase/.temp/project-ref)" = \
             "$EXPECTED_SUPABASE_PROJECT_ID"
 
       - name: Read migration state without applying changes
-        run: supabase migration list --linked
+        run: supabase --workdir infra/college-foundation migration list --linked
+
+      - name: Prove staging has no pending foundation migration
+        run: supabase --workdir infra/college-foundation db push --linked --dry-run
+
+      - name: Verify generated database types
+        shell: bash
+        run: |
+          set -euo pipefail
+          generated_types="$(mktemp)"
+          supabase --workdir infra/college-foundation gen types \
+            --linked \
+            --lang typescript \
+            --schema public,college_ingest > "$generated_types"
+          diff -u src/integrations/supabase/types.ts "$generated_types"
+
+      - name: Stop local foundation database
+        if: always()
+        run: supabase --workdir infra/college-foundation stop --no-backup
