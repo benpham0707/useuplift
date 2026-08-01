@@ -1,5 +1,9 @@
 // scripts/seed-colleges.ts
 //
+// LEGACY ONLY: superseded by `npm run ingest:college`. Do not use this script
+// for the college database rebuild; it does not preserve release provenance or
+// use the validated staging-and-promotion workflow.
+//
 // One-time seed script. Pulls institutional data from the College Scorecard API,
 // transforms it, and upserts into the colleges table.
 //

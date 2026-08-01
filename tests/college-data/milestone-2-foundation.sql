@@ -115,7 +115,8 @@ begin
   ) values (
     'admission_rate', 'ratio', 0, 1, '["ipeds_adm"]'::jsonb,
     'Admission rate', 'Fall admissions cohort', true
-  ) returning id into definition_id;
+  ) on conflict (metric_key) do update set metric_key = excluded.metric_key
+  returning id into definition_id;
 
   insert into public.institution_metric_facts (
     institution_id, metric_definition_id, release_id, academic_year,

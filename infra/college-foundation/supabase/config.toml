@@ -16,7 +16,7 @@ major_version = 17
 enabled = false
 
 [studio]
-enabled = true
+enabled = false
 port = 55323
 
 [inbucket]

@@ -1,0 +1,43 @@
+{
+  "manifestVersion": 1,
+  "requiredProjectRef": "ussnqsnuygqpgldyqtvv",
+  "bucket": "college-source-releases",
+  "sources": {
+    "ipeds-hd-2023": {
+      "sourceKey": "ipeds_hd",
+      "producerName": "NCES",
+      "datasetName": "IPEDS Institutional Characteristics - Directory Information",
+      "homepageUrl": "https://nces.ed.gov/ipeds/datacenter/DataFiles.aspx",
+      "releaseName": "HD2023",
+      "releaseType": "final",
+      "sourceUrl": "https://nces.ed.gov/ipeds/datacenter/data/HD2023.zip",
+      "sourcePublishedAt": "2025-09-21T20:40:56Z",
+      "retrievedAt": "2026-08-01T00:00:00Z",
+      "bytes": 1110720,
+      "sha256": "e11d35af6f50fbe2f51d8ddd5a9d4f49860abbab7d73beae1f8524f13ad8945b",
+      "member": "HD2023.csv",
+      "objectPath": "ipeds/2023-final/HD2023.zip",
+      "schemaVersion": "2023",
+      "academicYear": 2023,
+      "parser": "ipeds_hd"
+    },
+    "scorecard-institution-2026-06-10": {
+      "sourceKey": "scorecard_institution",
+      "producerName": "U.S. Department of Education",
+      "datasetName": "College Scorecard Most Recent Institution-Level Cohorts",
+      "homepageUrl": "https://collegescorecard.ed.gov/data/",
+      "releaseName": "Most-Recent-Cohorts-Institution_06102026",
+      "releaseType": "rolling",
+      "sourceUrl": "https://ed-public-download.scorecard.network/downloads/Most-Recent-Cohorts-Institution_06102026.zip",
+      "sourcePublishedAt": "2026-06-09T16:51:29Z",
+      "retrievedAt": "2026-08-01T20:41:13Z",
+      "bytes": 23559465,
+      "sha256": "f56a181b000ca4914e924c16b6b81dcc656e25aeb2ac68ab7d271ac0f29ffd58",
+      "member": "Most-Recent-Cohorts-Institution.csv",
+      "objectPath": "scorecard/2026-06-10/Most-Recent-Cohorts-Institution.zip",
+      "schemaVersion": "2026-06-10",
+      "academicYear": 2024,
+      "parser": "scorecard_institution"
+    }
+  }
+}

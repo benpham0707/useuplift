@@ -100,12 +100,124 @@ export type Database = {
         }
         Relationships: []
       }
+      staged_institutions: {
+        Row: {
+          city: string | null
+          created_at: string
+          ingestion_job_id: string
+          institution_level: string
+          is_eligible: boolean
+          latitude: number | null
+          longitude: number | null
+          official_name: string
+          ownership: string
+          source_record_locator: string
+          state: string | null
+          status: string
+          unitid: number
+          website_url: string | null
+          zip: string | null
+        }
+        Insert: {
+          city?: string | null
+          created_at?: string
+          ingestion_job_id: string
+          institution_level: string
+          is_eligible: boolean
+          latitude?: number | null
+          longitude?: number | null
+          official_name: string
+          ownership: string
+          source_record_locator: string
+          state?: string | null
+          status: string
+          unitid: number
+          website_url?: string | null
+          zip?: string | null
+        }
+        Update: {
+          city?: string | null
+          created_at?: string
+          ingestion_job_id?: string
+          institution_level?: string
+          is_eligible?: boolean
+          latitude?: number | null
+          longitude?: number | null
+          official_name?: string
+          ownership?: string
+          source_record_locator?: string
+          state?: string | null
+          status?: string
+          unitid?: number
+          website_url?: string | null
+          zip?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staged_institutions_ingestion_job_id_fkey"
+            columns: ["ingestion_job_id"]
+            isOneToOne: false
+            referencedRelation: "ingestion_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staged_metric_facts: {
+        Row: {
+          academic_year: number
+          cohort_key: string
+          created_at: string
+          ingestion_job_id: string
+          is_suppressed: boolean
+          metric_key: string
+          source_record_locator: string
+          unit: string
+          unitid: number
+          value_numeric: number | null
+        }
+        Insert: {
+          academic_year: number
+          cohort_key?: string
+          created_at?: string
+          ingestion_job_id: string
+          is_suppressed?: boolean
+          metric_key: string
+          source_record_locator: string
+          unit: string
+          unitid: number
+          value_numeric?: number | null
+        }
+        Update: {
+          academic_year?: number
+          cohort_key?: string
+          created_at?: string
+          ingestion_job_id?: string
+          is_suppressed?: boolean
+          metric_key?: string
+          source_record_locator?: string
+          unit?: string
+          unitid?: number
+          value_numeric?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staged_metric_facts_ingestion_job_id_fkey"
+            columns: ["ingestion_job_id"]
+            isOneToOne: false
+            referencedRelation: "ingestion_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      promote_ingestion_job: {
+        Args: { p_ingestion_job_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
