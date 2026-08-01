@@ -50,6 +50,22 @@ async function activeProjectionVersion() {
   return data?.active_projection_version_id ?? null;
 }
 
+async function catalogSources(projectionVersionId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('projection_version_releases')
+    .select('data_releases(source_release_name,source_published_at,data_sources(producer_name))')
+    .eq('projection_version_id', projectionVersionId);
+  if (error) throw error;
+  return (data ?? []).map((row) => {
+    const release = row.data_releases;
+    return {
+      producer: release?.data_sources?.producer_name ?? 'Official federal source',
+      release: release?.source_release_name ?? 'Unknown release',
+      publishedAt: release?.source_published_at ?? null,
+    };
+  });
+}
+
 function sendInternalError(res: Response, error: unknown) {
   console.error('[CollegeAPI] Request failed', error);
   return res.status(500).json({ error: 'College data is temporarily unavailable', code: 'COLLEGE_DATA_UNAVAILABLE' });
@@ -70,6 +86,7 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
     }
 
     const input = parsed.data;
+    const sources = await catalogSources(projectionVersionId);
     let query = supabaseAdmin
       .from('college_profiles')
       .select('institution_id,unitid,name,slug,city,state,ownership,institution_level,undergraduate_enrollment,admission_rate,tuition_in_state,tuition_out_of_state,net_price,coverage_score')
@@ -101,6 +118,7 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
       data: colleges,
       page: { limit: input.limit, nextCursor, hasMore },
       projectionVersionId,
+      sources,
       fieldContractStatus: 'provisional_pending_milestone_0',
     });
   } catch (error) {
@@ -131,6 +149,8 @@ router.get('/:slug', requireAuth, async (req: Request, res: Response) => {
     if (collegeError) throw collegeError;
     if (!college) return res.status(404).json({ error: 'College not found', code: 'COLLEGE_NOT_FOUND' });
 
+    const sources = await catalogSources(projectionVersionId);
+
     const { data: facts, error: factsError } = await supabaseAdmin
       .from('college_profile_facts')
       .select('field_key,display_value,source_name,source_release,period_start,period_end,academic_year,cohort_key,cohort_label,quality_status,is_estimate,is_suppressed,retrieved_at')
@@ -143,6 +163,7 @@ router.get('/:slug', requireAuth, async (req: Request, res: Response) => {
     return res.json({
       data: { ...college, facts: facts ?? [] },
       projectionVersionId,
+      sources,
       fieldContractStatus: 'provisional_pending_milestone_0',
     });
   } catch (error) {

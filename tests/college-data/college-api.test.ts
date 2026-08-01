@@ -22,6 +22,7 @@ const fixtures = vi.hoisted(() => ({
     cohort_key: 'all', cohort_label: 'all', quality_status: 'verified',
     is_estimate: false, is_suppressed: false, retrieved_at: '2026-08-01T00:00:00Z',
   }],
+  sources: [{ data_releases: { source_release_name: 'fixture-2026', source_published_at: '2026-06-01T00:00:00Z', data_sources: { producer_name: 'Fixture producer' } } }],
 }));
 
 vi.mock('@/http/security', () => ({
@@ -49,6 +50,7 @@ vi.mock('@/supabase/admin', () => ({
       builder.then = (resolve: (value: unknown) => void) => {
         if (table === 'college_profiles') resolve({ data: [fixtures.college], error: null });
         else if (table === 'college_profile_facts') resolve({ data: fixtures.facts, error: null });
+        else if (table === 'projection_version_releases') resolve({ data: fixtures.sources, error: null });
         else resolve({ data: [], error: null });
       };
       return builder;
@@ -96,6 +98,7 @@ describe('college API', () => {
     expect(await response.json()).toMatchObject({
       projectionVersionId: fixtures.projectionId,
       fieldContractStatus: 'provisional_pending_milestone_0',
+      sources: [{ producer: 'Fixture producer', release: 'fixture-2026' }],
       data: [{ slug: fixtures.college.slug }],
     });
   });

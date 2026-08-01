@@ -1,114 +1,65 @@
-/**
- * CollegeCard Component
- *
- * Displays a college in the gallery grid with lazy-loaded images
- * Priority hierarchy: Logo + Name → Location + Setting → Key Stats → Match Indicator
- */
-
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import type { College, CollegeCategory } from '@/lib/types/college';
-import { Building2 } from 'lucide-react';
+import { ArrowUpRight, Building2, MapPin, Users } from 'lucide-react';
+import type { FoundationCollegeSummary } from '@/lib/types/college';
+import { formatCollegeCurrency, formatCollegePercent, ownershipLabel } from '@/services/collegeDiscovery/format';
 
-interface CollegeCardProps {
-  college: College;
-  category?: CollegeCategory;
-  onSave?: (college: College) => void;
-}
-
-export function CollegeCard({ college, category }: CollegeCardProps) {
+export function CollegeCard({ college }: { college: FoundationCollegeSummary }) {
   const navigate = useNavigate();
-
-  const handleClick = () => {
-    navigate(`/dashboard/colleges/${college.slug}`);
-  };
-
-  // Format stats for display
-  const acceptanceText = college.acceptance_rate
-    ? `${college.acceptance_rate}% acceptance`
-    : 'N/A';
-
-  const gpaText =
-    college.avg_gpa_min && college.avg_gpa_max
-      ? `${college.avg_gpa_min}-${college.avg_gpa_max} GPA`
-      : '';
-
-  const satText =
-    college.avg_sat_min && college.avg_sat_max
-      ? `${college.avg_sat_min}-${college.avg_sat_max} SAT`
-      : '';
-
-  const settingText = college.campus_setting
-    ? college.campus_setting.charAt(0).toUpperCase() + college.campus_setting.slice(1)
-    : '';
-
-  const categoryBadgeColors = {
-    reach: 'bg-red-100 text-red-800 border-red-200',
-    match: 'bg-green-100 text-green-800 border-green-200',
-    safety: 'bg-blue-100 text-blue-800 border-blue-200',
-  };
+  const location = [college.city, college.state].filter(Boolean).join(', ') || 'Location unavailable';
 
   return (
-    <Card
-      className="hover:shadow-lg transition-shadow cursor-pointer group"
-      onClick={handleClick}
+    <button
+      type="button"
+      onClick={() => navigate(`/dashboard/colleges/${college.slug}`)}
+      className="group flex min-h-[250px] w-full flex-col rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+      aria-label={`View ${college.name}`}
     >
-      <CardContent className="p-4">
-        {/* Logo + Name */}
-        <div className="flex items-start gap-3 mb-3">
-          <div className="w-12 h-12 shrink-0 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden">
-            {college.logo_url ? (
-              <img
-                src={college.logo_url}
-                alt={`${college.name} logo`}
-                className="w-full h-full object-contain"
-                loading="lazy"
-              />
-            ) : (
-              <Building2 className="w-6 h-6 text-slate-400" />
-            )}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Building2 className="h-5 w-5" aria-hidden="true" />
           </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-base leading-tight group-hover:text-primary transition-colors line-clamp-2">
+          <div className="min-w-0">
+            <h2 className="line-clamp-2 text-base font-semibold leading-snug text-slate-950 group-hover:text-primary">
               {college.name}
-            </h3>
+            </h2>
+            <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
+              <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span className="truncate">{location}</span>
+            </p>
           </div>
-          {category && (
-            <Badge variant="outline" className={categoryBadgeColors[category]}>
-              {category.charAt(0).toUpperCase() + category.slice(1)}
-            </Badge>
-          )}
         </div>
+        <ArrowUpRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:text-primary" aria-hidden="true" />
+      </div>
 
-        {/* Location + Setting */}
-        <div className="text-sm text-muted-foreground mb-3">
-          {college.city}, {college.state}
-          {settingText && ` • ${settingText}`}
-          {college.type && ` • ${college.type.charAt(0).toUpperCase() + college.type.slice(1)}`}
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <Stat label="Admission rate" value={formatCollegePercent(college.admission_rate)} />
+        <Stat label="Average net price" value={formatCollegeCurrency(college.net_price)} />
+      </div>
+
+      <div className="mt-auto flex items-end justify-between gap-3 border-t border-slate-100 pt-4">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Institution</p>
+          <p className="mt-1 text-sm font-medium text-slate-700">{ownershipLabel(college.ownership)}</p>
         </div>
-
-        {/* Key Stats */}
-        <div className="text-sm space-y-1">
-          <div className="text-slate-700">{acceptanceText}</div>
-          {gpaText && <div className="text-slate-600">{gpaText}</div>}
-          {satText && <div className="text-slate-600">{satText}</div>}
+        <div className="text-right">
+          <p className="flex items-center justify-end gap-1 text-xs font-medium uppercase tracking-wide text-slate-400">
+            <Users className="h-3 w-3" aria-hidden="true" /> Enrollment
+          </p>
+          <p className="mt-1 text-sm font-medium text-slate-700">
+            {college.undergraduate_enrollment?.toLocaleString() ?? 'Unavailable'}
+          </p>
         </div>
+      </div>
+    </button>
+  );
+}
 
-        {/* Program Strengths Pills */}
-        {college.program_strengths && college.program_strengths.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1">
-            {college.program_strengths.slice(0, 3).map((strength) => (
-              <span
-                key={strength}
-                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary"
-              >
-                {strength}
-              </span>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-slate-50 px-3 py-3">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-slate-900">{value}</p>
+    </div>
   );
 }

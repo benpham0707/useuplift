@@ -12,6 +12,12 @@ on:
       - package-lock.json
       - package.json
       - scripts/college-data/**
+      - src/components/colleges/**
+      - src/http/collegeRoutes.ts
+      - src/lib/types/college.ts
+      - src/pages/CollegeDetail.tsx
+      - src/pages/CollegesGallery.tsx
+      - src/services/collegeDiscovery/**
       - tests/college-data/**
       - tsconfig.college-data.json
 
@@ -72,6 +78,11 @@ jobs:
 
       - name: Test versioned college serving layer
         run: npm run test:college-serving
+
+      - name: Typecheck and build the college experience
+        run: |
+          npm run typecheck
+          npm run build
 
       - name: Link and verify staging
         shell: bash
