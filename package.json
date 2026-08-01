@@ -13,6 +13,7 @@
     "dev:full": "run-p server dev",
     "setup:local": "bash scripts/setup-local-dev.sh",
     "seed:colleges": "tsx scripts/seed-colleges.ts",
+    "ingest:ipeds": "node scripts/college-data/ingest-ipeds-components.mjs",
     "test": "tsx tests/unit/run-all.ts",
     "test:integration": "tsx tests/integration/run-all.ts",
     "test:vitest": "vitest run",

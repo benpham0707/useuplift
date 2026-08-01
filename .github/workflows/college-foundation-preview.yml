@@ -1,0 +1,54 @@
+name: College foundation preview preflight
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - benpham/college-database
+    paths:
+      - .github/workflows/college-foundation-preview.yml
+      - docs/college-data/**
+      - scripts/college-data/**
+      - supabase/migrations/**
+
+permissions:
+  contents: read
+
+jobs:
+  staging-preflight:
+    name: Verify staging boundary
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: Preview
+    env:
+      EXPECTED_SUPABASE_PROJECT_ID: ussnqsnuygqpgldyqtvv
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.101.0
+
+      - name: Refuse any target except college staging
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+          test "$SUPABASE_PROJECT_ID" = "$EXPECTED_SUPABASE_PROJECT_ID"
+
+      - name: Link and verify staging
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase link \
+            --project-ref "$SUPABASE_PROJECT_ID" \
+            --password "$SUPABASE_DB_PASSWORD"
+          test "$(sed -n '1p' supabase/.temp/project-ref)" = \
+            "$EXPECTED_SUPABASE_PROJECT_ID"
+
+      - name: Read migration state without applying changes
+        run: supabase migration list --linked

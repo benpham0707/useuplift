@@ -1,5 +1,16 @@
 # College Database Feature Specification
 
+> [!WARNING]
+> **Superseded for the college-database rebuild.** This March 2026 draft contains
+> unsafe or obsolete assumptions, including reach/match/safety categorization,
+> client-side full-universe filtering, manual program-strength claims, and a
+> hand-curated 300-school scope. Do not use it as the implementation contract for
+> `benpham/college-database`. The active Milestone 0 evidence and field contract
+> begin at
+> [`docs/college-data/milestone-0/README.md`](../college-data/milestone-0/README.md).
+> Keep this document unchanged below the banner as migration evidence until the
+> legacy schema and saved-list data have been inventoried.
+
 **Feature:** College Discovery and Recommendations System
 **Version:** 1.0 MVP
 **Owner:** Tue Pham
