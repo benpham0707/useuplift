@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "source": "IPEDS",
   "releaseKey": "2023-final",
-  "requiredProjectRef": "ussnqsnuygqpgldyqtvv",
+  "requiredProjectRef": "zclaplpkuvxkrdwsgrul",
   "bucket": "college-source-releases",
   "retrievedAt": "2026-08-01T19:29:00Z",
   "catalogUrl": "https://nces.ed.gov/ipeds/datacenter/DataFiles.aspx?year=-1",

@@ -63,14 +63,14 @@ function assertManifest() {
   }
 }
 
-function assertStagingLink() {
+function assertTargetLink() {
   const linkedRef = readFileSync(
     resolve(repoRoot, 'supabase/.temp/project-ref'),
     'utf8',
   ).trim();
   if (linkedRef !== manifest.requiredProjectRef) {
     throw new Error(
-      `Refusing remote operation: linked ${linkedRef}, expected staging ${manifest.requiredProjectRef}`,
+      `Refusing remote operation: linked ${linkedRef}, expected configured target ${manifest.requiredProjectRef}`,
     );
   }
 }
@@ -202,7 +202,7 @@ function uploadAndRoundTrip(artifact, localPath, directory) {
 }
 
 assertManifest();
-if (upload) assertStagingLink();
+  if (upload) assertTargetLink();
 
 const directory = mkdtempSync(join(tmpdir(), 'uplift-ipeds-'));
 try {
