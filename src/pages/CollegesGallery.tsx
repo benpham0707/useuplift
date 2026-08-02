@@ -1,327 +1,166 @@
-/**
- * CollegesGallery Page
- *
- * Full-screen browse/filter/search gallery for colleges
- * Client-side filtering and search for instant UX
- */
-
-import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/safeClient';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
+import { useEffect, useMemo, useState } from 'react';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useAuth as useClerkAuth } from '@clerk/clerk-react';
+import { useNavigate } from 'react-router-dom';
+import { AlertCircle, Database, Loader2, Search, ShieldCheck, X } from 'lucide-react';
 import { CollegeCard } from '@/components/colleges/CollegeCard';
-import type { College, CollegeFilters, SortOption } from '@/lib/types/college';
-import { Search, X, Loader2 } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
+import { CollegePreview } from '@/components/colleges/CollegePreview';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { fetchCollegeDetail, fetchCollegePage } from '@/services/collegeDiscovery/api';
+import type { FoundationOwnership } from '@/lib/types/college';
+
+const states = ['AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'];
+
+const admissionRanges = {
+  all: {}, selective: { admissionRateMax: 0.25 }, moderate: { admissionRateMin: 0.25, admissionRateMax: 0.6 }, broad: { admissionRateMin: 0.6 },
+} as const;
+const enrollmentRanges = {
+  all: {}, small: { enrollmentMax: 4999 }, medium: { enrollmentMin: 5000, enrollmentMax: 14999 }, large: { enrollmentMin: 15000 },
+} as const;
 
 export default function CollegesGallery() {
-  const { user } = useAuth();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filters, setFilters] = useState<CollegeFilters>({});
-  const [sortBy, setSortBy] = useState<SortOption>('name-asc');
+  const { getToken } = useClerkAuth();
+  const navigate = useNavigate();
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [state, setState] = useState('all');
+  const [ownership, setOwnership] = useState<'all' | FoundationOwnership>('all');
+  const [admission, setAdmission] = useState<keyof typeof admissionRanges>('all');
+  const [enrollment, setEnrollment] = useState<keyof typeof enrollmentRanges>('all');
+  const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
 
-  // Fetch all colleges (cached for 10 minutes)
-  const { data: colleges, isLoading, error } = useQuery({
-    queryKey: ['colleges'],
-    queryFn: async () => {
-      console.log('[CollegesGallery] Fetching colleges from Supabase...');
-      const { data, error } = await supabase
-        .from('colleges')
-        .select('*')
-        .eq('is_active', true)
-        .order('name', { ascending: true });
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => window.clearTimeout(timeout);
+  }, [search]);
 
-      console.log('[CollegesGallery] Supabase response:', { data, error });
-      console.log('[CollegesGallery] Number of colleges:', data?.length);
+  const queryInput = useMemo(() => ({
+    q: debouncedSearch || undefined,
+    state: state === 'all' ? undefined : state,
+    ownership: ownership === 'all' ? undefined : ownership,
+    ...admissionRanges[admission],
+    ...enrollmentRanges[enrollment],
+    limit: 24,
+  }), [debouncedSearch, state, ownership, admission, enrollment]);
 
-      if (error) {
-        console.error('[CollegesGallery] Error fetching colleges:', error);
-        throw error;
-      }
-
-      console.log('[CollegesGallery] Successfully fetched colleges:', data);
-      return data as College[];
-    },
-    staleTime: 1000 * 60 * 10, // 10 minutes
+  const query = useInfiniteQuery({
+    queryKey: ['foundation-colleges', queryInput],
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }) => fetchCollegePage({ ...queryInput, cursor: pageParam }, getToken),
+    getNextPageParam: (lastPage) => lastPage.page.nextCursor ?? undefined,
+    staleTime: 60_000,
   });
 
-  // Fetch user's saved colleges for category badges
-  const { data: userColleges } = useQuery({
-    queryKey: ['user-college-list', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
-
-      const { data, error } = await supabase
-        .from('user_college_list')
-        .select('college_id, category')
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-      return data as Array<{ college_id: string; category: string | null }>;
-    },
-    enabled: !!user?.id,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+  const colleges = query.data?.pages.flatMap((page) => page.data) ?? [];
+  const catalog = query.data?.pages[0];
+  const hasFilters = Boolean(search || state !== 'all' || ownership !== 'all' || admission !== 'all' || enrollment !== 'all');
+  const activeSlug = colleges.some((college) => college.slug === selectedSlug) ? selectedSlug : colleges[0]?.slug ?? null;
+  const previewQuery = useQuery({
+    queryKey: ['foundation-college', activeSlug],
+    queryFn: () => fetchCollegeDetail(activeSlug!, getToken),
+    enabled: Boolean(activeSlug),
+    staleTime: 60_000,
   });
 
-  // Create a map of college_id -> category for quick lookup
-  const categoryMap = useMemo(() => {
-    const map = new Map<string, string | null>();
-    userColleges?.forEach((item) => {
-      map.set(item.college_id, item.category);
-    });
-    return map;
-  }, [userColleges]);
-
-  // Client-side filtering and sorting
-  const filteredColleges = useMemo(() => {
-    console.log('[CollegesGallery] Filtering colleges. Total colleges:', colleges?.length);
-    if (!colleges) {
-      console.log('[CollegesGallery] No colleges data available');
-      return [];
-    }
-
-    let result = colleges;
-
-    // Search filter (name, city, state)
-    if (searchTerm) {
-      const search = searchTerm.toLowerCase();
-      result = result.filter(
-        (c) =>
-          c.name.toLowerCase().includes(search) ||
-          c.city.toLowerCase().includes(search) ||
-          c.state.toLowerCase().includes(search)
-      );
-    }
-
-    // State filter
-    if (filters.states && filters.states.length > 0) {
-      result = result.filter((c) => filters.states!.includes(c.state));
-    }
-
-    // Type filter
-    if (filters.types && filters.types.length > 0) {
-      result = result.filter((c) => filters.types!.includes(c.type));
-    }
-
-    // Setting filter
-    if (filters.settings && filters.settings.length > 0) {
-      result = result.filter((c) => c.campus_setting && filters.settings!.includes(c.campus_setting));
-    }
-
-    // Major filter (check if any popular_majors match)
-    if (filters.majors && filters.majors.length > 0) {
-      result = result.filter((c) =>
-        c.popular_majors.some((major) =>
-          filters.majors!.some((filterMajor) => major.toLowerCase().includes(filterMajor.toLowerCase()))
-        )
-      );
-    }
-
-    // Sort
-    if (sortBy === 'name-asc') {
-      result.sort((a, b) => a.name.localeCompare(b.name));
-    } else if (sortBy === 'acceptance-asc') {
-      result.sort((a, b) => (a.acceptance_rate || 100) - (b.acceptance_rate || 100));
-    } else if (sortBy === 'tuition-asc') {
-      result.sort(
-        (a, b) =>
-          (a.tuition_out_of_state || 999999) - (b.tuition_out_of_state || 999999)
-      );
-    }
-
-    console.log('[CollegesGallery] Filtered result count:', result.length);
-    console.log('[CollegesGallery] First 3 colleges:', result.slice(0, 3).map(c => c.name));
-    return result;
-  }, [colleges, searchTerm, filters, sortBy]);
-
-  const handleClearFilters = () => {
-    setSearchTerm('');
-    setFilters({});
+  const clearFilters = () => {
+    setSearch(''); setDebouncedSearch(''); setState('all'); setOwnership('all'); setAdmission('all'); setEnrollment('all');
   };
 
-  const hasActiveFilters =
-    searchTerm ||
-    (filters.states && filters.states.length > 0) ||
-    (filters.types && filters.types.length > 0) ||
-    (filters.settings && filters.settings.length > 0) ||
-    (filters.majors && filters.majors.length > 0);
-
-  if (error) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <p className="text-red-600">Failed to load colleges. Please try again.</p>
-          <Button onClick={() => window.location.reload()} className="mt-4">
-            Reload
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  const selectCollege = (slug: string) => {
+    if (window.matchMedia('(max-width: 1023px)').matches) {
+      navigate(`/dashboard/colleges/${slug}`);
+      return;
+    }
+    setSelectedSlug(slug);
+  };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Explore Colleges</h1>
-        <p className="text-muted-foreground">
-          Browse, filter, and search through top colleges to build your personalized list
-        </p>
-      </div>
-
-      {/* Search and Sort Bar */}
-      <div className="flex gap-4 mb-6">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="Search colleges by name, city, or state..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Sort by" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="name-asc">A-Z</SelectItem>
-            <SelectItem value="acceptance-asc">Most Selective</SelectItem>
-            <SelectItem value="tuition-asc">Lowest Tuition</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Filter Bar */}
-      <div className="flex gap-4 mb-4 flex-wrap">
-        <Select
-          value={filters.types?.[0] || ''}
-          onValueChange={(value) =>
-            setFilters({ ...filters, types: value ? [value as 'public' | 'private' | 'community'] : [] })
-          }
-        >
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="public">Public</SelectItem>
-            <SelectItem value="private">Private</SelectItem>
-            <SelectItem value="community">Community</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={filters.settings?.[0] || ''}
-          onValueChange={(value) =>
-            setFilters({ ...filters, settings: value ? [value as 'urban' | 'suburban' | 'rural'] : [] })
-          }
-        >
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Setting" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="urban">Urban</SelectItem>
-            <SelectItem value="suburban">Suburban</SelectItem>
-            <SelectItem value="rural">Rural</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {hasActiveFilters && (
-          <Button variant="ghost" size="sm" onClick={handleClearFilters}>
-            <X className="h-4 w-4 mr-1" />
-            Clear Filters
-          </Button>
-        )}
-      </div>
-
-      {/* Active Filters Chips */}
-      {hasActiveFilters && (
-        <div className="flex gap-2 mb-6 flex-wrap">
-          {searchTerm && (
-            <Badge variant="secondary" className="gap-1">
-              Search: {searchTerm}
-              <X
-                className="h-3 w-3 cursor-pointer"
-                onClick={() => setSearchTerm('')}
-              />
-            </Badge>
-          )}
-          {filters.types?.map((type) => (
-            <Badge key={type} variant="secondary" className="gap-1">
-              {type}
-              <X
-                className="h-3 w-3 cursor-pointer"
-                onClick={() => setFilters({ ...filters, types: [] })}
-              />
-            </Badge>
-          ))}
-          {filters.settings?.map((setting) => (
-            <Badge key={setting} variant="secondary" className="gap-1">
-              {setting}
-              <X
-                className="h-3 w-3 cursor-pointer"
-                onClick={() => setFilters({ ...filters, settings: [] })}
-              />
-            </Badge>
-          ))}
-        </div>
-      )}
-
-      {/* Results Count */}
-      <div className="mb-4 text-sm text-muted-foreground">
-        {isLoading ? (
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading colleges...
+    <div className="min-h-full bg-slate-50/70 lg:flex lg:h-[calc(100svh-4rem)] lg:min-h-0 lg:flex-col lg:overflow-hidden">
+      <section className="shrink-0 border-b border-slate-200 bg-white">
+        <div className="mx-auto max-w-[1500px] px-4 py-4 sm:px-6 lg:px-8 lg:py-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-950">Explore colleges</h1>
+              <span className="flex items-center gap-1.5 text-sm font-medium text-primary"><Database className="h-4 w-4" aria-hidden="true" />Official federal data</span>
+              <p className="basis-full text-sm text-slate-600 lg:hidden">Search active four-year institutions and compare reported admissions, enrollment, and cost data.</p>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-amber-950">
+              <ShieldCheck className="h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
+              <p>Provisional fields include their source and reporting year.</p>
+            </div>
           </div>
-        ) : (
-          <span>
-            {filteredColleges.length} {filteredColleges.length === 1 ? 'college' : 'colleges'}{' '}
-            found
-          </span>
-        )}
-      </div>
 
-      {/* College Grid */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {Array.from({ length: 9 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-48 bg-slate-100 animate-pulse rounded-lg"
-            />
-          ))}
+          <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(280px,1.35fr)_repeat(4,minmax(135px,1fr))] lg:items-end">
+            <div>
+            <label htmlFor="college-search" className="sr-only">Search colleges</label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+              <Input id="college-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search colleges" className="h-10 bg-white pl-10 pr-10" />
+              {search && <button type="button" onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Clear search"><X className="h-4 w-4" /></button>}
+            </div>
+            </div>
+              <FilterSelect label="State" compact value={state} onChange={setState}>
+                <SelectItem value="all">All states</SelectItem>{states.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
+              </FilterSelect>
+              <FilterSelect label="Ownership" compact value={ownership} onChange={(value) => setOwnership(value as typeof ownership)}>
+                <SelectItem value="all">All ownership types</SelectItem><SelectItem value="public">Public</SelectItem><SelectItem value="private_nonprofit">Private nonprofit</SelectItem><SelectItem value="private_for_profit">Private for-profit</SelectItem>
+              </FilterSelect>
+              <FilterSelect label="Admission rate" compact value={admission} onChange={(value) => setAdmission(value as keyof typeof admissionRanges)}>
+                <SelectItem value="all">Any reported rate</SelectItem><SelectItem value="selective">Below 25%</SelectItem><SelectItem value="moderate">25% to 60%</SelectItem><SelectItem value="broad">60% and above</SelectItem>
+              </FilterSelect>
+              <FilterSelect label="Undergraduate enrollment" compact value={enrollment} onChange={(value) => setEnrollment(value as keyof typeof enrollmentRanges)}>
+                <SelectItem value="all">Any reported size</SelectItem><SelectItem value="small">Under 5,000</SelectItem><SelectItem value="medium">5,000 to 14,999</SelectItem><SelectItem value="large">15,000 and above</SelectItem>
+              </FilterSelect>
+          </div>
         </div>
-      ) : filteredColleges.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground mb-4">
-            No colleges found matching your criteria.
+      </section>
+
+      <section className="mx-auto w-full max-w-[1500px] px-4 py-5 sm:px-6 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:px-8 lg:py-3">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 lg:hidden">
+          <p className="text-sm text-slate-600" aria-live="polite">
+            {query.isLoading ? 'Loading colleges…' : `Showing ${colleges.length.toLocaleString()} college${colleges.length === 1 ? '' : 's'}`}
           </p>
-          <Button variant="outline" onClick={handleClearFilters}>
-            Clear all filters
-          </Button>
+          {hasFilters && <Button type="button" variant="ghost" size="sm" onClick={clearFilters}><X className="mr-1.5 h-4 w-4" />Clear filters</Button>}
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredColleges.map((college) => (
-            <CollegeCard
-              key={college.id}
-              college={college}
-              category={categoryMap.get(college.id) as any}
-            />
-          ))}
-        </div>
-      )}
+
+        {query.isLoading ? <CollegeListSkeleton /> : query.isError ? (
+          <StatePanel icon={<AlertCircle className="h-5 w-5" />} title="College data is unavailable" body="The catalog could not be loaded right now. Your filters have been preserved." action={<Button onClick={() => query.refetch()}>Try again</Button>} />
+        ) : colleges.length === 0 ? (
+          <StatePanel icon={<Search className="h-5 w-5" />} title="No colleges match these filters" body="Try a broader admission range, another state, or fewer filters." action={<Button variant="outline" onClick={clearFilters}>Clear all filters</Button>} />
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(320px,390px)_minmax(0,1fr)]">
+            <div className="flex min-h-0 flex-col border-slate-200 lg:border-r">
+              <div className="hidden shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-3 lg:flex">
+                <p className="text-sm font-medium text-slate-700" aria-live="polite">{`Showing ${colleges.length.toLocaleString()} college${colleges.length === 1 ? '' : 's'}`}</p>
+                {hasFilters && <Button type="button" variant="ghost" size="sm" onClick={clearFilters}><X className="mr-1 h-3.5 w-3.5" />Clear</Button>}
+              </div>
+              <div className="min-h-0 lg:overflow-y-auto" aria-label="College search results">
+                {colleges.map((college) => <CollegeCard key={college.institution_id} college={college} selected={college.slug === activeSlug} onSelect={() => selectCollege(college.slug)} />)}
+                {query.hasNextPage && <div className="bg-white p-4"><Button className="w-full" variant="outline" onClick={() => query.fetchNextPage()} disabled={query.isFetchingNextPage}>{query.isFetchingNextPage && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Load more colleges</Button></div>}
+              </div>
+            </div>
+            <div className="hidden min-h-0 min-w-0 overflow-y-auto lg:block">
+              <CollegePreview response={previewQuery.data} loading={previewQuery.isLoading} error={previewQuery.isError} onRetry={() => previewQuery.refetch()} onOpenProfile={() => activeSlug && navigate(`/dashboard/colleges/${activeSlug}`)} />
+            </div>
+          </div>
+        )}
+
+        {catalog && <p className="mt-8 text-center text-xs leading-5 text-slate-500 lg:hidden">Catalog sources: {catalog.sources.map((source) => source.producer).filter((value, index, all) => all.indexOf(value) === index).join(' and ')}. Projection {catalog.projectionVersionId.slice(0, 8)}.</p>}
+      </section>
     </div>
   );
+}
+
+function FilterSelect({ label, value, onChange, children, compact = false }: { label: string; value: string; onChange: (value: string) => void; children: React.ReactNode; compact?: boolean }) {
+  return <div><label className={compact ? 'sr-only' : 'mb-1.5 block text-xs font-medium text-slate-600'}>{label}</label><Select value={value} onValueChange={onChange}><SelectTrigger className="h-10 bg-white" aria-label={label}><SelectValue /></SelectTrigger><SelectContent>{children}</SelectContent></Select></div>;
+}
+
+function CollegeListSkeleton() {
+  return <div className="overflow-hidden rounded-xl border border-slate-200 bg-white lg:grid lg:min-h-[620px] lg:grid-cols-[minmax(320px,390px)_minmax(0,1fr)]" aria-label="Loading colleges"><div className="divide-y divide-slate-200 lg:border-r">{Array.from({ length: 5 }).map((_, index) => <div key={index} className="h-[142px] animate-pulse p-4"><div className="h-5 w-2/3 rounded bg-slate-200" /><div className="mt-3 h-4 w-2/5 rounded bg-slate-100" /><div className="mt-7 h-4 w-4/5 rounded bg-slate-100" /></div>)}</div><div className="hidden animate-pulse p-7 lg:block"><div className="h-8 w-1/2 rounded bg-slate-200" /><div className="mt-4 h-4 w-1/3 rounded bg-slate-100" /><div className="mt-10 grid grid-cols-4 gap-1">{Array.from({ length: 4 }).map((_, index) => <div key={index} className="h-28 bg-slate-100" />)}</div></div></div>;
+}
+
+function StatePanel({ icon, title, body, action }: { icon: React.ReactNode; title: string; body: string; action: React.ReactNode }) {
+  return <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center"><div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500">{icon}</div><h2 className="mt-4 text-lg font-semibold text-slate-900">{title}</h2><p className="mx-auto mt-2 max-w-md text-sm text-slate-600">{body}</p><div className="mt-5">{action}</div></div>;
 }

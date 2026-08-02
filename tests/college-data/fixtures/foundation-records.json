@@ -1,0 +1,44 @@
+{
+  "ipedsActive": {
+    "UNITID": "100654", "INSTNM": "Example University", "CITY": "Example",
+    "STABBR": "AL", "ZIP": "35000", "SECTOR": "1", "ICLEVEL": "1",
+    "CONTROL": "1", "CYACTIVE": "1", "UGOFFER": "1", "WEBADDR": "example.edu",
+    "LONGITUD": "-86.5", "LATITUDE": "34.7"
+  },
+  "ipedsClosed": {
+    "UNITID": "100655", "INSTNM": "Closed University", "CITY": "Example",
+    "STABBR": "AL", "ZIP": "35001", "SECTOR": "2", "ICLEVEL": "1",
+    "CONTROL": "2", "CYACTIVE": "0", "UGOFFER": "1", "WEBADDR": "",
+    "LONGITUD": "-2", "LATITUDE": "-2"
+  },
+  "scorecardNull": {
+    "UNITID": "100654", "INSTNM": "Example University", "CITY": "Example",
+    "STABBR": "AL", "ZIP": "35000", "INSTURL": "example.edu",
+    "PREDDEG": "3", "CONTROL": "1", "CURROPER": "1",
+    "LATITUDE": "34.7", "LONGITUDE": "-86.5", "UGDS": "5000",
+    "ADM_RATE": "", "TUITIONFEE_IN": "10000", "TUITIONFEE_OUT": "20000",
+    "COSTT4_A": "25000", "NPT4_PUB": "12000", "NPT4_PRIV": "",
+    "PCTPELL": "0.4", "C150_4": "0.6", "RET_FT4": "0.8",
+    "MD_EARN_WNE_P10": "50000"
+  },
+  "scorecardSuppressed": {
+    "UNITID": "100656", "INSTNM": "Private University", "CITY": "Example",
+    "STABBR": "AL", "ZIP": "35002", "INSTURL": "https://private.edu",
+    "PREDDEG": "3", "CONTROL": "2", "CURROPER": "1",
+    "LATITUDE": "34.8", "LONGITUDE": "-86.6", "UGDS": "1000",
+    "ADM_RATE": "PrivacySuppressed", "TUITIONFEE_IN": "30000",
+    "TUITIONFEE_OUT": "30000", "COSTT4_A": "PrivacySuppressed",
+    "NPT4_PUB": "", "NPT4_PRIV": "20000", "PCTPELL": "0.2",
+    "C150_4": "0.7", "RET_FT4": "0.9", "MD_EARN_WNE_P10": "PrivacySuppressed"
+  },
+  "scorecardConflict": {
+    "UNITID": "100654", "INSTNM": "Example University Renamed", "CITY": "Example",
+    "STABBR": "AL", "ZIP": "35000", "INSTURL": "example.edu",
+    "PREDDEG": "3", "CONTROL": "1", "CURROPER": "1",
+    "LATITUDE": "34.7", "LONGITUDE": "-86.5", "UGDS": "5000",
+    "ADM_RATE": "0.5", "TUITIONFEE_IN": "10000", "TUITIONFEE_OUT": "20000",
+    "COSTT4_A": "25000", "NPT4_PUB": "12000", "NPT4_PRIV": "",
+    "PCTPELL": "0.4", "C150_4": "0.6", "RET_FT4": "0.8",
+    "MD_EARN_WNE_P10": "50000"
+  }
+}

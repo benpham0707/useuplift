@@ -10,14 +10,12 @@ export function cn(...inputs: ClassValue[]) {
 // Otherwise, if in DEV mode, use empty string (relative path to use Vite proxy).
 // In production, we expect VITE_API_BASE to be set.
 
-// DEBUG: Log the environment variable to see if it's being read
-
-const API_BASE = ((import.meta as any)?.env?.VITE_API_BASE as string) || 
-  ((import.meta as any)?.env?.DEV ? '' : 'https://uplift-backend-cyqk.onrender.com');
+const API_BASE = import.meta.env.VITE_API_BASE ||
+  (import.meta.env.DEV ? '' : 'https://uplift-backend-cyqk.onrender.com');
 
 export async function apiFetch(path: string, init: RequestInit = {}) {
   // Warn if in production and no API base is set (unless using a same-domain proxy)
-  if (!API_BASE && !(import.meta as any)?.env?.DEV && !path.startsWith('http')) {
+  if (!API_BASE && !import.meta.env.DEV && !path.startsWith('http')) {
      // Fallback for debugging - if you see this warning but want it to work, 
      // this hardcoded value will save the day temporarily.
      // We only use this fallback if the env var failed to load.

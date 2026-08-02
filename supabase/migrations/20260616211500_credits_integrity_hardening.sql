@@ -97,6 +97,12 @@ BEGIN
 END $$;
 
 -- 3. Hygiene: trigger-only fn should not be directly executable; lock RAG RPCs from anon.
-REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM authenticated, anon, public;
+-- Legacy preview baselines may not contain the Supabase Auth trigger function.
+DO $$
+BEGIN
+  IF to_regprocedure('public.handle_new_user()') IS NOT NULL THEN
+    REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM authenticated, anon, public;
+  END IF;
+END $$;
 REVOKE EXECUTE ON FUNCTION public.match_rag_fragments(vector, double precision, integer, text, text, text, text) FROM anon;
 REVOKE EXECUTE ON FUNCTION public.match_rag_transformations(vector, double precision, integer, text, text, text) FROM anon;

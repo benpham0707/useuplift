@@ -1,0 +1,116 @@
+name: College foundation preview preflight
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - benpham/college-database
+    paths:
+      - .github/workflows/college-foundation-preview.yml
+      - docs/college-data/**
+      - infra/college-foundation/supabase/**
+      - package-lock.json
+      - package.json
+      - scripts/college-data/**
+      - src/components/colleges/**
+      - src/http/collegeRoutes.ts
+      - src/lib/types/college.ts
+      - src/pages/CollegeDetail.tsx
+      - src/pages/CollegesGallery.tsx
+      - src/services/collegeDiscovery/**
+      - tests/college-data/**
+      - tsconfig.college-data.json
+
+permissions:
+  contents: read
+
+jobs:
+  staging-preflight:
+    name: Verify staging boundary
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: Preview
+    env:
+      EXPECTED_SUPABASE_PROJECT_ID: ussnqsnuygqpgldyqtvv
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install application dependencies
+        run: npm ci
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.101.0
+
+      - name: Refuse any target except college staging
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+          test "$SUPABASE_PROJECT_ID" = "$EXPECTED_SUPABASE_PROJECT_ID"
+
+      - name: Replay foundation on a fresh local database
+        run: supabase --workdir infra/college-foundation start
+
+      - name: Test foundation constraints and grants
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql \
+            postgresql://postgres@127.0.0.1:55322/postgres \
+            -X \
+            -f tests/college-data/milestone-2-foundation.sql
+
+      - name: Typecheck the ingestion pipeline
+        run: npm run typecheck:college-ingestion
+
+      - name: Test parsers, promotion, and ingestion grants
+        run: npm run test:college-ingestion
+
+      - name: Test versioned college serving layer
+        run: npm run test:college-serving
+
+      - name: Typecheck and build the college experience
+        run: |
+          npm run typecheck
+          npm run build
+
+      - name: Link and verify staging
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase --workdir infra/college-foundation link \
+            --project-ref "$SUPABASE_PROJECT_ID" \
+            --password "$SUPABASE_DB_PASSWORD"
+          test "$(sed -n '1p' infra/college-foundation/supabase/.temp/project-ref)" = \
+            "$EXPECTED_SUPABASE_PROJECT_ID"
+
+      - name: Read migration state without applying changes
+        run: supabase --workdir infra/college-foundation migration list --linked
+
+      - name: Prove staging has no pending foundation migration
+        run: supabase --workdir infra/college-foundation db push --linked --dry-run
+
+      - name: Verify generated database types
+        shell: bash
+        run: |
+          set -euo pipefail
+          generated_types="$(mktemp)"
+          supabase --workdir infra/college-foundation gen types \
+            --linked \
+            --lang typescript \
+            --schema public,college_ingest > "$generated_types"
+          diff -u src/integrations/supabase/types.ts "$generated_types"
+
+      - name: Stop local foundation database
+        if: always()
+        run: supabase --workdir infra/college-foundation stop --no-backup

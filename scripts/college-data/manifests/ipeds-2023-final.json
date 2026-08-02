@@ -1,0 +1,120 @@
+{
+  "manifestVersion": 1,
+  "source": "IPEDS",
+  "releaseKey": "2023-final",
+  "requiredProjectRef": "ussnqsnuygqpgldyqtvv",
+  "bucket": "college-source-releases",
+  "retrievedAt": "2026-08-01T19:29:00Z",
+  "catalogUrl": "https://nces.ed.gov/ipeds/datacenter/DataFiles.aspx?year=-1",
+  "memberSelectionRule": "When a ZIP contains both base and _RV CSV members, parse the revised _RV member and retain both members in the immutable raw artifact.",
+  "artifacts": [
+    {
+      "id": "HD2023",
+      "survey": "Institutional Characteristics — directory",
+      "reportingPeriod": "2023 directory release",
+      "releaseType": "final/revised",
+      "sourceUrl": "https://nces.ed.gov/ipeds/datacenter/data/HD2023.zip",
+      "storagePath": "ipeds/2023-final/HD2023.zip",
+      "bytes": 1110720,
+      "sha256": "e11d35af6f50fbe2f51d8ddd5a9d4f49860abbab7d73beae1f8524f13ad8945b",
+      "members": ["HD2023.csv"],
+      "productUse": ["identity", "name", "location", "ownership", "level", "active-status inputs"]
+    },
+    {
+      "id": "IC2023",
+      "survey": "Institutional Characteristics — offerings and organization",
+      "reportingPeriod": "2023-24 collection",
+      "releaseType": "final/revised bundle",
+      "sourceUrl": "https://nces.ed.gov/ipeds/datacenter/data/IC2023.zip",
+      "storagePath": "ipeds/2023-final/IC2023.zip",
+      "bytes": 381806,
+      "sha256": "1454ab8fc5df34aafb04566351c29ed313350f41bc2a241a33fb4f7b93a044a1",
+      "members": ["IC2023.csv", "IC2023_RV.csv"],
+      "productUse": ["institutional characteristics", "offerings context"]
+    },
+    {
+      "id": "ADM2023",
+      "survey": "Admissions and Test Scores",
+      "reportingPeriod": "fall 2023",
+      "releaseType": "final/revised",
+      "sourceUrl": "https://nces.ed.gov/ipeds/datacenter/data/ADM2023.zip",
+      "storagePath": "ipeds/2023-final/ADM2023.zip",
+      "bytes": 97321,
+      "sha256": "670ecc7c4313f044dcdf740a42ef10c6d2927eb9f890fb405e3569c8442aca27",
+      "members": ["adm2023.csv"],
+      "productUse": ["historical admission rate", "SAT percentiles", "ACT percentiles"]
+    },
+    {
+      "id": "EFFY2023",
+      "survey": "12-month Enrollment",
+      "reportingPeriod": "2022-23 academic year",
+      "releaseType": "final/revised bundle",
+      "sourceUrl": "https://nces.ed.gov/ipeds/datacenter/data/EFFY2023.zip",
+      "storagePath": "ipeds/2023-final/EFFY2023.zip",
+      "bytes": 7295855,
+      "sha256": "bfc36572b930551f784ebb9c1e428b8f985fa70a80dab2e7c7121bd2c6feb433",
+      "members": ["EFFY2023.csv", "EFFY2023_RV.csv"],
+      "productUse": ["undergraduate enrollment cohort context"]
+    },
+    {
+      "id": "EF2023D",
+      "survey": "Fall Enrollment — entering class and retention",
+      "reportingPeriod": "fall 2023",
+      "releaseType": "final/revised",
+      "sourceUrl": "https://nces.ed.gov/ipeds/datacenter/data/EF2023D.zip",
+      "storagePath": "ipeds/2023-final/EF2023D.zip",
+      "bytes": 94562,
+      "sha256": "cfe4267b5b2e2a2ce6ea8c079c64707868c8c5b22372d578959e1726969e0c8c",
+      "members": ["ef2023d.csv"],
+      "productUse": ["first-year retention", "student-to-faculty context"]
+    },
+    {
+      "id": "C2023_A",
+      "survey": "Completions by program and award level",
+      "reportingPeriod": "2022-07-01 through 2023-06-30",
+      "releaseType": "final/revised bundle",
+      "sourceUrl": "https://nces.ed.gov/ipeds/datacenter/data/C2023_A.zip",
+      "storagePath": "ipeds/2023-final/C2023_A.zip",
+      "bytes": 9294160,
+      "sha256": "651d95b6405bb86c6c14884ed54225a27492199d21d8acd63cda2581aa60838a",
+      "members": ["C2023_a.csv", "C2023_a_RV.csv"],
+      "productUse": ["historical two-digit CIP program evidence"]
+    },
+    {
+      "id": "SFA2223",
+      "survey": "Student Financial Aid and Net Price",
+      "reportingPeriod": "2022-23 academic year",
+      "releaseType": "final/revised",
+      "sourceUrl": "https://nces.ed.gov/ipeds/datacenter/data/SFA2223.zip",
+      "storagePath": "ipeds/2023-final/SFA2223.zip",
+      "bytes": 1913114,
+      "sha256": "144f97dc24492febc772e2aed6c7eb543037ed56274a49cbae0e743cf717e2df",
+      "members": ["sfa2223.csv"],
+      "productUse": ["Pell share", "historical net-price context"]
+    },
+    {
+      "id": "GR2023",
+      "survey": "Graduation Rates",
+      "reportingPeriod": "component-defined entry cohorts reported in 2023",
+      "releaseType": "final/revised",
+      "sourceUrl": "https://nces.ed.gov/ipeds/datacenter/data/GR2023.zip",
+      "storagePath": "ipeds/2023-final/GR2023.zip",
+      "bytes": 913058,
+      "sha256": "f00c7140d4dbbb056043689aa82835eec5f6101b907b047a2933372505fa54bd",
+      "members": ["gr2023.csv"],
+      "productUse": ["completion-rate context with exact cohort label"]
+    },
+    {
+      "id": "OM2023",
+      "survey": "Outcome Measures",
+      "reportingPeriod": "component-defined entering cohort reported in 2023",
+      "releaseType": "final/revised",
+      "sourceUrl": "https://nces.ed.gov/ipeds/datacenter/data/OM2023.zip",
+      "storagePath": "ipeds/2023-final/OM2023.zip",
+      "bytes": 1347816,
+      "sha256": "60a619776e8da60542c9a728b2c2122bcdef6825c76b5b36a40ab243a5d0b504",
+      "members": ["om2023.csv"],
+      "productUse": ["outcome-measure context with exact cohort label"]
+    }
+  ]
+}

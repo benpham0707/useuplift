@@ -117,3 +117,52 @@ export interface ClassificationThresholds {
     match_act_buffer: number;
   };
 }
+
+export type FoundationOwnership = 'public' | 'private_nonprofit' | 'private_for_profit' | 'other';
+
+export interface FoundationCollegeSummary {
+  institution_id: string;
+  unitid: number;
+  name: string;
+  slug: string;
+  city: string | null;
+  state: string | null;
+  ownership: FoundationOwnership;
+  institution_level: 'two_year' | 'four_year' | 'less_than_two_year' | 'other';
+  undergraduate_enrollment: number | null;
+  admission_rate: number | null;
+  tuition_in_state: number | null;
+  tuition_out_of_state: number | null;
+  net_price: number | null;
+  coverage_score: number;
+}
+
+export interface FoundationCollegeFact {
+  field_key: string;
+  display_value: string | null;
+  source_name: string | null;
+  source_release: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  academic_year: number | null;
+  cohort_key: string | null;
+  cohort_label: string | null;
+  quality_status: string;
+  is_estimate: boolean;
+  is_suppressed: boolean;
+  retrieved_at: string | null;
+}
+
+export interface FoundationCollegeDetail extends FoundationCollegeSummary {
+  aliases: string[];
+  zip: string | null;
+  setting: string | null;
+  generated_at: string;
+  facts: FoundationCollegeFact[];
+}
+
+export interface CollegeCatalogSource {
+  producer: string;
+  release: string;
+  publishedAt: string | null;
+}
