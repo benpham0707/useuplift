@@ -1,7 +1,6 @@
 # Milestone 5 — Student-facing college discovery
 
-Status: implementation and automated validation complete; signed-in responsive
-browser QA remains pending. The field contract is provisional pending Milestone 0
+Status: **complete**. The field contract remains provisional pending Milestone 0
 student-session review.
 
 Validation date: 2026-08-01
@@ -18,7 +17,8 @@ prediction claims.
   offer undergraduate study and report positive undergraduate enrollment.
 - State, ownership, admission-rate, and undergraduate-enrollment filters.
 - Stable keyset pagination with a 24-college initial page.
-- Responsive college cards using only supported foundation fields.
+- Responsive college discovery: independently scrolling list and source-aware
+  preview panes on desktop, with direct profile navigation on mobile.
 - Detail pages with field-level source release, reporting period, quality state,
   suppression state, and retrieval provenance.
 - Explicit loading, error, empty, unavailable, and suppressed-value states.
@@ -60,8 +60,10 @@ npm run build
 
 All six commands passed locally on 2026-08-01. The unauthenticated browser path
 was also verified to redirect to Clerk sign-in without exposing catalog data.
-Neither available development browser had an active Uplift session, so the
-signed-in desktop/mobile visual pass remains the only open Milestone 5 exit gate.
+Signed-in browser QA passed at desktop (1280x720) and mobile (390x844) widths.
+On desktop, the document remains viewport-locked while the college list and
+preview scroll independently. On mobile, the catalog uses normal page scrolling,
+has no horizontal overflow, and selecting a college opens its responsive profile.
 
 The preview workflow now watches the college UI, API, types, service, tests, and
 documentation paths. It replays the database, runs all serving tests, typechecks
