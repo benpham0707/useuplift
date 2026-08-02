@@ -47,3 +47,38 @@ evidence; neither source proves that unrecorded local SQL was or was not run.
 This resolves the Milestone 1 uncertainty by preserving it explicitly. It does
 not pretend the legacy application migration chain is replayable.
 
+## Git preview replay repair — 2026-08-01
+
+PR #41 proved that Supabase Git branching reconstructs an empty preview database
+from the SQL bodies stored in production's migration ledger. The replay failed
+because two legacy prerequisites existed in production but were absent from that
+ledger:
+
+1. `20260504024343_expand_colleges_table_with_scorecard_fields` altered
+   `public.colleges` without establishing the legacy table first.
+2. `20260616211500_credits_integrity_hardening` expected three billing columns
+   and the legacy `handle_new_user()` trigger function even when those objects
+   were not part of the preview baseline.
+
+The repair was deliberately limited to migration reproducibility:
+
+- The recovered `20260504024343` migration now creates an empty,
+  production-compatible legacy college table when absent, enables RLS, installs
+  the two existing read policies, and then applies the historical expansion.
+- The existing `20260428205857` profile baseline now includes
+  `stripe_customer_id`, `subscription_status`, and `referral_discount_active`.
+- The credits hardening migration conditionally revokes execute permission from
+  `handle_new_user()` only when that legacy trigger function exists.
+- The repaired migration bodies were recorded in production's migration ledger
+  so newly created Supabase preview branches pull the corrected history.
+
+No production application table, row, constraint, policy, function, or college
+foundation object was changed by the ledger repair. The exact production college
+row count was checked before and after the metadata update. The recovered files
+are committed under `supabase/migrations/` so Git and the production ledger retain
+the same preview prerequisites going forward.
+
+Before preview recreation, the relevant production-ledger sequence was replayed
+against an empty local database inside a transaction. It created both baselines,
+ran the Scorecard expansion, credits hardening, and onboarding migration, and was
+then rolled back successfully.
