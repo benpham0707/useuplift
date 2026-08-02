@@ -77,53 +77,48 @@ export default function CollegesGallery() {
   };
 
   return (
-    <div className="min-h-full bg-slate-50/70">
-      <section className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8 lg:py-7">
-          <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
-            <div className="max-w-2xl">
-              <div className="mb-3 flex items-center gap-2 text-sm font-medium text-primary">
-                <Database className="h-4 w-4" aria-hidden="true" /> Official federal college data
-              </div>
-              <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Explore colleges with the source attached</h1>
-              <p className="mt-3 max-w-xl text-base leading-7 text-slate-600">
-                Search active four-year institutions and compare reported admissions, enrollment, and cost data without rankings or hidden match labels.
-              </p>
+    <div className="min-h-full bg-slate-50/70 lg:flex lg:h-[calc(100svh-4rem)] lg:min-h-0 lg:flex-col lg:overflow-hidden">
+      <section className="shrink-0 border-b border-slate-200 bg-white">
+        <div className="mx-auto max-w-[1500px] px-4 py-4 sm:px-6 lg:px-8 lg:py-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-950">Explore colleges</h1>
+              <span className="flex items-center gap-1.5 text-sm font-medium text-primary"><Database className="h-4 w-4" aria-hidden="true" />Official federal data</span>
+              <p className="basis-full text-sm text-slate-600 lg:hidden">Search active four-year institutions and compare reported admissions, enrollment, and cost data.</p>
             </div>
-            <div className="flex max-w-md items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-              <p>Fields are provisional while student research is underway. Open a college to see its exact source and reporting year.</p>
+            <div className="flex items-center gap-2 text-xs text-amber-950">
+              <ShieldCheck className="h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
+              <p>Provisional fields include their source and reporting year.</p>
             </div>
           </div>
 
-          <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(280px,1.35fr)_repeat(4,minmax(135px,1fr))] lg:items-end">
+            <div>
             <label htmlFor="college-search" className="sr-only">Search colleges</label>
             <div className="relative">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-              <Input id="college-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by college, city, or state" className="h-11 pl-10 pr-10" />
+              <Input id="college-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search colleges" className="h-10 bg-white pl-10 pr-10" />
               {search && <button type="button" onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Clear search"><X className="h-4 w-4" /></button>}
             </div>
-
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <FilterSelect label="State" value={state} onChange={setState}>
+            </div>
+              <FilterSelect label="State" compact value={state} onChange={setState}>
                 <SelectItem value="all">All states</SelectItem>{states.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
               </FilterSelect>
-              <FilterSelect label="Ownership" value={ownership} onChange={(value) => setOwnership(value as typeof ownership)}>
+              <FilterSelect label="Ownership" compact value={ownership} onChange={(value) => setOwnership(value as typeof ownership)}>
                 <SelectItem value="all">All ownership types</SelectItem><SelectItem value="public">Public</SelectItem><SelectItem value="private_nonprofit">Private nonprofit</SelectItem><SelectItem value="private_for_profit">Private for-profit</SelectItem>
               </FilterSelect>
-              <FilterSelect label="Admission rate" value={admission} onChange={(value) => setAdmission(value as keyof typeof admissionRanges)}>
+              <FilterSelect label="Admission rate" compact value={admission} onChange={(value) => setAdmission(value as keyof typeof admissionRanges)}>
                 <SelectItem value="all">Any reported rate</SelectItem><SelectItem value="selective">Below 25%</SelectItem><SelectItem value="moderate">25% to 60%</SelectItem><SelectItem value="broad">60% and above</SelectItem>
               </FilterSelect>
-              <FilterSelect label="Undergraduate enrollment" value={enrollment} onChange={(value) => setEnrollment(value as keyof typeof enrollmentRanges)}>
+              <FilterSelect label="Undergraduate enrollment" compact value={enrollment} onChange={(value) => setEnrollment(value as keyof typeof enrollmentRanges)}>
                 <SelectItem value="all">Any reported size</SelectItem><SelectItem value="small">Under 5,000</SelectItem><SelectItem value="medium">5,000 to 14,999</SelectItem><SelectItem value="large">15,000 and above</SelectItem>
               </FilterSelect>
-            </div>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6 lg:px-8">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <section className="mx-auto w-full max-w-[1500px] px-4 py-5 sm:px-6 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:px-8 lg:py-3">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 lg:hidden">
           <p className="text-sm text-slate-600" aria-live="polite">
             {query.isLoading ? 'Loading colleges…' : `Showing ${colleges.length.toLocaleString()} college${colleges.length === 1 ? '' : 's'}`}
           </p>
@@ -135,25 +130,31 @@ export default function CollegesGallery() {
         ) : colleges.length === 0 ? (
           <StatePanel icon={<Search className="h-5 w-5" />} title="No colleges match these filters" body="Try a broader admission range, another state, or fewer filters." action={<Button variant="outline" onClick={clearFilters}>Clear all filters</Button>} />
         ) : (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:grid lg:min-h-[620px] lg:grid-cols-[minmax(320px,390px)_minmax(0,1fr)]">
-            <div className="border-slate-200 lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto lg:border-r" aria-label="College search results">
-              {colleges.map((college) => <CollegeCard key={college.institution_id} college={college} selected={college.slug === activeSlug} onSelect={() => selectCollege(college.slug)} />)}
-              {query.hasNextPage && <div className="bg-white p-4"><Button className="w-full" variant="outline" onClick={() => query.fetchNextPage()} disabled={query.isFetchingNextPage}>{query.isFetchingNextPage && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Load more colleges</Button></div>}
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(320px,390px)_minmax(0,1fr)]">
+            <div className="flex min-h-0 flex-col border-slate-200 lg:border-r">
+              <div className="hidden shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-3 lg:flex">
+                <p className="text-sm font-medium text-slate-700" aria-live="polite">{`Showing ${colleges.length.toLocaleString()} college${colleges.length === 1 ? '' : 's'}`}</p>
+                {hasFilters && <Button type="button" variant="ghost" size="sm" onClick={clearFilters}><X className="mr-1 h-3.5 w-3.5" />Clear</Button>}
+              </div>
+              <div className="min-h-0 lg:overflow-y-auto" aria-label="College search results">
+                {colleges.map((college) => <CollegeCard key={college.institution_id} college={college} selected={college.slug === activeSlug} onSelect={() => selectCollege(college.slug)} />)}
+                {query.hasNextPage && <div className="bg-white p-4"><Button className="w-full" variant="outline" onClick={() => query.fetchNextPage()} disabled={query.isFetchingNextPage}>{query.isFetchingNextPage && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Load more colleges</Button></div>}
+              </div>
             </div>
-            <div className="hidden min-w-0 lg:block">
+            <div className="hidden min-h-0 min-w-0 overflow-y-auto lg:block">
               <CollegePreview response={previewQuery.data} loading={previewQuery.isLoading} error={previewQuery.isError} onRetry={() => previewQuery.refetch()} onOpenProfile={() => activeSlug && navigate(`/dashboard/colleges/${activeSlug}`)} />
             </div>
           </div>
         )}
 
-        {catalog && <p className="mt-8 text-center text-xs leading-5 text-slate-500">Catalog sources: {catalog.sources.map((source) => source.producer).filter((value, index, all) => all.indexOf(value) === index).join(' and ')}. Projection {catalog.projectionVersionId.slice(0, 8)}.</p>}
+        {catalog && <p className="mt-8 text-center text-xs leading-5 text-slate-500 lg:hidden">Catalog sources: {catalog.sources.map((source) => source.producer).filter((value, index, all) => all.indexOf(value) === index).join(' and ')}. Projection {catalog.projectionVersionId.slice(0, 8)}.</p>}
       </section>
     </div>
   );
 }
 
-function FilterSelect({ label, value, onChange, children }: { label: string; value: string; onChange: (value: string) => void; children: React.ReactNode }) {
-  return <div><label className="mb-1.5 block text-xs font-medium text-slate-600">{label}</label><Select value={value} onValueChange={onChange}><SelectTrigger className="h-10 bg-white"><SelectValue /></SelectTrigger><SelectContent>{children}</SelectContent></Select></div>;
+function FilterSelect({ label, value, onChange, children, compact = false }: { label: string; value: string; onChange: (value: string) => void; children: React.ReactNode; compact?: boolean }) {
+  return <div><label className={compact ? 'sr-only' : 'mb-1.5 block text-xs font-medium text-slate-600'}>{label}</label><Select value={value} onValueChange={onChange}><SelectTrigger className="h-10 bg-white" aria-label={label}><SelectValue /></SelectTrigger><SelectContent>{children}</SelectContent></Select></div>;
 }
 
 function CollegeListSkeleton() {
