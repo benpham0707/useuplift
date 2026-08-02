@@ -59,6 +59,8 @@ ledger:
 2. `20260616211500_credits_integrity_hardening` expected three billing columns
    and the legacy `handle_new_user()` trigger function even when those objects
    were not part of the preview baseline.
+3. `20260730050021_create_portfolio_guidance_cache` expected the shared
+   `set_timestamp()` trigger function, which also predated the ledger.
 
 The repair was deliberately limited to migration reproducibility:
 
@@ -69,6 +71,8 @@ The repair was deliberately limited to migration reproducibility:
   `stripe_customer_id`, `subscription_status`, and `referral_discount_active`.
 - The credits hardening migration conditionally revokes execute permission from
   `handle_new_user()` only when that legacy trigger function exists.
+- The guidance-cache migration establishes the production-compatible
+  `set_timestamp()` trigger function before attaching its update trigger.
 - The repaired migration bodies were recorded in production's migration ledger
   so newly created Supabase preview branches pull the corrected history.
 
