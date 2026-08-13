@@ -27,6 +27,7 @@ export default defineConfig({
     // shouldn't be loaded here. Phase 1+ test deliverables append to
     // this list as new vitest-compatible tests land.
     include: [
+      'tests/unit/launch-mode.test.ts',
       'tests/unit/build-cost-ledger.test.ts',
       'tests/unit/mock-llm.test.ts',
       'tests/unit/no-silent-fallback.test.ts',
