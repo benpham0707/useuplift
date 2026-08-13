@@ -7,13 +7,11 @@
 
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
 import { 
   PenTool, 
   Target, 
   MessageSquare, 
   CheckCircle2,
-  ArrowRight,
   Sparkles,
   Layers,
   TrendingUp
@@ -80,7 +78,7 @@ const PIQShowcase = () => {
         >
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary mb-6">
             <Sparkles className="h-4 w-4" />
-            Available Now
+            In Development
           </div>
           
           <h2 className="text-4xl md:text-5xl font-bold mb-6">
@@ -196,15 +194,12 @@ const PIQShowcase = () => {
           viewport={{ once: true }}
           transition={{ delay: 0.5 }}
         >
-          <Button size="lg" className="h-14 px-10 text-lg" asChild>
-            <Link to="/piq-workshop">
-              <PenTool className="mr-2 h-5 w-5" />
-              Try PIQ Workshop
-              <span className="ml-2 text-xs bg-white/20 px-2 py-0.5 rounded-full">Free</span>
-            </Link>
+          <Button size="lg" className="h-14 px-10 text-lg" disabled>
+            <PenTool className="mr-2 h-5 w-5" />
+            PIQ Workshop in development
           </Button>
           <p className="mt-4 text-sm text-muted-foreground">
-            No signup required to try. See your score in under 2 minutes.
+            Preparing for the 2026/2027 college application cycle. Check back soon.
           </p>
         </motion.div>
       </div>

@@ -1,7 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { motion } from 'motion/react';
-import { ArrowRight, PenTool, CheckCircle, Sparkles } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { PenTool, CheckCircle, Sparkles } from 'lucide-react';
 
 const HeroSection = () => {
   return (
@@ -22,7 +21,7 @@ const HeroSection = () => {
             >
               <div className="inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium bg-primary/10 text-primary mb-6">
                 <Sparkles className="h-3 w-3 mr-1.5" />
-                PIQ Workshop Available Now
+                Built for the 2026/2027 application cycle
               </div>
               <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl text-foreground">
                 Craft essays that{' '}
@@ -42,12 +41,9 @@ const HeroSection = () => {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start"
             >
-              <Button size="lg" className="text-base h-12 px-8 w-full sm:w-auto" asChild>
-                <Link to="/piq-workshop">
-                  <PenTool className="mr-2 h-4 w-4" />
-                  Try PIQ Workshop Free
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
+              <Button size="lg" className="text-base h-12 px-8 w-full sm:w-auto" disabled>
+                <PenTool className="mr-2 h-4 w-4" />
+                In development — check back soon
               </Button>
             </motion.div>
 
@@ -59,7 +55,7 @@ const HeroSection = () => {
             >
               <div className="flex items-center gap-1">
                 <CheckCircle className="h-3 w-3 text-green-500" />
-                <span>Get your score in 2 minutes</span>
+                <span>Focused, actionable feedback</span>
               </div>
               <div className="flex items-center gap-1">
                 <CheckCircle className="h-3 w-3 text-green-500" />
