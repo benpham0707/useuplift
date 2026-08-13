@@ -157,7 +157,7 @@ const ComingSoonSection = () => {
           ))}
         </div>
 
-        {/* Waitlist CTA */}
+        {/* Development status */}
         <motion.div 
           className="text-center"
           initial={{ opacity: 0, y: 20 }}
@@ -172,10 +172,10 @@ const ComingSoonSection = () => {
             disabled
           >
             <Bell className="mr-2 h-4 w-4" />
-            Get notified when it launches
+            In development
           </Button>
           <p className="mt-4 text-sm text-muted-foreground">
-            Waitlist temporarily closed. Check back soon!
+            Preparing for the 2026/2027 college application cycle. Check back soon.
           </p>
         </motion.div>
       </div>

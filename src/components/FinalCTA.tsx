@@ -1,6 +1,5 @@
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
-import { ArrowRight } from 'lucide-react';
 
 const FinalCTA = () => {
   return (
@@ -44,7 +43,7 @@ const FinalCTA = () => {
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.2 }}
         >
-          Join the early access list and get your first portfolio scan when we open the next batch.
+          Uplift is in development for the 2026/2027 college application cycle.
         </motion.p>
 
         <motion.div
@@ -55,11 +54,10 @@ const FinalCTA = () => {
           transition={{ duration: 0.5, delay: 0.4 }}
         >
           <Button size="lg" className="h-12 px-8 text-base opacity-50 cursor-not-allowed" disabled>
-            Join early access
-            <ArrowRight className="ml-2 h-4 w-4" />
+            Check back soon
           </Button>
           <p className="text-xs text-muted-foreground">
-            Portfolio scanner coming soon. Check back later!
+            We’ll be ready for the next application cycle.
           </p>
         </motion.div>
       </div>

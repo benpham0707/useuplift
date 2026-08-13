@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { Separator } from '@/components/ui/separator';
 import { ArrowLeft } from 'lucide-react';
@@ -14,8 +13,6 @@ const Privacy = () => {
 
   return (
     <div className="min-h-screen bg-background font-sans">
-      <Navigation />
-      
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Back link */}
         <Link 
