@@ -14,7 +14,9 @@ and links directly into product routes.
 - Keep authentication available in local development so product work can
   continue. A deliberate `VITE_ENABLE_PRODUCTION_AUTH=true` build-time flag can
   restore production auth when the product is ready.
-- Remove the landing navbar and all remaining landing-page product/auth links.
+- Replace the landing navbar with a standalone brand header: keep the logo and
+  disabled auth controls in their original positions, but remove all product
+  navigation links and authentication behavior.
 - Replace the announcement copy and calls to action with a consistent
   development notice for the 2026/2027 college application cycle.
 
@@ -26,6 +28,7 @@ and links directly into product routes.
 - `src/config/launchMode.ts`
 - `.env.example`
 - `src/pages/Index.tsx`
+- `src/components/LandingHeader.tsx`
 - `src/pages/Privacy.tsx`
 - `src/pages/Terms.tsx`
 - `src/components/AnnouncementBar.tsx`
@@ -44,7 +47,7 @@ and links directly into product routes.
 
 - Run TypeScript type checking and a production build.
 - Serve the production build and verify `/`, `/auth`, and a protected route.
-- Confirm the landing page has no navbar, logo, sign-in/sign-up controls, or
-  active product CTA.
+- Confirm the landing page has no product navbar or active product CTA, the
+  logo remains in its original position, and Sign In/Sign Up are disabled.
 - Run a development-mode build to confirm the full authenticated route tree
   still compiles.

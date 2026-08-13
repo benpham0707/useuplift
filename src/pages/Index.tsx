@@ -1,4 +1,5 @@
 import AnnouncementBar from '@/components/AnnouncementBar';
+import LandingHeader from '@/components/LandingHeader';
 import HeroSection from '@/components/HeroSection';
 import UniversityBacked from '@/components/UniversityBacked';
 import PIQShowcase from '@/components/landing/PIQShowcase';
@@ -15,6 +16,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background font-sans antialiased">
       <AnnouncementBar />
+      <LandingHeader />
       <main className="flex-1">
         <HeroSection />
         <UniversityBacked />
