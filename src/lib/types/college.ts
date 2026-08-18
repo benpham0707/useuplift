@@ -135,6 +135,8 @@ export interface FoundationCollegeSummary {
   tuition_out_of_state: number | null;
   net_price: number | null;
   coverage_score: number;
+  program_area_codes: string[];
+  program_area_labels: string[];
 }
 
 export interface FoundationCollegeFact {
@@ -165,4 +167,21 @@ export interface CollegeCatalogSource {
   producer: string;
   release: string;
   publishedAt: string | null;
+}
+
+export interface CollegeMajorFacet {
+  code: string;
+  label: string;
+}
+
+export interface FoundationCollegeListItem {
+  id: string;
+  institution_id: string;
+  category: CollegeCategory;
+  status: ApplicationStatus;
+  notes: string | null;
+  position: number | null;
+  added_at: string;
+  updated_at: string;
+  college: FoundationCollegeSummary;
 }

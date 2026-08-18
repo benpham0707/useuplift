@@ -4,6 +4,10 @@ import type {
   FoundationCollegeDetail,
   FoundationCollegeSummary,
   FoundationOwnership,
+  CollegeMajorFacet,
+  CollegeCategory,
+  ApplicationStatus,
+  FoundationCollegeListItem,
 } from '@/lib/types/college';
 
 export interface CollegeSearchInput {
@@ -14,6 +18,9 @@ export interface CollegeSearchInput {
   admissionRateMax?: number;
   enrollmentMin?: number;
   enrollmentMax?: number;
+  netPriceMin?: number;
+  netPriceMax?: number;
+  major?: string;
   cursor?: string | null;
   limit?: number;
 }
@@ -34,9 +41,16 @@ export interface CollegeDetailResponse {
 }
 
 async function authenticatedRequest<T>(path: string, getToken: () => Promise<string | null>) {
+  return authenticatedMutation<T>(path, getToken);
+}
+
+async function authenticatedMutation<T>(path: string, getToken: () => Promise<string | null>, init: RequestInit = {}) {
   const token = await getToken();
   if (!token) throw new Error('AUTH_REQUIRED');
-  const response = await apiFetch(path, { headers: { Authorization: `Bearer ${token}` } });
+  const response = await apiFetch(path, {
+    ...init,
+    headers: { 'Content-Type': 'application/json', ...init.headers, Authorization: `Bearer ${token}` },
+  });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     const error = new Error(body.error || 'College data request failed');
@@ -56,4 +70,34 @@ export function fetchCollegePage(input: CollegeSearchInput, getToken: () => Prom
 
 export function fetchCollegeDetail(slug: string, getToken: () => Promise<string | null>) {
   return authenticatedRequest<CollegeDetailResponse>(`/api/v1/colleges/${encodeURIComponent(slug)}`, getToken);
+}
+
+export function fetchCollegeFacets(getToken: () => Promise<string | null>) {
+  return authenticatedRequest<{ majors: CollegeMajorFacet[] }>('/api/v1/colleges/facets', getToken);
+}
+
+export function fetchCollegeList(getToken: () => Promise<string | null>) {
+  return authenticatedRequest<{ data: FoundationCollegeListItem[] }>('/api/v1/colleges/list', getToken);
+}
+
+export function addCollegeToList(institutionId: string, getToken: () => Promise<string | null>) {
+  return authenticatedMutation<{ data: Omit<FoundationCollegeListItem, 'college'> }>(
+    '/api/v1/colleges/list', getToken,
+    { method: 'POST', body: JSON.stringify({ institutionId }) },
+  );
+}
+
+export function updateCollegeListItem(
+  institutionId: string,
+  input: { category?: CollegeCategory; status?: ApplicationStatus },
+  getToken: () => Promise<string | null>,
+) {
+  return authenticatedMutation<{ data: Omit<FoundationCollegeListItem, 'college'> }>(
+    `/api/v1/colleges/list/${institutionId}`, getToken,
+    { method: 'PATCH', body: JSON.stringify(input) },
+  );
+}
+
+export function removeCollegeFromList(institutionId: string, getToken: () => Promise<string | null>) {
+  return authenticatedMutation<void>(`/api/v1/colleges/list/${institutionId}`, getToken, { method: 'DELETE' });
 }

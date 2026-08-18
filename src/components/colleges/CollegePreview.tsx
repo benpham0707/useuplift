@@ -1,4 +1,4 @@
-import { AlertCircle, ArrowUpRight, Building2, Database, Loader2, MapPin, ShieldCheck, Users } from 'lucide-react';
+import { AlertCircle, ArrowUpRight, Building2, Check, Database, Loader2, MapPin, Plus, ShieldCheck, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { CollegeDetailResponse } from '@/services/collegeDiscovery/api';
 import { formatCollegeCurrency, formatCollegePercent, ownershipLabel } from '@/services/collegeDiscovery/format';
@@ -9,9 +9,12 @@ interface CollegePreviewProps {
   error: boolean;
   onRetry: () => void;
   onOpenProfile: () => void;
+  saved?: boolean;
+  adding?: boolean;
+  onAdd?: () => void;
 }
 
-export function CollegePreview({ response, loading, error, onRetry, onOpenProfile }: CollegePreviewProps) {
+export function CollegePreview({ response, loading, error, onRetry, onOpenProfile, saved = false, adding = false, onAdd }: CollegePreviewProps) {
   if (loading) return <PreviewState icon={<Loader2 className="h-5 w-5 animate-spin" />} title="Loading college profile…" />;
   if (error || !response) return <PreviewState icon={<AlertCircle className="h-5 w-5" />} title="Preview unavailable" body="The college list is still available while this profile reloads." action={<Button variant="outline" size="sm" onClick={onRetry}>Try again</Button>} />;
 
@@ -31,14 +34,17 @@ export function CollegePreview({ response, loading, error, onRetry, onOpenProfil
               <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-600"><span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" aria-hidden="true" />{location}</span><span aria-hidden="true">·</span><span>{ownershipLabel(college.ownership)}</span><span aria-hidden="true">·</span><span>Four-year</span></p>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={onOpenProfile}>View full profile<ArrowUpRight className="ml-2 h-4 w-4" /></Button>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            {onAdd && <Button size="sm" variant={saved ? 'secondary' : 'default'} onClick={onAdd} disabled={saved || adding}>{adding ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}{saved ? 'Added to My Colleges' : 'Add to My Colleges'}</Button>}
+            <Button variant="outline" size="sm" onClick={onOpenProfile}>View full profile<ArrowUpRight className="ml-2 h-4 w-4" /></Button>
+          </div>
         </div>
       </header>
 
       <div className="space-y-6 px-5 py-5 xl:px-7">
-        <section aria-labelledby="why-heading">
-          <SectionHeading number="1" id="why-heading">Why this college appears</SectionHeading>
-          <p className="mt-3 text-sm leading-6 text-slate-600">This is an active four-year institution reporting undergraduate enrollment. Uplift includes it for research without assigning a ranking or hidden match score.</p>
+        <section aria-labelledby="programs-heading">
+          <SectionHeading number="1" id="programs-heading">Reported program areas</SectionHeading>
+          {college.program_area_labels.length > 0 ? <div className="mt-3 flex flex-wrap gap-2">{college.program_area_labels.map((label) => <span key={label} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">{label}</span>)}</div> : <p className="mt-3 text-sm text-slate-500">No bachelor’s program areas are available in this release.</p>}
         </section>
 
         <section className="border-t border-slate-200 pt-5" aria-labelledby="overview-preview-heading">
