@@ -136,7 +136,7 @@ export default function CollegesGallery() {
         </div>
       </div>
 
-      <main className="mx-auto grid w-full max-w-[1600px] flex-1 bg-white lg:min-h-0 lg:grid-cols-[410px_minmax(0,1fr)] lg:border-x lg:border-slate-200 xl:grid-cols-[450px_minmax(0,1fr)]">
+      <main className="mx-auto grid w-full max-w-[1600px] flex-1 bg-white lg:min-h-0 lg:grid-cols-[380px_minmax(0,1fr)] lg:border-x lg:border-slate-200 xl:grid-cols-[400px_minmax(0,1fr)]">
         <section className="min-w-0 lg:flex lg:min-h-0 lg:flex-col lg:border-r lg:border-slate-200" aria-labelledby="college-results-heading">
           <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/70 px-4 py-3">
             <h2 id="college-results-heading" className="text-sm font-semibold text-slate-800">{results.length}{searchQuery.hasNextPage ? '+' : ''} colleges</h2>
