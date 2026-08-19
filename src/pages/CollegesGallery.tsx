@@ -120,19 +120,21 @@ export default function CollegesGallery() {
       </header>
 
       <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-4 sm:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-[1600px] flex-col gap-3 xl:flex-row xl:items-center">
-          <div className="relative min-w-0 flex-1 xl:max-w-xl">
+        <div className="mx-auto grid max-w-[1600px] grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-[minmax(14rem,2fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1.2fr)_5rem] xl:items-center">
+          <div className="relative col-span-2 min-w-0 sm:col-span-4 xl:col-span-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by college name" className="h-11 pl-10 pr-10" />
             {search && <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-slate-700" aria-label="Clear search"><X className="h-4 w-4" /></button>}
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:flex xl:shrink-0">
-            <Filter value={state} onChange={setState} label="State" className="xl:w-32"><SelectItem value="all">All states</SelectItem>{states.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</Filter>
-            <Filter value={size} onChange={(value) => setSize(value as keyof typeof sizeRanges)} label="Size" className="xl:w-40"><SelectItem value="all">Any size</SelectItem><SelectItem value="small">Small · under 5k</SelectItem><SelectItem value="medium">Medium · 5k–15k</SelectItem><SelectItem value="large">Large · 15k+</SelectItem></Filter>
-            <Filter value={cost} onChange={(value) => setCost(value as keyof typeof costRanges)} label="Average net price" className="xl:w-44"><SelectItem value="all">Any net price</SelectItem><SelectItem value="under15">Under $15k</SelectItem><SelectItem value="from15to25">$15k–$25k</SelectItem><SelectItem value="from25to40">$25k–$40k</SelectItem><SelectItem value="over40">$40k+</SelectItem></Filter>
-            <Filter value={major} onChange={setMajor} label="Major area" className="xl:w-48"><SelectItem value="all">Any major</SelectItem>{facetsQuery.data?.majors.map((item) => <SelectItem key={item.code} value={item.code}>{item.label}</SelectItem>)}</Filter>
+          <div className="col-span-2 grid grid-cols-2 gap-2 sm:col-span-4 sm:grid-cols-4 xl:contents">
+            <Filter value={state} onChange={setState} label="State"><SelectItem value="all">All states</SelectItem>{states.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</Filter>
+            <Filter value={size} onChange={(value) => setSize(value as keyof typeof sizeRanges)} label="Size"><SelectItem value="all">Any size</SelectItem><SelectItem value="small">Small · under 5k</SelectItem><SelectItem value="medium">Medium · 5k–15k</SelectItem><SelectItem value="large">Large · 15k+</SelectItem></Filter>
+            <Filter value={cost} onChange={(value) => setCost(value as keyof typeof costRanges)} label="Average net price"><SelectItem value="all">Any net price</SelectItem><SelectItem value="under15">Under $15k</SelectItem><SelectItem value="from15to25">$15k–$25k</SelectItem><SelectItem value="from25to40">$25k–$40k</SelectItem><SelectItem value="over40">$40k+</SelectItem></Filter>
+            <Filter value={major} onChange={setMajor} label="Major area"><SelectItem value="all">Any major</SelectItem>{facetsQuery.data?.majors.map((item) => <SelectItem key={item.code} value={item.code}>{item.label}</SelectItem>)}</Filter>
           </div>
-          {hasFilters && <Button variant="ghost" size="sm" onClick={clearFilters} className="self-start xl:self-auto"><X className="h-4 w-4" />Clear</Button>}
+          <div className={`${hasFilters ? 'flex' : 'hidden xl:flex'} col-span-2 h-9 items-center justify-end sm:col-span-4 xl:col-span-1 xl:justify-start`}>
+            <Button variant="ghost" size="sm" onClick={clearFilters} className={!hasFilters ? 'invisible w-20' : 'w-20'} disabled={!hasFilters} aria-hidden={!hasFilters}><X className="h-4 w-4" />Clear</Button>
+          </div>
         </div>
       </div>
 
