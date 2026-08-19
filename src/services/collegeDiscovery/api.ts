@@ -13,6 +13,9 @@ import type {
 export interface CollegeSearchInput {
   q?: string;
   state?: string;
+  states?: string[];
+  sizes?: Array<'small' | 'medium' | 'large'>;
+  costs?: Array<'under15' | 'from15to25' | 'from25to40' | 'over40'>;
   ownership?: FoundationOwnership;
   admissionRateMin?: number;
   admissionRateMax?: number;
@@ -21,6 +24,7 @@ export interface CollegeSearchInput {
   netPriceMin?: number;
   netPriceMax?: number;
   major?: string;
+  majors?: string[];
   cursor?: string | null;
   limit?: number;
 }
@@ -63,7 +67,11 @@ async function authenticatedMutation<T>(path: string, getToken: () => Promise<st
 export function fetchCollegePage(input: CollegeSearchInput, getToken: () => Promise<string | null>) {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(input)) {
-    if (value !== undefined && value !== null && value !== '') params.set(key, String(value));
+    if (Array.isArray(value)) {
+      if (value.length > 0) params.set(key, value.join(','));
+    } else if (value !== undefined && value !== null && value !== '') {
+      params.set(key, String(value));
+    }
   }
   return authenticatedRequest<CollegePageResponse>(`/api/v1/colleges?${params}`, getToken);
 }

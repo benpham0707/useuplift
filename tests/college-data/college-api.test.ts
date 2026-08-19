@@ -45,7 +45,7 @@ vi.mock('@/supabase/admin', () => ({
       let operation = 'select';
       const filters = new Map<string, unknown>();
       const builder: Record<string, unknown> = {};
-      for (const method of ['select', 'eq', 'order', 'limit', 'textSearch', 'ilike', 'gte', 'lte', 'gt', 'not', 'in', 'contains', 'upsert', 'update', 'delete']) {
+      for (const method of ['select', 'eq', 'order', 'limit', 'textSearch', 'ilike', 'gte', 'lte', 'gt', 'not', 'in', 'contains', 'overlaps', 'or', 'upsert', 'update', 'delete']) {
         builder[method] = (...args: unknown[]) => {
           fixtures.calls.push({ table, method, args });
           if (method === 'eq') filters.set(String(args[0]), args[1]);
@@ -156,6 +156,34 @@ describe('college API', () => {
       expect.objectContaining({ table: 'college_profiles', method: 'contains', args: ['program_area_codes', ['11']] }),
     ]));
     expect(fixtures.calls.some((call) => call.method === 'order' && call.args[0] === 'slug')).toBe(true);
+  });
+
+  it('applies multiple selections within each filter as OR conditions', async () => {
+    fixtures.calls.length = 0;
+    const response = await fetch(`${baseUrl}/colleges?states=CA,NY&sizes=small,large&costs=under15,over40&majors=11,14`, {
+      headers: { Authorization: 'Bearer fixture' },
+    });
+    expect(response.status).toBe(200);
+    expect(fixtures.calls).toEqual(expect.arrayContaining([
+      expect.objectContaining({ table: 'college_profiles', method: 'in', args: ['state', ['CA', 'NY']] }),
+      expect.objectContaining({
+        table: 'college_profiles', method: 'or',
+        args: ['undergraduate_enrollment.lt.5000,undergraduate_enrollment.gte.15000'],
+      }),
+      expect.objectContaining({
+        table: 'college_profiles', method: 'or',
+        args: ['net_price.lt.15000,net_price.gte.40000'],
+      }),
+      expect.objectContaining({ table: 'college_profiles', method: 'overlaps', args: ['program_area_codes', ['11', '14']] }),
+    ]));
+  });
+
+  it('rejects invalid multi-select filter values', async () => {
+    const response = await fetch(`${baseUrl}/colleges?states=CA,California&sizes=tiny&costs=free&majors=computer-science`, {
+      headers: { Authorization: 'Bearer fixture' },
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: 'INVALID_QUERY' });
   });
 
   it('serves an authenticated page with version and provisional contract state', async () => {

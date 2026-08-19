@@ -3,9 +3,37 @@ import { z } from 'zod';
 import { requireAuth } from './middleware/auth';
 import { supabaseAdmin } from '@/supabase/admin';
 
+const parseCsvValues = (value: unknown) => {
+  if (value === undefined) return undefined;
+  return (Array.isArray(value) ? value : [value])
+    .flatMap((item) => String(item).split(','))
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
+
+const statesSchema = z.preprocess(
+  parseCsvValues,
+  z.array(z.string().regex(/^[A-Z]{2}$/)).min(1).max(51).optional(),
+);
+const sizesSchema = z.preprocess(
+  parseCsvValues,
+  z.array(z.enum(['small', 'medium', 'large'])).min(1).max(3).optional(),
+);
+const costsSchema = z.preprocess(
+  parseCsvValues,
+  z.array(z.enum(['under15', 'from15to25', 'from25to40', 'over40'])).min(1).max(4).optional(),
+);
+const majorsSchema = z.preprocess(
+  parseCsvValues,
+  z.array(z.string().regex(/^[0-9]{2}$/)).min(1).max(25).optional(),
+);
+
 const searchSchema = z.object({
   q: z.string().trim().max(100).optional(),
   state: z.string().trim().regex(/^[A-Z]{2}$/).optional(),
+  states: statesSchema,
+  sizes: sizesSchema,
+  costs: costsSchema,
   ownership: z.enum(['public', 'private_nonprofit', 'private_for_profit', 'other']).optional(),
   level: z.enum(['two_year', 'four_year', 'less_than_two_year', 'other']).optional(),
   admissionRateMin: z.coerce.number().min(0).max(1).optional(),
@@ -15,6 +43,7 @@ const searchSchema = z.object({
   netPriceMin: z.coerce.number().min(0).optional(),
   netPriceMax: z.coerce.number().min(0).optional(),
   major: z.string().regex(/^[0-9]{2}$/).optional(),
+  majors: majorsSchema,
   limit: z.coerce.number().int().min(1).max(100).default(24),
   cursor: z.string().trim().max(300).optional(),
 }).superRefine((value, context) => {
@@ -226,16 +255,35 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
       const literalName = input.q.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_');
       query = query.ilike('name', `%${literalName}%`);
     }
-    if (input.state) query = query.eq('state', input.state);
+    if (input.states?.length) query = query.in('state', [...new Set(input.states)]);
+    else if (input.state) query = query.eq('state', input.state);
     if (input.ownership) query = query.eq('ownership', input.ownership);
     if (input.level) query = query.eq('institution_level', input.level);
     if (input.admissionRateMin !== undefined) query = query.gte('admission_rate', input.admissionRateMin);
     if (input.admissionRateMax !== undefined) query = query.lte('admission_rate', input.admissionRateMax);
     if (input.enrollmentMin !== undefined) query = query.gte('undergraduate_enrollment', input.enrollmentMin);
     if (input.enrollmentMax !== undefined) query = query.lte('undergraduate_enrollment', input.enrollmentMax);
+    if (input.sizes?.length) {
+      const sizeFilters = {
+        small: 'undergraduate_enrollment.lt.5000',
+        medium: 'and(undergraduate_enrollment.gte.5000,undergraduate_enrollment.lte.14999)',
+        large: 'undergraduate_enrollment.gte.15000',
+      } as const;
+      query = query.or([...new Set(input.sizes)].map((size) => sizeFilters[size]).join(','));
+    }
     if (input.netPriceMin !== undefined) query = query.gte('net_price', input.netPriceMin);
     if (input.netPriceMax !== undefined) query = query.lte('net_price', input.netPriceMax);
-    if (input.major) query = query.contains('program_area_codes', [input.major]);
+    if (input.costs?.length) {
+      const costFilters = {
+        under15: 'net_price.lt.15000',
+        from15to25: 'and(net_price.gte.15000,net_price.lte.24999)',
+        from25to40: 'and(net_price.gte.25000,net_price.lte.39999)',
+        over40: 'net_price.gte.40000',
+      } as const;
+      query = query.or([...new Set(input.costs)].map((cost) => costFilters[cost]).join(','));
+    }
+    if (input.majors?.length) query = query.overlaps('program_area_codes', [...new Set(input.majors)]);
+    else if (input.major) query = query.contains('program_area_codes', [input.major]);
     if (input.cursor) query = query.gt('slug', decodeCursor(input.cursor));
 
     const { data, error } = await query;

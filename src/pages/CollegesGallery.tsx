@@ -7,6 +7,7 @@ import {
   Bookmark,
   Building2,
   Check,
+  ChevronDown,
   ChevronRight,
   ListFilter,
   Loader2,
@@ -17,8 +18,9 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CollegePreview } from '@/components/colleges/CollegePreview';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -32,8 +34,20 @@ import { formatCollegeCurrency } from '@/services/collegeDiscovery/format';
 import type { FoundationCollegeSummary } from '@/lib/types/college';
 
 const states = ['AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'];
-const sizeRanges = { all: {}, small: { enrollmentMax: 4999 }, medium: { enrollmentMin: 5000, enrollmentMax: 14999 }, large: { enrollmentMin: 15000 } } as const;
-const costRanges = { all: {}, under15: { netPriceMax: 14999 }, from15to25: { netPriceMin: 15000, netPriceMax: 24999 }, from25to40: { netPriceMin: 25000, netPriceMax: 39999 }, over40: { netPriceMin: 40000 } } as const;
+type SizeBand = 'small' | 'medium' | 'large';
+type CostBand = 'under15' | 'from15to25' | 'from25to40' | 'over40';
+const stateOptions = states.map((value) => ({ value, label: value }));
+const sizeOptions: Array<{ value: SizeBand; label: string }> = [
+  { value: 'small', label: 'Small · under 5k' },
+  { value: 'medium', label: 'Medium · 5k–15k' },
+  { value: 'large', label: 'Large · 15k+' },
+];
+const costOptions: Array<{ value: CostBand; label: string }> = [
+  { value: 'under15', label: 'Under $15k' },
+  { value: 'from15to25', label: '$15k–$25k' },
+  { value: 'from25to40', label: '$25k–$40k' },
+  { value: 'over40', label: '$40k+' },
+];
 
 export default function CollegesGallery() {
   const { getToken } = useClerkAuth();
@@ -42,10 +56,10 @@ export default function CollegesGallery() {
   const { toast } = useToast();
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [state, setState] = useState('all');
-  const [size, setSize] = useState<keyof typeof sizeRanges>('all');
-  const [cost, setCost] = useState<keyof typeof costRanges>('all');
-  const [major, setMajor] = useState('all');
+  const [selectedStates, setSelectedStates] = useState<string[]>([]);
+  const [selectedSizes, setSelectedSizes] = useState<SizeBand[]>([]);
+  const [selectedCosts, setSelectedCosts] = useState<CostBand[]>([]);
+  const [selectedMajors, setSelectedMajors] = useState<string[]>([]);
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
 
   useEffect(() => {
@@ -57,12 +71,12 @@ export default function CollegesGallery() {
   const facetsQuery = useQuery({ queryKey: ['college-facets'], queryFn: () => fetchCollegeFacets(getToken), staleTime: 300_000 });
   const queryInput = useMemo(() => ({
     q: debouncedSearch || undefined,
-    state: state === 'all' ? undefined : state,
-    major: major === 'all' ? undefined : major,
-    ...sizeRanges[size],
-    ...costRanges[cost],
+    states: selectedStates.length ? selectedStates : undefined,
+    sizes: selectedSizes.length ? selectedSizes : undefined,
+    costs: selectedCosts.length ? selectedCosts : undefined,
+    majors: selectedMajors.length ? selectedMajors : undefined,
     limit: 24,
-  }), [debouncedSearch, state, size, cost, major]);
+  }), [debouncedSearch, selectedStates, selectedSizes, selectedCosts, selectedMajors]);
   const searchQuery = useInfiniteQuery({
     queryKey: ['foundation-colleges', queryInput],
     initialPageParam: null as string | null,
@@ -92,8 +106,16 @@ export default function CollegesGallery() {
     onError: () => toast({ title: 'Could not add college', description: 'Please try again.', variant: 'destructive' }),
   });
 
-  const hasFilters = Boolean(search || state !== 'all' || size !== 'all' || cost !== 'all' || major !== 'all');
-  const clearFilters = () => { setSearch(''); setDebouncedSearch(''); setState('all'); setSize('all'); setCost('all'); setMajor('all'); setSelectedSlug(null); };
+  const hasFilters = Boolean(search || selectedStates.length || selectedSizes.length || selectedCosts.length || selectedMajors.length);
+  const clearFilters = () => {
+    setSearch('');
+    setDebouncedSearch('');
+    setSelectedStates([]);
+    setSelectedSizes([]);
+    setSelectedCosts([]);
+    setSelectedMajors([]);
+    setSelectedSlug(null);
+  };
   const openCollege = (college: FoundationCollegeSummary) => {
     if (window.matchMedia('(max-width: 1023px)').matches) navigate(`/dashboard/colleges/${college.slug}`);
     else setSelectedSlug(college.slug);
@@ -127,10 +149,10 @@ export default function CollegesGallery() {
             {search && <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-slate-700" aria-label="Clear search"><X className="h-4 w-4" /></button>}
           </div>
           <div className="col-span-2 grid grid-cols-2 gap-2 sm:col-span-4 sm:grid-cols-4 xl:contents">
-            <Filter value={state} onChange={setState} label="State"><SelectItem value="all">All states</SelectItem>{states.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</Filter>
-            <Filter value={size} onChange={(value) => setSize(value as keyof typeof sizeRanges)} label="Size"><SelectItem value="all">Any size</SelectItem><SelectItem value="small">Small · under 5k</SelectItem><SelectItem value="medium">Medium · 5k–15k</SelectItem><SelectItem value="large">Large · 15k+</SelectItem></Filter>
-            <Filter value={cost} onChange={(value) => setCost(value as keyof typeof costRanges)} label="Average net price"><SelectItem value="all">Any net price</SelectItem><SelectItem value="under15">Under $15k</SelectItem><SelectItem value="from15to25">$15k–$25k</SelectItem><SelectItem value="from25to40">$25k–$40k</SelectItem><SelectItem value="over40">$40k+</SelectItem></Filter>
-            <Filter value={major} onChange={setMajor} label="Major area"><SelectItem value="all">Any major</SelectItem>{facetsQuery.data?.majors.map((item) => <SelectItem key={item.code} value={item.code}>{item.label}</SelectItem>)}</Filter>
+            <MultiFilter values={selectedStates} onChange={setSelectedStates} label="States" placeholder="All states" selectedLabel="states" options={stateOptions} />
+            <MultiFilter values={selectedSizes} onChange={setSelectedSizes} label="Sizes" placeholder="Any size" selectedLabel="sizes" options={sizeOptions} />
+            <MultiFilter values={selectedCosts} onChange={setSelectedCosts} label="Average net prices" placeholder="Any net price" selectedLabel="prices" options={costOptions} />
+            <MultiFilter values={selectedMajors} onChange={setSelectedMajors} label="Major areas" placeholder="Any major" selectedLabel="majors" options={facetsQuery.data?.majors.map((item) => ({ value: item.code, label: item.label })) ?? []} />
           </div>
           <div className={`${hasFilters ? 'flex' : 'hidden xl:flex'} col-span-2 h-9 items-center justify-end sm:col-span-4 xl:col-span-1 xl:justify-start`}>
             <Button variant="ghost" size="sm" onClick={clearFilters} className={!hasFilters ? 'invisible w-20' : 'w-20'} disabled={!hasFilters} aria-hidden={!hasFilters}><X className="h-4 w-4" />Clear</Button>
@@ -185,8 +207,40 @@ function CollegeResult({ college, active, added, adding, onSelect, onAdd }: { co
   </div>;
 }
 
-function Filter({ value, onChange, label, className, children }: { value: string; onChange: (value: string) => void; label: string; className?: string; children: React.ReactNode }) {
-  return <Select value={value} onValueChange={onChange}><SelectTrigger className={`h-11 min-w-0 text-sm ${className ?? ''}`} aria-label={label}><SelectValue /></SelectTrigger><SelectContent>{children}</SelectContent></Select>;
+function MultiFilter<T extends string>({ values, onChange, label, placeholder, selectedLabel, options }: {
+  values: T[];
+  onChange: (values: T[]) => void;
+  label: string;
+  placeholder: string;
+  selectedLabel: string;
+  options: Array<{ value: T; label: string }>;
+}) {
+  const selectedText = values.length === 0
+    ? placeholder
+    : values.length === 1
+      ? options.find((option) => option.value === values[0])?.label ?? values[0]
+      : `${values.length} ${selectedLabel}`;
+
+  const toggle = (value: T) => {
+    onChange(values.includes(value) ? values.filter((item) => item !== value) : [...values, value]);
+  };
+
+  return <Popover>
+    <PopoverTrigger asChild>
+      <Button variant="outline" className="h-11 min-w-0 justify-between px-3 font-normal" aria-label={`${label}: ${selectedText}`}>
+        <span className="truncate">{selectedText}</span>
+        <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-slate-400" />
+      </Button>
+    </PopoverTrigger>
+    <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] min-w-56 p-1">
+      <div className="max-h-64 overflow-y-auto py-1" aria-label={label}>
+        {options.map((option) => <label key={option.value} className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-2 text-sm hover:bg-slate-100">
+          <Checkbox checked={values.includes(option.value)} onCheckedChange={() => toggle(option.value)} />
+          <span className="min-w-0 flex-1 truncate">{option.label}</span>
+        </label>)}
+      </div>
+    </PopoverContent>
+  </Popover>;
 }
 
 function CompactState({ icon, title, action }: { icon: React.ReactNode; title: string; action?: React.ReactNode }) {
