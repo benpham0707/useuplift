@@ -28,8 +28,6 @@ import {
   Settings,
   User,
   LogOut,
-  ChevronLeft,
-  ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -79,7 +77,7 @@ export function AppSidebar() {
   const location = useLocation();
   const { user, signOut } = useAuth();
   const [credits, setCredits] = useState<number | null>(null);
-  const { state, toggleSidebar } = useSidebar();
+  const { state } = useSidebar();
 
   // Load credits
   useEffect(() => {
@@ -92,9 +90,11 @@ export function AppSidebar() {
           .eq('user_id', user.id)
           .maybeSingle();
         if (error) throw error;
-        const value = Number((data as any)?.credits ?? 0);
+        const profile = data as { credits?: number | string | null } | null;
+        const value = Number(profile?.credits ?? 0);
         setCredits(Number.isFinite(value) ? value : 0);
       } catch (err) {
+        emitCreditsLoadFailure(err);
         setCredits(0);
       }
     };
@@ -119,28 +119,17 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar>
-      <SidebarHeader className="border-b border-sidebar-border p-4">
-        <div className="flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
+    <Sidebar collapsible="icon">
+      <SidebarHeader className="border-b border-sidebar-border p-3 group-data-[collapsible=icon]:p-2">
+        <div className={`flex h-10 items-center ${state === 'collapsed' ? 'justify-center' : 'justify-between'}`}>
+          {state === 'expanded' && <Link to="/" className="flex min-w-0 items-center gap-2">
             <img
               src="/uplift_logo_lr.png"
               alt="Uplift"
               className="h-8 w-auto object-contain"
             />
-          </Link>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleSidebar}
-            className="h-8 w-8"
-          >
-            {state === 'expanded' ? (
-              <ChevronLeft className="h-4 w-4" />
-            ) : (
-              <ChevronRight className="h-4 w-4" />
-            )}
-          </Button>
+          </Link>}
+          <SidebarTrigger className="h-9 w-9 shrink-0" />
         </div>
       </SidebarHeader>
 
@@ -180,45 +169,49 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border p-4">
+      <SidebarFooter className="border-t border-sidebar-border p-4 group-data-[collapsible=icon]:p-2">
         {/* Credits Display */}
         {user && (
-          <div className="mb-3">
+          <div className="mb-3 group-data-[collapsible=icon]:mb-2">
             <Button
               variant="outline"
               size="sm"
               asChild
-              className="w-full justify-start gap-2 border-primary/20 hover:bg-primary/10"
+              className="w-full justify-start gap-2 border-primary/20 hover:bg-primary/10 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0"
             >
               <Link to="/pricing">
                 <GradientZap className="h-4 w-4" />
-                <span>{credits ?? 0} Credits</span>
+                <span className="group-data-[collapsible=icon]:hidden">{credits ?? 0} Credits</span>
               </Link>
             </Button>
           </div>
         )}
 
-        <SidebarSeparator className="mb-3" />
+        <SidebarSeparator className="mb-3 group-data-[collapsible=icon]:mx-0 group-data-[collapsible=icon]:mb-2" />
 
         {/* User Info & Sign Out */}
         {user && (
           <div className="space-y-2">
-            <div className="flex items-center gap-2 px-2 py-1 text-sm text-sidebar-foreground/70">
+            <div className="flex items-center gap-2 px-2 py-1 text-sm text-sidebar-foreground/70 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
               <User className="h-4 w-4" />
-              <span className="truncate">{user.email}</span>
+              <span className="truncate group-data-[collapsible=icon]:hidden">{user.email}</span>
             </div>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => signOut()}
-              className="w-full justify-start gap-2 text-sidebar-foreground/70 hover:text-sidebar-foreground"
+              className="w-full justify-start gap-2 text-sidebar-foreground/70 hover:text-sidebar-foreground group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0"
             >
               <LogOut className="h-4 w-4" />
-              <span>Sign Out</span>
+              <span className="group-data-[collapsible=icon]:hidden">Sign Out</span>
             </Button>
           </div>
         )}
       </SidebarFooter>
     </Sidebar>
   );
+}
+
+function emitCreditsLoadFailure(error: unknown) {
+  console.warn('[AppSidebar] Could not load credits', error);
 }

@@ -8,6 +8,7 @@ export default defineConfig({
     include: [
       'tests/college-data/college-api.test.ts',
       'tests/college-data/college-format.test.ts',
+      'tests/college-data/program-area-parser.test.ts',
     ],
   },
 });
