@@ -142,13 +142,13 @@ export default function CollegesGallery() {
       </header>
 
       <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-4 sm:px-6 lg:px-8">
-        <div className="mx-auto grid max-w-[1600px] grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-[minmax(14rem,2fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1.2fr)_5rem] xl:items-center">
+        <div className="mx-auto grid max-w-[1600px] grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-[minmax(14rem,2fr)_repeat(4,minmax(0,1fr))_5rem] xl:items-center">
           <div className="relative col-span-2 min-w-0 sm:col-span-4 xl:col-span-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by college name" className="h-11 pl-10 pr-10" />
             {search && <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-slate-700" aria-label="Clear search"><X className="h-4 w-4" /></button>}
           </div>
-          <div className="col-span-2 grid grid-cols-2 gap-2 sm:col-span-4 sm:grid-cols-4 xl:contents">
+          <div className="col-span-2 grid grid-cols-2 gap-3 sm:col-span-4 sm:grid-cols-4 xl:contents">
             <MultiFilter values={selectedStates} onChange={setSelectedStates} label="States" placeholder="All states" selectedLabel="states" options={stateOptions} />
             <MultiFilter values={selectedSizes} onChange={setSelectedSizes} label="Sizes" placeholder="Any size" selectedLabel="sizes" options={sizeOptions} />
             <MultiFilter values={selectedCosts} onChange={setSelectedCosts} label="Average net prices" placeholder="Any net price" selectedLabel="prices" options={costOptions} />
@@ -227,7 +227,7 @@ function MultiFilter<T extends string>({ values, onChange, label, placeholder, s
 
   return <Popover>
     <PopoverTrigger asChild>
-      <Button variant="outline" className="h-11 min-w-0 justify-between px-3 font-normal" aria-label={`${label}: ${selectedText}`}>
+      <Button variant="outline" className="h-11 w-full min-w-0 justify-between px-3 font-normal" aria-label={`${label}: ${selectedText}`}>
         <span className="truncate">{selectedText}</span>
         <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-slate-400" />
       </Button>

@@ -1,4 +1,5 @@
 import express from 'express';
+import { readFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -93,6 +94,11 @@ describe('college API', () => {
 
   afterAll(async () => {
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  });
+
+  it('restarts the local API when server source changes', () => {
+    const packageJson = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
+    expect(packageJson.scripts.server).toContain('node --env-file-if-exists=.env.local --import tsx --watch src/http/server.ts');
   });
 
   it('rejects unauthenticated access', async () => {

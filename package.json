@@ -9,7 +9,7 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "server": "PORT=8789 tsx src/http/server.ts",
+    "server": "PORT=8789 node --env-file-if-exists=.env.local --import tsx --watch src/http/server.ts",
     "dev:full": "run-p server dev",
     "setup:local": "bash scripts/setup-local-dev.sh",
     "seed:colleges": "tsx scripts/seed-colleges.ts",
